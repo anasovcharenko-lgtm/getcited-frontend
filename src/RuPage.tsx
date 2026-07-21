@@ -99,6 +99,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
 
 export default function RuPage() {
   const [brand, setBrand] = useState("");
+const [competitorsInput, setCompetitorsInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [auditData, setAuditData] = useState<AuditData | null>(null);
@@ -112,8 +113,10 @@ export default function RuPage() {
       const res = await fetch(`${API_URL}/audit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brand: brand.trim(), competitors: [] }),
-      });
+        body: JSON.stringify({ 
+  brand: brand.trim(), 
+  competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean)
+}),
       const data = await res.json();
       setAuditData(data);
     } catch {
@@ -172,23 +175,29 @@ export default function RuPage() {
           </p>
         </Reveal>
         <Reveal>
-          <form onSubmit={startAudit} className="mx-auto mt-10 flex w-full max-w-xl flex-col gap-3 sm:flex-row">
-            <input
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              placeholder="Введите название вашего бренда"
-              className="h-12 flex-1 rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="h-12 rounded-md bg-[#5B4BFF] px-6 text-white hover:bg-[#4a3ae0] disabled:opacity-60 flex items-center gap-2 justify-center"
-            >
-              {loading ? "Запускаем аудит..." : <><span>Начать бесплатный аудит</span><ArrowRight className="h-4 w-4" /></>}
-            </button>
-          </form>
-          {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
-          <p className="mt-4 text-sm text-neutral-500">Бесплатно · без карты</p>
+          <form onSubmit={startAudit} className="mx-auto mt-10 flex w-full max-w-xl flex-col gap-3">
+  <input
+    value={brand}
+    onChange={(e) => setBrand(e.target.value)}
+    placeholder="Enter your brand name"
+    className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
+  />
+  <input
+    value={competitorsInput}
+    onChange={(e) => setCompetitorsInput(e.target.value)}
+    placeholder="Конкуренты (необязательно): Notion, Confluence, Coda"
+    className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
+  />
+  <button
+    type="submit"
+    disabled={loading}
+    className="h-12 rounded-md bg-[#5B4BFF] px-6 text-white hover:bg-[#4a3ae0] disabled:opacity-60 flex items-center gap-2 justify-center"
+  >
+    {loading ? "Running audit..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
+  </button>
+</form>
+{error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+<p className="mt-4 text-sm text-neutral-500">Free to start · no credit card</p>
         </Reveal>
       </section>
 
