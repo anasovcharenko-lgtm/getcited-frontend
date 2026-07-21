@@ -63,7 +63,6 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
           <div className="mt-4 text-8xl font-bold text-[#5B4BFF]">{data.visibility_score}%</div>
           <p className="mt-2 text-neutral-500">AI Visibility Score</p>
         </div>
-
         <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
           <h2 className="mb-4 text-xl font-bold">Prompt Results</h2>
           <div className="space-y-3">
@@ -78,7 +77,6 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
             ))}
           </div>
         </div>
-
         <div className="rounded-2xl border border-neutral-200 p-6">
           <h2 className="mb-4 text-xl font-bold">🎯 Recommendations</h2>
           <div className="space-y-4">
@@ -101,7 +99,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
 
 export default function App() {
   const [brand, setBrand] = useState("");
-const [competitorsInput, setCompetitorsInput] = useState("");
+  const [competitorsInput, setCompetitorsInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [auditData, setAuditData] = useState<AuditData | null>(null);
@@ -115,10 +113,11 @@ const [competitorsInput, setCompetitorsInput] = useState("");
       const res = await fetch(`${API_URL}/audit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-  brand: brand.trim(), 
-  competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean)
-}),
+        body: JSON.stringify({
+          brand: brand.trim(),
+          competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean)
+        }),
+      });
       const data = await res.json();
       setAuditData(data);
     } catch {
@@ -148,6 +147,11 @@ const [competitorsInput, setCompetitorsInput] = useState("");
             <a href="#blog" className="hover:text-neutral-900">Blog</a>
           </nav>
           <div className="flex items-center justify-end gap-2">
+            <div className="mr-2 hidden items-center gap-1 text-xs text-neutral-500 sm:flex">
+              <a href="/" className="font-semibold text-neutral-900">🇬🇧 EN</a>
+              <span className="text-neutral-300">|</span>
+              <a href="/ru" className="hover:text-neutral-900">🇷🇺 RU</a>
+            </div>
             <button className="hidden sm:inline-flex px-3 py-1.5 text-sm text-neutral-600 hover:text-neutral-900">Sign In</button>
             <button className="px-3 py-1.5 text-sm bg-[#5B4BFF] text-white rounded-md hover:bg-[#4a3ae0]">Start Free</button>
           </div>
@@ -173,28 +177,28 @@ const [competitorsInput, setCompetitorsInput] = useState("");
         </Reveal>
         <Reveal>
           <form onSubmit={startAudit} className="mx-auto mt-10 flex w-full max-w-xl flex-col gap-3">
-  <input
-    value={brand}
-    onChange={(e) => setBrand(e.target.value)}
-    placeholder="Enter your brand name"
-    className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
-  />
-  <input
-    value={competitorsInput}
-    onChange={(e) => setCompetitorsInput(e.target.value)}
-    placeholder="Competitors (optional): Notion, Confluence, Coda"
-    className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
-  />
-  <button
-    type="submit"
-    disabled={loading}
-    className="h-12 rounded-md bg-[#5B4BFF] px-6 text-white hover:bg-[#4a3ae0] disabled:opacity-60 flex items-center gap-2 justify-center"
-  >
-    {loading ? "Running audit..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
-  </button>
-</form>
-{error && <p className="mt-2 text-sm text-red-500">{error}</p>}
-<p className="mt-4 text-sm text-neutral-500">Free to start · no credit card</p
+            <input
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="Enter your brand name"
+              className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
+            />
+            <input
+              value={competitorsInput}
+              onChange={(e) => setCompetitorsInput(e.target.value)}
+              placeholder="Competitors (optional): Notion, Confluence, Coda"
+              className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="h-12 rounded-md bg-[#5B4BFF] px-6 text-white hover:bg-[#4a3ae0] disabled:opacity-60 flex items-center gap-2 justify-center"
+            >
+              {loading ? "Running audit..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
+            </button>
+          </form>
+          {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+          <p className="mt-4 text-sm text-neutral-500">Free to start · no credit card</p>
         </Reveal>
       </section>
 
