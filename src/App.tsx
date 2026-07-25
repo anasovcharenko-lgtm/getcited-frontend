@@ -31,13 +31,22 @@ function Reveal({ children, className = "" }: { children: React.ReactNode; class
 
 type AuditResult = {
   prompt: string;
-  brand_mentioned: boolean;
-  competitors_found: string[];
+  gemini: {
+    mentioned: boolean;
+    competitors_found: string[];
+  };
+  chatgpt: {
+    mentioned: boolean;
+    competitors_found: string[];
+  };
 };
 
 type AuditData = {
   brand: string;
   visibility_score: number;
+  gemini_score: number;
+  chatgpt_score: number;
+  total_prompts: number;
   results: AuditResult[];
   recommendations: string;
 };
@@ -58,25 +67,68 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
         </div>
       </header>
       <main className="mx-auto max-w-4xl px-6 py-12">
+
+        {/* Overall score */}
         <div className="mb-10 text-center">
           <h1 className="text-4xl font-bold">{data.brand}</h1>
           <div className="mt-4 text-8xl font-bold text-[#5B4BFF]">{data.visibility_score}%</div>
-          <p className="mt-2 text-neutral-500">AI Visibility Score</p>
+          <p className="mt-2 text-neutral-500">Overall AI Visibility Score</p>
         </div>
-        <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
-          <h2 className="mb-4 text-xl font-bold">Prompt Results</h2>
-          <div className="space-y-3">
-            {data.results.map((r, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border border-neutral-100 bg-neutral-50 px-4 py-3">
-                <span className="text-sm text-neutral-700">{r.prompt}</span>
-                {r.brand_mentioned
-                  ? <span className="flex items-center gap-1 text-emerald-600 text-sm"><Check className="h-4 w-4" /> Mentioned</span>
-                  : <span className="flex items-center gap-1 text-red-500 text-sm"><X className="h-4 w-4" /> Not mentioned</span>
-                }
-              </div>
-            ))}
+
+        {/* Per model scores */}
+        <div className="mb-10 grid grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-neutral-200 p-6 text-center">
+            <p className="text-sm text-neutral-500">Gemini</p>
+            <div className="mt-2 text-5xl font-bold text-[#5B4BFF]">
+              {Math.round(data.gemini_score / data.total_prompts * 100)}%
+            </div>
+            <p className="mt-1 text-xs text-neutral-400">{data.gemini_score}/{data.total_prompts} prompts</p>
+          </div>
+          <div className="rounded-2xl border border-neutral-200 p-6 text-center">
+            <p className="text-sm text-neutral-500">ChatGPT</p>
+            <div className="mt-2 text-5xl font-bold text-[#5B4BFF]">
+              {Math.round(data.chatgpt_score / data.total_prompts * 100)}%
+            </div>
+            <p className="mt-1 text-xs text-neutral-400">{data.chatgpt_score}/{data.total_prompts} prompts</p>
           </div>
         </div>
+
+        {/* Prompt results */}
+        <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
+          <h2 className="mb-4 text-xl font-bold">Prompt Results</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-neutral-100">
+                  <th className="pb-3 text-left font-medium text-neutral-500">Prompt</th>
+                  <th className="pb-3 text-center font-medium text-neutral-500">Gemini</th>
+                  <th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.results.map((r, i) => (
+                  <tr key={i} className="border-b border-neutral-50">
+                    <td className="py-3 pr-4 text-neutral-700">{r.prompt}</td>
+                    <td className="py-3 text-center">
+                      {r.gemini.mentioned
+                        ? <span className="text-emerald-600">✅</span>
+                        : <span className="text-red-500">❌</span>
+                      }
+                    </td>
+                    <td className="py-3 text-center">
+                      {r.chatgpt.mentioned
+                        ? <span className="text-emerald-600">✅</span>
+                        : <span className="text-red-500">❌</span>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Recommendations */}
         <div className="rounded-2xl border border-neutral-200 p-6">
           <h2 className="mb-4 text-xl font-bold">🎯 Recommendations</h2>
           <div className="space-y-4">
@@ -92,6 +144,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
             })}
           </div>
         </div>
+
       </main>
     </div>
   );
