@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, X } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
