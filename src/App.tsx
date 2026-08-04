@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, X } from "lucide-react";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -33,7 +33,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
             <span className="text-lg font-semibold tracking-tight">{BRAND}</span>
           </button>
-          <button onClick={onBack} className="text-sm text-neutral-500 hover:text-neutral-900">Back</button>
+          <button onClick={onBack} className="text-sm text-neutral-500 hover:text-neutral-900">← Back</button>
         </div>
       </header>
       <main className="mx-auto max-w-4xl px-6 py-12">
@@ -88,7 +88,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
           </table>
         </div>
         <div className="rounded-2xl border border-neutral-200 p-6">
-          <h2 className="mb-4 text-xl font-bold">Recommendations</h2>
+          <h2 className="mb-4 text-xl font-bold">🎯 Recommendations</h2>
           <div className="space-y-4">
             {recs.map((rec, i) => {
               const priority = rec.includes("High") ? "High" : rec.includes("Medium") ? "Medium" : "Low";
@@ -107,7 +107,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
   );
 }
 
-export default function App() {
+function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditComplete: (data: AuditData) => void }) {
   const [brand, setBrand] = useState("");
   const [competitorsInput, setCompetitorsInput] = useState("");
   const [description, setDescription] = useState("");
@@ -115,7 +115,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
-  const [auditData, setAuditData] = useState<AuditData | null>(null);
 
   useEffect(() => {
     if (!brand.trim() || brand.length < 3) { setShowDescription(false); return; }
@@ -139,16 +138,46 @@ export default function App() {
     try {
       const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean), description: description.trim() }) });
       const data = await res.json();
-      setAuditData(data);
+      onAuditComplete(data);
     } catch { setError("Something went wrong. Please try again."); }
     finally { setLoading(false); }
   };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+        <button onClick={onClose} className="absolute right-4 top-4 text-neutral-400 hover:text-neutral-600">
+          <X className="h-5 w-5" />
+        </button>
+        <h2 className="text-2xl font-bold tracking-tight">Audit your brand</h2>
+        <p className="mt-1 text-sm text-neutral-500">See how often AI recommends you vs competitors.</p>
+        <form onSubmit={startAudit} className="mt-6 flex flex-col gap-3">
+          <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Your brand name" className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]" />
+          {checking && <p className="text-xs text-neutral-400">Checking brand...</p>}
+          {showDescription && <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does your brand do? (e.g. CRM for small teams)" className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]" />}
+          <input value={competitorsInput} onChange={(e) => setCompetitorsInput(e.target.value)} placeholder="Competitors (optional): Notion, Confluence" className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]" />
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          <button type="submit" disabled={loading} className="h-12 rounded-md bg-[#5B4BFF] px-6 text-white hover:bg-[#4a3ae0] disabled:opacity-60 flex items-center gap-2 justify-center font-medium">
+            {loading ? "Running audit..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
+          </button>
+        </form>
+        <p className="mt-3 text-center text-xs text-neutral-400">Free to start · no credit card</p>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [showModal, setShowModal] = useState(false);
+  const [auditData, setAuditData] = useState<AuditData | null>(null);
 
   if (auditData) return <Dashboard data={auditData} onBack={() => setAuditData(null)} />;
 
   return (
     <div className="min-h-screen bg-white text-neutral-900">
       <style>{`:root{--brand:#5B4BFF;} @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
+      {showModal && <Modal onClose={() => setShowModal(false)} onAuditComplete={(data) => { setShowModal(false); setAuditData(data); }} />}
       <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/80 backdrop-blur">
         <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-6 py-4 md:grid-cols-3">
           <div className="flex items-center gap-2">
@@ -167,7 +196,7 @@ export default function App() {
               <a href="/ru" className="hover:text-neutral-900">RU</a>
             </div>
             <button className="hidden sm:inline-flex px-3 py-1.5 text-sm text-neutral-600 hover:text-neutral-900">Sign In</button>
-            <button className="px-3 py-1.5 text-sm bg-[#5B4BFF] text-white rounded-md hover:bg-[#4a3ae0]">Start Free</button>
+            <button onClick={() => setShowModal(true)} className="px-3 py-1.5 text-sm bg-[#5B4BFF] text-white rounded-md hover:bg-[#4a3ae0]">Start Free</button>
           </div>
         </div>
       </header>
@@ -181,17 +210,12 @@ export default function App() {
         <Reveal><h1 className="mx-auto mt-6 max-w-4xl text-5xl font-bold tracking-tight text-neutral-900 md:text-7xl">See how often AI recommends your brand</h1></Reveal>
         <Reveal><p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600 md:text-xl">Get actionable recommendations to outflank your competitors.</p></Reveal>
         <Reveal>
-          <form onSubmit={startAudit} className="mx-auto mt-10 flex w-full max-w-xl flex-col gap-3">
-            <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Enter your brand name" className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]" />
-            {checking && <p className="text-xs text-neutral-400">Checking brand...</p>}
-            {showDescription && <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does your brand do? (e.g. CRM for small teams, AI writing assistant)" className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]" />}
-            <input value={competitorsInput} onChange={(e) => setCompetitorsInput(e.target.value)} placeholder="Competitors (optional): Notion, Confluence, Coda" className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]" />
-            <button type="submit" disabled={loading} className="h-12 rounded-md bg-[#5B4BFF] px-6 text-white hover:bg-[#4a3ae0] disabled:opacity-60 flex items-center gap-2 justify-center">
-              {loading ? "Running audit..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
+          <div className="mt-10 flex flex-col items-center gap-4">
+            <button onClick={() => setShowModal(true)} className="h-12 rounded-md bg-[#5B4BFF] px-8 text-white hover:bg-[#4a3ae0] flex items-center gap-2 text-base font-medium">
+              Start Free Audit <ArrowRight className="h-4 w-4" />
             </button>
-          </form>
-          {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
-          <p className="mt-4 text-sm text-neutral-500">Free to start · no credit card</p>
+            <p className="text-sm text-neutral-500">Free to start · no credit card</p>
+          </div>
         </Reveal>
       </section>
       <section className="border-y border-neutral-100 bg-white py-8">
@@ -225,7 +249,7 @@ export default function App() {
               <ul className="mt-8 flex-1 space-y-3 text-sm">
                 {plan.features.map((f) => <li key={f} className="flex items-start gap-2"><Check className={`mt-0.5 h-4 w-4 shrink-0 ${plan.dark ? "text-[#5B4BFF]" : "text-neutral-900"}`} /><span>{f}</span></li>)}
               </ul>
-              <button className={`mt-8 h-11 rounded-xl font-medium ${plan.dark ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{plan.cta}</button>
+              <button onClick={() => setShowModal(true)} className={`mt-8 h-11 rounded-xl font-medium ${plan.dark ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{plan.cta}</button>
             </div>
           ))}
         </div>
