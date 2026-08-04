@@ -53,6 +53,7 @@ type CompetitorStat = {
 
 type AuditData = {
   brand: string;
+category: string;
   visibility_score: number;
   gemini_score: number;
   chatgpt_score: number;
@@ -80,11 +81,16 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
       <main className="mx-auto max-w-4xl px-6 py-12">
 
         {/* Overall score */}
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl font-bold">{data.brand}</h1>
-          <div className="mt-4 text-8xl font-bold text-[#5B4BFF]">{data.visibility_score}%</div>
-          <p className="mt-2 text-neutral-500">Overall AI Visibility Score</p>
-        </div>
+       <div className="mb-10 text-center">
+  <h1 className="text-4xl font-bold">{data.brand}</h1>
+  {data.category && (
+    <span className="mt-2 inline-block rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-500">
+      {data.category}
+    </span>
+  )}
+  <div className="mt-4 text-8xl font-bold text-[#5B4BFF]">{data.visibility_score}%</div>
+  <p className="mt-2 text-neutral-500">Overall AI Visibility Score</p>
+</div>
 
         {/* Per model scores */}
         <div className="mb-10 grid grid-cols-2 gap-4">
