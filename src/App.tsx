@@ -41,6 +41,16 @@ type AuditResult = {
   };
 };
 
+type CompetitorStat = {
+  name: string;
+  is_your_brand: boolean;
+  gemini_mentions: number;
+  chatgpt_mentions: number;
+  total_mentions: number;
+  mention_rate: number;
+  rank: number;
+};
+
 type AuditData = {
   brand: string;
   visibility_score: number;
@@ -48,6 +58,7 @@ type AuditData = {
   chatgpt_score: number;
   total_prompts: number;
   results: AuditResult[];
+  competitor_ranking: CompetitorStat[];
   recommendations: string;
 };
 
@@ -92,7 +103,35 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
             <p className="mt-1 text-xs text-neutral-400">{data.chatgpt_score}/{data.total_prompts} prompts</p>
           </div>
         </div>
-
+{/* Competitor Ranking */}
+<div className="mb-10 rounded-2xl border border-neutral-200 p-6">
+  <h2 className="mb-4 text-xl font-bold">Brand Ranking</h2>
+  <table className="w-full text-sm">
+    <thead>
+      <tr className="border-b border-neutral-100">
+        <th className="pb-3 text-left font-medium text-neutral-500">#</th>
+        <th className="pb-3 text-left font-medium text-neutral-500">Brand</th>
+        <th className="pb-3 text-center font-medium text-neutral-500">Gemini</th>
+        <th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th>
+        <th className="pb-3 text-center font-medium text-neutral-500">Mention Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      {data.competitor_ranking.map((stat) => (
+        <tr key={stat.name} className={`border-b border-neutral-50 ${stat.is_your_brand ? "bg-[#5B4BFF]/5" : ""}`}>
+          <td className="py-3 text-neutral-500">{stat.rank}</td>
+          <td className="py-3 font-medium">
+            {stat.name}
+            {stat.is_your_brand && <span className="ml-2 rounded-full bg-[#5B4BFF] px-2 py-0.5 text-xs text-white">You</span>}
+          </td>
+          <td className="py-3 text-center text-neutral-600">{stat.gemini_mentions}/{data.total_prompts}</td>
+          <td className="py-3 text-center text-neutral-600">{stat.chatgpt_mentions}/{data.total_prompts}</td>
+          <td className="py-3 text-center font-semibold">{stat.mention_rate}%</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
         {/* Prompt results */}
         <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
           <h2 className="mb-4 text-xl font-bold">Prompt Results</h2>
