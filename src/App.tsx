@@ -4,10 +4,7 @@ import { ArrowRight, Check } from "lucide-react";
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
 
-const AI_LOGOS = [
-  "ChatGPT", "Claude", "Gemini", "Perplexity",
-  "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok",
-];
+const AI_LOGOS = ["ChatGPT", "Claude", "Gemini", "Perplexity", "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok"];
 
 function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -15,149 +12,16 @@ function Reveal({ children, className = "" }: { children: React.ReactNode; class
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setShown(true); io.disconnect(); } },
-      { threshold: 0.15 },
-    );
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setShown(true); io.disconnect(); } }, { threshold: 0.15 });
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  return (
-    <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"} ${className}`}>
-      {children}
-    </div>
-  );
+  return <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"} ${className}`}>{children}</div>;
 }
 
-type AuditResult = {
-  prompt: string;
-  gemini: { mentioned: boolean; competitors_found: string[]; };
-  chatgpt: { mentioned: boolean; competitors_found: string[]; };
-};
-
-type CompetitorStat = {
-  name: string;
-  is_your_brand: boolean;
-  gemini_mentions: number;
-  chatgpt_mentions: number;
-  total_mentions: number;
-  mention_rate: number;
-  rank: number;
-};
-
-type AuditData = {
-  brand: string;
-cd ~/getcited-frontend
-cat > src/App.tsx << 'ENDOFFILE'
-import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check } from "lucide-react";
-
-const BRAND = "GetCited";
-const API_URL = "https://web-production-b2168.up.railway.app";
-
-const AI_LOGOS = [
-  "ChatGPT", "Claude", "Gemini", "Perplexity",
-  "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok",
-];
-
-function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setShown(true); io.disconnect(); } },
-      { threshold: 0.15 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"} ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-type AuditResult = {
-  prompt: string;
-  gemini: { mentioned: boolean; competitors_found: string[]; };
-  chatgpt: { mentioned: boolean; competitors_found: string[]; };
-};
-
-type CompetitorStat = {
-  name: string;
-  is_your_brand: boolean;
-  gemini_mentions: number;
-  chatgpt_mentions: number;
-  total_mentions: number;
-  mention_rate: number;
-  rank: number;
-};
-
-type AuditData = {
-  brand: string;
-cd ~/getcited-frontend
-cat > src/App.tsx << 'ENDOFFILE'
-import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check } from "lucide-react";
-
-const BRAND = "GetCited";
-const API_URL = "https://web-production-b2168.up.railway.app";
-
-const AI_LOGOS = [
-  "ChatGPT", "Claude", "Gemini", "Perplexity",
-  "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok",
-];
-
-function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setShown(true); io.disconnect(); } },
-      { threshold: 0.15 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"} ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-type AuditResult = {
-  prompt: string;
-  gemini: { mentioned: boolean; competitors_found: string[]; };
-  chatgpt: { mentioned: boolean; competitors_found: string[]; };
-};
-
-type CompetitorStat = {
-  name: string;
-  is_your_brand: boolean;
-  gemini_mentions: number;
-  chatgpt_mentions: number;
-  total_mentions: number;
-  mention_rate: number;
-  rank: number;
-};
-
-type AuditData = {
-  brand: string;
-  category: string;
-  visibility_score: number;
-  gemini_score: number;
-  chatgpt_score: number;
-  total_prompts: number;
-  results: AuditResult[];
-  competitor_ranking: CompetitorStat[];
-  recommendations: string;
-};
+type AuditResult = { prompt: string; gemini: { mentioned: boolean; competitors_found: string[]; }; chatgpt: { mentioned: boolean; competitors_found: string[]; }; };
+type CompetitorStat = { name: string; is_your_brand: boolean; gemini_mentions: number; chatgpt_mentions: number; total_mentions: number; mention_rate: number; rank: number; };
+type AuditData = { brand: string; category: string; visibility_score: number; gemini_score: number; chatgpt_score: number; total_prompts: number; results: AuditResult[]; competitor_ranking: CompetitorStat[]; recommendations: string; };
 
 function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
   const recs = data.recommendations.split("\n\n").filter(Boolean);
@@ -166,9 +30,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
       <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <button onClick={onBack} className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white">
-              <span className="text-sm font-bold">G</span>
-            </div>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
             <span className="text-lg font-semibold tracking-tight">{BRAND}</span>
           </button>
           <button onClick={onBack} className="text-sm text-neutral-500 hover:text-neutral-900">Back</button>
@@ -177,11 +39,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
       <main className="mx-auto max-w-4xl px-6 py-12">
         <div className="mb-10 text-center">
           <h1 className="text-4xl font-bold">{data.brand}</h1>
-          {data.category && (
-            <span className="mt-2 inline-block rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-500">
-              {data.category}
-            </span>
-          )}
+          {data.category && <span className="mt-2 inline-block rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-500">{data.category}</span>}
           <div className="mt-4 text-8xl font-bold text-[#5B4BFF]">{data.visibility_score}%</div>
           <p className="mt-2 text-neutral-500">Overall AI Visibility Score</p>
         </div>
@@ -200,23 +58,12 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
         <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
           <h2 className="mb-4 text-xl font-bold">Brand Ranking</h2>
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-neutral-100">
-                <th className="pb-3 text-left font-medium text-neutral-500">#</th>
-                <th className="pb-3 text-left font-medium text-neutral-500">Brand</th>
-                <th className="pb-3 text-center font-medium text-neutral-500">Gemini</th>
-                <th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th>
-                <th className="pb-3 text-center font-medium text-neutral-500">Mention Rate</th>
-              </tr>
-            </thead>
+            <thead><tr className="border-b border-neutral-100"><th className="pb-3 text-left font-medium text-neutral-500">#</th><th className="pb-3 text-left font-medium text-neutral-500">Brand</th><th className="pb-3 text-center font-medium text-neutral-500">Gemini</th><th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th><th className="pb-3 text-center font-medium text-neutral-500">Mention Rate</th></tr></thead>
             <tbody>
               {data.competitor_ranking.map((stat) => (
                 <tr key={stat.name} className={`border-b border-neutral-50 ${stat.is_your_brand ? "bg-[#5B4BFF]/5" : ""}`}>
                   <td className="py-3 text-neutral-500">{stat.rank}</td>
-                  <td className="py-3 font-medium">
-                    {stat.name}
-                    {stat.is_your_brand && <span className="ml-2 rounded-full bg-[#5B4BFF] px-2 py-0.5 text-xs text-white">You</span>}
-                  </td>
+                  <td className="py-3 font-medium">{stat.name}{stat.is_your_brand && <span className="ml-2 rounded-full bg-[#5B4BFF] px-2 py-0.5 text-xs text-white">You</span>}</td>
                   <td className="py-3 text-center text-neutral-600">{stat.gemini_mentions}/{data.total_prompts}</td>
                   <td className="py-3 text-center text-neutral-600">{stat.chatgpt_mentions}/{data.total_prompts}</td>
                   <td className="py-3 text-center font-semibold">{stat.mention_rate}%</td>
@@ -228,13 +75,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
         <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
           <h2 className="mb-4 text-xl font-bold">Prompt Results</h2>
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-neutral-100">
-                <th className="pb-3 text-left font-medium text-neutral-500">Prompt</th>
-                <th className="pb-3 text-center font-medium text-neutral-500">Gemini</th>
-                <th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th>
-              </tr>
-            </thead>
+            <thead><tr className="border-b border-neutral-100"><th className="pb-3 text-left font-medium text-neutral-500">Prompt</th><th className="pb-3 text-center font-medium text-neutral-500">Gemini</th><th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th></tr></thead>
             <tbody>
               {data.results.map((r, i) => (
                 <tr key={i} className="border-b border-neutral-50">
@@ -276,23 +117,19 @@ export default function App() {
   const [error, setError] = useState("");
   const [auditData, setAuditData] = useState<AuditData | null>(null);
 
-  const handleBrandBlur = async () => {
-    if (!brand.trim()) return;
-    setChecking(true);
-    try {
-      const res = await fetch(`${API_URL}/check-brand`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brand: brand.trim() }),
-      });
-      const data = await res.json();
-      setShowDescription(!data.known);
-    } catch {
-      setShowDescription(true);
-    } finally {
-      setChecking(false);
-    }
-  };
+  useEffect(() => {
+    if (!brand.trim() || brand.length < 3) { setShowDescription(false); return; }
+    const timer = setTimeout(async () => {
+      setChecking(true);
+      try {
+        const res = await fetch(`${API_URL}/check-brand`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim() }) });
+        const data = await res.json();
+        setShowDescription(!data.known);
+      } catch { setShowDescription(true); }
+      finally { setChecking(false); }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [brand]);
 
   const startAudit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,22 +137,11 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/audit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          brand: brand.trim(),
-          competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean),
-          description: description.trim(),
-        }),
-      });
+      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean), description: description.trim() }) });
       const data = await res.json();
       setAuditData(data);
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Something went wrong. Please try again."); }
+    finally { setLoading(false); }
   };
 
   if (auditData) return <Dashboard data={auditData} onBack={() => setAuditData(null)} />;
@@ -326,9 +152,7 @@ export default function App() {
       <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/80 backdrop-blur">
         <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-6 py-4 md:grid-cols-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white">
-              <span className="text-sm font-bold">G</span>
-            </div>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
             <span className="text-lg font-semibold tracking-tight">{BRAND}</span>
           </div>
           <nav className="hidden items-center justify-center gap-8 text-sm text-neutral-600 md:flex">
@@ -354,45 +178,15 @@ export default function App() {
             Now tracking ChatGPT, Claude, Gemini & YandexGPT
           </span>
         </Reveal>
-        <Reveal>
-          <h1 className="mx-auto mt-6 max-w-4xl text-5xl font-bold tracking-tight text-neutral-900 md:text-7xl">
-            See how often AI recommends your brand
-          </h1>
-        </Reveal>
-        <Reveal>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600 md:text-xl">
-            Get actionable recommendations to outflank your competitors.
-          </p>
-        </Reveal>
+        <Reveal><h1 className="mx-auto mt-6 max-w-4xl text-5xl font-bold tracking-tight text-neutral-900 md:text-7xl">See how often AI recommends your brand</h1></Reveal>
+        <Reveal><p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600 md:text-xl">Get actionable recommendations to outflank your competitors.</p></Reveal>
         <Reveal>
           <form onSubmit={startAudit} className="mx-auto mt-10 flex w-full max-w-xl flex-col gap-3">
-            <input
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              onBlur={handleBrandBlur}
-              placeholder="Enter your brand name"
-              className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
-            />
+            <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Enter your brand name" className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]" />
             {checking && <p className="text-xs text-neutral-400">Checking brand...</p>}
-            {showDescription && (
-              <input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What does your brand do? (e.g. CRM for small teams, AI writing assistant)"
-                className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
-              />
-            )}
-            <input
-              value={competitorsInput}
-              onChange={(e) => setCompetitorsInput(e.target.value)}
-              placeholder="Competitors (optional): Notion, Confluence, Coda"
-              className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="h-12 rounded-md bg-[#5B4BFF] px-6 text-white hover:bg-[#4a3ae0] disabled:opacity-60 flex items-center gap-2 justify-center"
-            >
+            {showDescription && <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does your brand do? (e.g. CRM for small teams, AI writing assistant)" className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]" />}
+            <input value={competitorsInput} onChange={(e) => setCompetitorsInput(e.target.value)} placeholder="Competitors (optional): Notion, Confluence, Coda" className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]" />
+            <button type="submit" disabled={loading} className="h-12 rounded-md bg-[#5B4BFF] px-6 text-white hover:bg-[#4a3ae0] disabled:opacity-60 flex items-center gap-2 justify-center">
               {loading ? "Running audit..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
             </button>
           </form>
@@ -404,9 +198,7 @@ export default function App() {
         <div className="mb-4 text-center text-xs uppercase tracking-widest text-neutral-400">Tracking visibility across</div>
         <div className="relative overflow-hidden">
           <div className="flex w-max animate-[marquee_30s_linear_infinite] gap-14 pr-14">
-            {[...AI_LOGOS, ...AI_LOGOS].map((logo, i) => (
-              <span key={i} className="whitespace-nowrap text-xl font-semibold tracking-tight text-neutral-400">{logo}</span>
-            ))}
+            {[...AI_LOGOS, ...AI_LOGOS].map((logo, i) => <span key={i} className="whitespace-nowrap text-xl font-semibold tracking-tight text-neutral-400">{logo}</span>)}
           </div>
         </div>
       </section>
@@ -431,16 +223,9 @@ export default function App() {
                 <span className={plan.dark ? "text-neutral-400" : "text-neutral-500"}>{plan.period}</span>
               </div>
               <ul className="mt-8 flex-1 space-y-3 text-sm">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <Check className={`mt-0.5 h-4 w-4 shrink-0 ${plan.dark ? "text-[#5B4BFF]" : "text-neutral-900"}`} />
-                    <span>{f}</span>
-                  </li>
-                ))}
+                {plan.features.map((f) => <li key={f} className="flex items-start gap-2"><Check className={`mt-0.5 h-4 w-4 shrink-0 ${plan.dark ? "text-[#5B4BFF]" : "text-neutral-900"}`} /><span>{f}</span></li>)}
               </ul>
-              <button className={`mt-8 h-11 rounded-xl font-medium ${plan.dark ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>
-                {plan.cta}
-              </button>
+              <button className={`mt-8 h-11 rounded-xl font-medium ${plan.dark ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{plan.cta}</button>
             </div>
           ))}
         </div>
@@ -449,9 +234,7 @@ export default function App() {
         <div className="mx-auto max-w-6xl px-6 py-12">
           <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white">
-                <span className="text-sm font-bold">G</span>
-              </div>
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
               <span className="text-lg font-semibold tracking-tight">{BRAND}</span>
             </div>
             <nav className="flex flex-wrap gap-6 text-sm text-neutral-600">
