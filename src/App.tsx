@@ -31,14 +31,8 @@ function Reveal({ children, className = "" }: { children: React.ReactNode; class
 
 type AuditResult = {
   prompt: string;
-  gemini: {
-    mentioned: boolean;
-    competitors_found: string[];
-  };
-  chatgpt: {
-    mentioned: boolean;
-    competitors_found: string[];
-  };
+  gemini: { mentioned: boolean; competitors_found: string[]; };
+  chatgpt: { mentioned: boolean; competitors_found: string[]; };
 };
 
 type CompetitorStat = {
@@ -53,7 +47,109 @@ type CompetitorStat = {
 
 type AuditData = {
   brand: string;
-category: string;
+cd ~/getcited-frontend
+cat > src/App.tsx << 'ENDOFFILE'
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Check } from "lucide-react";
+
+const BRAND = "GetCited";
+const API_URL = "https://web-production-b2168.up.railway.app";
+
+const AI_LOGOS = [
+  "ChatGPT", "Claude", "Gemini", "Perplexity",
+  "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok",
+];
+
+function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setShown(true); io.disconnect(); } },
+      { threshold: 0.15 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+type AuditResult = {
+  prompt: string;
+  gemini: { mentioned: boolean; competitors_found: string[]; };
+  chatgpt: { mentioned: boolean; competitors_found: string[]; };
+};
+
+type CompetitorStat = {
+  name: string;
+  is_your_brand: boolean;
+  gemini_mentions: number;
+  chatgpt_mentions: number;
+  total_mentions: number;
+  mention_rate: number;
+  rank: number;
+};
+
+type AuditData = {
+  brand: string;
+cd ~/getcited-frontend
+cat > src/App.tsx << 'ENDOFFILE'
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Check } from "lucide-react";
+
+const BRAND = "GetCited";
+const API_URL = "https://web-production-b2168.up.railway.app";
+
+const AI_LOGOS = [
+  "ChatGPT", "Claude", "Gemini", "Perplexity",
+  "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok",
+];
+
+function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setShown(true); io.disconnect(); } },
+      { threshold: 0.15 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+type AuditResult = {
+  prompt: string;
+  gemini: { mentioned: boolean; competitors_found: string[]; };
+  chatgpt: { mentioned: boolean; competitors_found: string[]; };
+};
+
+type CompetitorStat = {
+  name: string;
+  is_your_brand: boolean;
+  gemini_mentions: number;
+  chatgpt_mentions: number;
+  total_mentions: number;
+  mention_rate: number;
+  rank: number;
+};
+
+type AuditData = {
+  brand: string;
+  category: string;
   visibility_score: number;
   gemini_score: number;
   chatgpt_score: number;
@@ -75,107 +171,83 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
             </div>
             <span className="text-lg font-semibold tracking-tight">{BRAND}</span>
           </button>
-          <button onClick={onBack} className="text-sm text-neutral-500 hover:text-neutral-900">← Back</button>
+          <button onClick={onBack} className="text-sm text-neutral-500 hover:text-neutral-900">Back</button>
         </div>
       </header>
       <main className="mx-auto max-w-4xl px-6 py-12">
-
-        {/* Overall score */}
-       <div className="mb-10 text-center">
-  <h1 className="text-4xl font-bold">{data.brand}</h1>
-  {data.category && (
-    <span className="mt-2 inline-block rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-500">
-      {data.category}
-    </span>
-  )}
-  <div className="mt-4 text-8xl font-bold text-[#5B4BFF]">{data.visibility_score}%</div>
-  <p className="mt-2 text-neutral-500">Overall AI Visibility Score</p>
-</div>
-
-        {/* Per model scores */}
+        <div className="mb-10 text-center">
+          <h1 className="text-4xl font-bold">{data.brand}</h1>
+          {data.category && (
+            <span className="mt-2 inline-block rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-500">
+              {data.category}
+            </span>
+          )}
+          <div className="mt-4 text-8xl font-bold text-[#5B4BFF]">{data.visibility_score}%</div>
+          <p className="mt-2 text-neutral-500">Overall AI Visibility Score</p>
+        </div>
         <div className="mb-10 grid grid-cols-2 gap-4">
           <div className="rounded-2xl border border-neutral-200 p-6 text-center">
             <p className="text-sm text-neutral-500">Gemini</p>
-            <div className="mt-2 text-5xl font-bold text-[#5B4BFF]">
-              {Math.round(data.gemini_score / data.total_prompts * 100)}%
-            </div>
+            <div className="mt-2 text-5xl font-bold text-[#5B4BFF]">{Math.round(data.gemini_score / data.total_prompts * 100)}%</div>
             <p className="mt-1 text-xs text-neutral-400">{data.gemini_score}/{data.total_prompts} prompts</p>
           </div>
           <div className="rounded-2xl border border-neutral-200 p-6 text-center">
             <p className="text-sm text-neutral-500">ChatGPT</p>
-            <div className="mt-2 text-5xl font-bold text-[#5B4BFF]">
-              {Math.round(data.chatgpt_score / data.total_prompts * 100)}%
-            </div>
+            <div className="mt-2 text-5xl font-bold text-[#5B4BFF]">{Math.round(data.chatgpt_score / data.total_prompts * 100)}%</div>
             <p className="mt-1 text-xs text-neutral-400">{data.chatgpt_score}/{data.total_prompts} prompts</p>
           </div>
         </div>
-{/* Competitor Ranking */}
-<div className="mb-10 rounded-2xl border border-neutral-200 p-6">
-  <h2 className="mb-4 text-xl font-bold">Brand Ranking</h2>
-  <table className="w-full text-sm">
-    <thead>
-      <tr className="border-b border-neutral-100">
-        <th className="pb-3 text-left font-medium text-neutral-500">#</th>
-        <th className="pb-3 text-left font-medium text-neutral-500">Brand</th>
-        <th className="pb-3 text-center font-medium text-neutral-500">Gemini</th>
-        <th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th>
-        <th className="pb-3 text-center font-medium text-neutral-500">Mention Rate</th>
-      </tr>
-    </thead>
-    <tbody>
-      {data.competitor_ranking.map((stat) => (
-        <tr key={stat.name} className={`border-b border-neutral-50 ${stat.is_your_brand ? "bg-[#5B4BFF]/5" : ""}`}>
-          <td className="py-3 text-neutral-500">{stat.rank}</td>
-          <td className="py-3 font-medium">
-            {stat.name}
-            {stat.is_your_brand && <span className="ml-2 rounded-full bg-[#5B4BFF] px-2 py-0.5 text-xs text-white">You</span>}
-          </td>
-          <td className="py-3 text-center text-neutral-600">{stat.gemini_mentions}/{data.total_prompts}</td>
-          <td className="py-3 text-center text-neutral-600">{stat.chatgpt_mentions}/{data.total_prompts}</td>
-          <td className="py-3 text-center font-semibold">{stat.mention_rate}%</td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
-        {/* Prompt results */}
+        <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
+          <h2 className="mb-4 text-xl font-bold">Brand Ranking</h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-100">
+                <th className="pb-3 text-left font-medium text-neutral-500">#</th>
+                <th className="pb-3 text-left font-medium text-neutral-500">Brand</th>
+                <th className="pb-3 text-center font-medium text-neutral-500">Gemini</th>
+                <th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th>
+                <th className="pb-3 text-center font-medium text-neutral-500">Mention Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.competitor_ranking.map((stat) => (
+                <tr key={stat.name} className={`border-b border-neutral-50 ${stat.is_your_brand ? "bg-[#5B4BFF]/5" : ""}`}>
+                  <td className="py-3 text-neutral-500">{stat.rank}</td>
+                  <td className="py-3 font-medium">
+                    {stat.name}
+                    {stat.is_your_brand && <span className="ml-2 rounded-full bg-[#5B4BFF] px-2 py-0.5 text-xs text-white">You</span>}
+                  </td>
+                  <td className="py-3 text-center text-neutral-600">{stat.gemini_mentions}/{data.total_prompts}</td>
+                  <td className="py-3 text-center text-neutral-600">{stat.chatgpt_mentions}/{data.total_prompts}</td>
+                  <td className="py-3 text-center font-semibold">{stat.mention_rate}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
           <h2 className="mb-4 text-xl font-bold">Prompt Results</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-neutral-100">
-                  <th className="pb-3 text-left font-medium text-neutral-500">Prompt</th>
-                  <th className="pb-3 text-center font-medium text-neutral-500">Gemini</th>
-                  <th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-100">
+                <th className="pb-3 text-left font-medium text-neutral-500">Prompt</th>
+                <th className="pb-3 text-center font-medium text-neutral-500">Gemini</th>
+                <th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.results.map((r, i) => (
+                <tr key={i} className="border-b border-neutral-50">
+                  <td className="py-3 pr-4 text-neutral-700">{r.prompt}</td>
+                  <td className="py-3 text-center">{r.gemini.mentioned ? "✅" : "❌"}</td>
+                  <td className="py-3 text-center">{r.chatgpt.mentioned ? "✅" : "❌"}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {data.results.map((r, i) => (
-                  <tr key={i} className="border-b border-neutral-50">
-                    <td className="py-3 pr-4 text-neutral-700">{r.prompt}</td>
-                    <td className="py-3 text-center">
-                      {r.gemini.mentioned
-                        ? <span className="text-emerald-600">✅</span>
-                        : <span className="text-red-500">❌</span>
-                      }
-                    </td>
-                    <td className="py-3 text-center">
-                      {r.chatgpt.mentioned
-                        ? <span className="text-emerald-600">✅</span>
-                        : <span className="text-red-500">❌</span>
-                      }
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
-
-        {/* Recommendations */}
         <div className="rounded-2xl border border-neutral-200 p-6">
-          <h2 className="mb-4 text-xl font-bold">🎯 Recommendations</h2>
+          <h2 className="mb-4 text-xl font-bold">Recommendations</h2>
           <div className="space-y-4">
             {recs.map((rec, i) => {
               const priority = rec.includes("High") ? "High" : rec.includes("Medium") ? "Medium" : "Low";
@@ -183,13 +255,12 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
               return (
                 <div key={i} className="rounded-xl border border-neutral-100 bg-neutral-50 p-4">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>Priority: {priority}</span>
-                  <p className="mt-2 text-sm text-neutral-800 whitespace-pre-wrap">{rec.replace(/PRIORITY:.*\n/, "").replace(/WHY IT WORKS.*\n?/g, "").trim()}</p>
+                  <p className="mt-2 text-sm text-neutral-800 whitespace-pre-wrap">{rec.replace(/PRIORITY:.*\n/, "").trim()}</p>
                 </div>
               );
             })}
           </div>
         </div>
-
       </main>
     </div>
   );
@@ -198,9 +269,30 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
 export default function App() {
   const [brand, setBrand] = useState("");
   const [competitorsInput, setCompetitorsInput] = useState("");
+  const [description, setDescription] = useState("");
+  const [showDescription, setShowDescription] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
   const [auditData, setAuditData] = useState<AuditData | null>(null);
+
+  const handleBrandBlur = async () => {
+    if (!brand.trim()) return;
+    setChecking(true);
+    try {
+      const res = await fetch(`${API_URL}/check-brand`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand: brand.trim() }),
+      });
+      const data = await res.json();
+      setShowDescription(!data.known);
+    } catch {
+      setShowDescription(true);
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const startAudit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,7 +305,8 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brand: brand.trim(),
-          competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean)
+          competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean),
+          description: description.trim(),
         }),
       });
       const data = await res.json();
@@ -230,7 +323,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white text-neutral-900">
       <style>{`:root{--brand:#5B4BFF;} @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
-
       <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/80 backdrop-blur">
         <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-6 py-4 md:grid-cols-3">
           <div className="flex items-center gap-2">
@@ -246,16 +338,15 @@ export default function App() {
           </nav>
           <div className="flex items-center justify-end gap-2">
             <div className="mr-2 hidden items-center gap-1 text-xs text-neutral-500 sm:flex">
-              <a href="/" className="font-semibold text-neutral-900">🇬🇧 EN</a>
+              <a href="/" className="font-semibold text-neutral-900">EN</a>
               <span className="text-neutral-300">|</span>
-              <a href="/ru" className="hover:text-neutral-900">🇷🇺 RU</a>
+              <a href="/ru" className="hover:text-neutral-900">RU</a>
             </div>
             <button className="hidden sm:inline-flex px-3 py-1.5 text-sm text-neutral-600 hover:text-neutral-900">Sign In</button>
             <button className="px-3 py-1.5 text-sm bg-[#5B4BFF] text-white rounded-md hover:bg-[#4a3ae0]">Start Free</button>
           </div>
         </div>
       </header>
-
       <section className="mx-auto max-w-5xl px-6 pt-20 pb-16 text-center md:pt-28">
         <Reveal>
           <span className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-600">
@@ -278,9 +369,19 @@ export default function App() {
             <input
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
+              onBlur={handleBrandBlur}
               placeholder="Enter your brand name"
               className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
             />
+            {checking && <p className="text-xs text-neutral-400">Checking brand...</p>}
+            {showDescription && (
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What does your brand do? (e.g. CRM for small teams, AI writing assistant)"
+                className="h-12 w-full rounded-md border border-neutral-200 bg-white px-4 text-base outline-none focus:border-[#5B4BFF]"
+              />
+            )}
             <input
               value={competitorsInput}
               onChange={(e) => setCompetitorsInput(e.target.value)}
@@ -299,7 +400,6 @@ export default function App() {
           <p className="mt-4 text-sm text-neutral-500">Free to start · no credit card</p>
         </Reveal>
       </section>
-
       <section className="border-y border-neutral-100 bg-white py-8">
         <div className="mb-4 text-center text-xs uppercase tracking-widest text-neutral-400">Tracking visibility across</div>
         <div className="relative overflow-hidden">
@@ -310,12 +410,11 @@ export default function App() {
           </div>
         </div>
       </section>
-
       <section id="pricing" className="mx-auto max-w-6xl px-6 py-24 md:py-32">
         <Reveal>
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-4xl font-bold tracking-tight md:text-5xl">Simple pricing</h2>
-            <p className="mt-4 text-lg text-neutral-600">Start free. Upgrade when you're ready.</p>
+            <p className="mt-4 text-lg text-neutral-600">Start free. Upgrade when you are ready.</p>
           </div>
         </Reveal>
         <div className="mt-16 grid gap-6 md:grid-cols-3">
@@ -346,7 +445,6 @@ export default function App() {
           ))}
         </div>
       </section>
-
       <footer className="border-t border-neutral-100 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-12">
           <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
@@ -364,7 +462,7 @@ export default function App() {
           </div>
           <div className="mt-8 flex flex-col items-start justify-between gap-2 border-t border-neutral-100 pt-6 text-sm text-neutral-500 md:flex-row md:items-center">
             <span>Free to start · no credit card · set up in minutes</span>
-            <span>© 2026 {BRAND}</span>
+            <span>2026 {BRAND}</span>
           </div>
         </div>
       </footer>
