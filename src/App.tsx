@@ -150,22 +150,6 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
           </div>
         )}
 
-        {/* Section 4: All Prompts */}
-        {showAllPrompts && (
-          <div className="mb-8 rounded-2xl border border-neutral-200 p-6">
-            <h2 className="mb-4 text-lg font-bold">All Prompts</h2>
-            <table className="w-full text-sm">
-              <thead><tr className="border-b border-neutral-100"><th className="pb-2 text-left text-xs font-medium text-neutral-400">#</th><th className="pb-2 text-left text-xs font-medium text-neutral-400">Prompt</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">Gemini</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">ChatGPT</th></tr></thead>
-              <tbody>
-                {visiblePrompts.map((r, i) => (
-                  <tr key={i} className="border-b border-neutral-50">
-                    <td className="py-2 text-xs text-neutral-400">{i + 1}</td>
-                    <td className="py-2 pr-4 text-xs text-neutral-700">{r.prompt}</td>
-                    <td className="py-2 text-center text-xs">{r.gemini.mentioned ? <span className="text-emerald-600 font-medium">1</span> : <span className="text-neutral-400">0</span>}</td>
-                    <td className="py-2 text-center text-xs">{r.chatgpt.mentioned ? <span className="text-emerald-600 font-medium">1</span> : <span className="text-neutral-400">0</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
             </table>
           </div>
         )}
