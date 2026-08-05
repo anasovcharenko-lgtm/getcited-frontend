@@ -284,7 +284,7 @@ export default function App() {
         </Reveal>
         <Reveal>
           <h1 className="mt-4 max-w-3xl text-balance text-5xl font-bold leading-tight tracking-tight md:text-6xl">
-            Win more clients.<br />Get cited by AI.
+            Win more clients.<br />Get <span style="color:#FF4D00">cited</span> by AI.
           </h1>
         </Reveal>
         <Reveal>
@@ -408,7 +408,7 @@ export default function App() {
               <ul className="mt-6 flex-1 space-y-2">
                 {plan.features.map((f) => <li key={f} className="flex items-center gap-2 text-sm"><Check className={`h-4 w-4 shrink-0 ${"highlight" in plan && plan.highlight ? "text-white" : "text-neutral-900"}`} />{f}</li>)}
               </ul>
-              <button onClick={() => setShowModal(true)} className={`mt-6 rounded-lg py-2.5 text-sm font-medium ${"highlight" in plan && plan.highlight ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-[#FF4D00] text-white hover:bg-[#e04400]"}`}>{plan.cta}</button>
+              <button onClick={() => setShowModal(true)} className={`mt-6 rounded-lg py-2.5 text-sm font-medium ${"highlight" in plan && plan.highlight ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{plan.cta}</button>
             </div>
           ))}
         </div>
