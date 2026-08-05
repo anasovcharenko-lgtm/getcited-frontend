@@ -3,7 +3,6 @@ import { ArrowRight, Check, X } from "lucide-react";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
-
 const AI_LOGOS = ["ChatGPT", "Claude", "Gemini", "Perplexity", "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok"];
 
 function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -21,10 +20,23 @@ function Reveal({ children, className = "" }: { children: React.ReactNode; class
 
 type AuditResult = { prompt: string; gemini: { mentioned: boolean; competitors_found: string[]; }; chatgpt: { mentioned: boolean; competitors_found: string[]; }; };
 type CompetitorStat = { name: string; is_your_brand: boolean; gemini_mentions: number; chatgpt_mentions: number; total_mentions: number; mention_rate: number; rank: number; };
-type AuditData = { brand: string; category: string; visibility_score: number; gemini_score: number; chatgpt_score: number; total_prompts: number; results: AuditResult[]; competitor_ranking: CompetitorStat[]; recommendations: string; };
+type Citation = { url: string; domain: string; gemini_count: number; chatgpt_count: number; total: number; };
+type AuditData = { brand: string; category: string; visibility_score: number; gemini_score: number; chatgpt_score: number; total_prompts: number; results: AuditResult[]; competitor_ranking: CompetitorStat[]; citations: Citation[]; recommendations: string; };
 
 function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
+  const [showAllPrompts, setShowAllPrompts] = useState(false);
+  const [showAllCitations, setShowAllCitations] = useState(false);
   const recs = data.recommendations.split("\n\n").filter(Boolean);
+
+  const sortedPrompts = [...data.results].sort((a, b) => {
+    const aTotal = (a.gemini.mentioned ? 1 : 0) + (a.chatgpt.mentioned ? 1 : 0);
+    const bTotal = (b.gemini.mentioned ? 1 : 0) + (b.chatgpt.mentioned ? 1 : 0);
+    return bTotal - aTotal;
+  });
+
+  const visiblePrompts = showAllPrompts ? sortedPrompts : sortedPrompts.slice(0, 10);
+  const visibleCitations = showAllCitations ? data.citations : data.citations.slice(0, 10);
+
   return (
     <div className="min-h-screen bg-white text-neutral-900">
       <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/80 backdrop-blur">
@@ -36,59 +48,131 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
           <button onClick={onBack} className="text-sm text-neutral-500 hover:text-neutral-900">← Back</button>
         </div>
       </header>
-      <main className="mx-auto max-w-4xl px-6 py-12">
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl font-bold">{data.brand}</h1>
-          {data.category && <span className="mt-2 inline-block rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-500">{data.category}</span>}
-          <div className="mt-4 text-8xl font-bold text-[#5B4BFF]">{data.visibility_score}%</div>
-          <p className="mt-2 text-neutral-500">Overall AI Visibility Score</p>
-        </div>
-        <div className="mb-10 grid grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-neutral-200 p-6 text-center">
-            <p className="text-sm text-neutral-500">Gemini</p>
-            <div className="mt-2 text-5xl font-bold text-[#5B4BFF]">{Math.round(data.gemini_score / data.total_prompts * 100)}%</div>
-            <p className="mt-1 text-xs text-neutral-400">{data.gemini_score}/{data.total_prompts} prompts</p>
+
+      <main className="mx-auto max-w-5xl px-6 py-12">
+
+        {/* Section 1: Visibility Score */}
+        <div className="mb-8 rounded-2xl border border-neutral-200 p-8">
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">{data.brand}</h1>
+              {data.category && <span className="mt-1 inline-block rounded-full border border-neutral-200 bg-neutral-50 px-3 py-0.5 text-xs text-neutral-500">{data.category}</span>}
+            </div>
+            <div className="text-right">
+              <div className="text-7xl font-bold text-[#5B4BFF]">{data.visibility_score}%</div>
+              <p className="text-sm text-neutral-500">Overall AI Visibility Score</p>
+            </div>
           </div>
-          <div className="rounded-2xl border border-neutral-200 p-6 text-center">
-            <p className="text-sm text-neutral-500">ChatGPT</p>
-            <div className="mt-2 text-5xl font-bold text-[#5B4BFF]">{Math.round(data.chatgpt_score / data.total_prompts * 100)}%</div>
-            <p className="mt-1 text-xs text-neutral-400">{data.chatgpt_score}/{data.total_prompts} prompts</p>
+          <div className="mt-6 grid grid-cols-2 gap-4">
+            <div className="rounded-xl bg-neutral-50 p-4">
+              <p className="text-xs text-neutral-500 uppercase tracking-wider">Gemini</p>
+              <div className="mt-1 text-3xl font-bold text-[#5B4BFF]">{Math.round(data.gemini_score / data.total_prompts * 100)}%</div>
+              <p className="text-xs text-neutral-400">{data.gemini_score}/{data.total_prompts} prompts</p>
+            </div>
+            <div className="rounded-xl bg-neutral-50 p-4">
+              <p className="text-xs text-neutral-500 uppercase tracking-wider">ChatGPT</p>
+              <div className="mt-1 text-3xl font-bold text-[#5B4BFF]">{Math.round(data.chatgpt_score / data.total_prompts * 100)}%</div>
+              <p className="text-xs text-neutral-400">{data.chatgpt_score}/{data.total_prompts} prompts</p>
+            </div>
           </div>
         </div>
-        <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
-          <h2 className="mb-4 text-xl font-bold">Brand Ranking</h2>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-neutral-100"><th className="pb-3 text-left font-medium text-neutral-500">#</th><th className="pb-3 text-left font-medium text-neutral-500">Brand</th><th className="pb-3 text-center font-medium text-neutral-500">Gemini</th><th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th><th className="pb-3 text-center font-medium text-neutral-500">Mention Rate</th></tr></thead>
-            <tbody>
-              {data.competitor_ranking.map((stat) => (
-                <tr key={stat.name} className={`border-b border-neutral-50 ${stat.is_your_brand ? "bg-[#5B4BFF]/5" : ""}`}>
-                  <td className="py-3 text-neutral-500">{stat.rank}</td>
-                  <td className="py-3 font-medium">{stat.name}{stat.is_your_brand && <span className="ml-2 rounded-full bg-[#5B4BFF] px-2 py-0.5 text-xs text-white">You</span>}</td>
-                  <td className="py-3 text-center text-neutral-600">{stat.gemini_mentions}/{data.total_prompts}</td>
-                  <td className="py-3 text-center text-neutral-600">{stat.chatgpt_mentions}/{data.total_prompts}</td>
-                  <td className="py-3 text-center font-semibold">{stat.mention_rate}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {/* Section 2: Brand Ranking + Top Prompts */}
+        <div className="mb-8 grid grid-cols-2 gap-6">
+          <div className="rounded-2xl border border-neutral-200 p-6">
+            <h2 className="mb-4 text-lg font-bold">Brand Ranking</h2>
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-neutral-100"><th className="pb-2 text-left text-xs font-medium text-neutral-400">#</th><th className="pb-2 text-left text-xs font-medium text-neutral-400">Brand</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">Gemini</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">ChatGPT</th><th className="pb-2 text-right text-xs font-medium text-neutral-400">Rate</th></tr></thead>
+              <tbody>
+                {data.competitor_ranking.map((stat) => (
+                  <tr key={stat.name} className={`border-b border-neutral-50 ${stat.is_your_brand ? "bg-[#5B4BFF]/5" : ""}`}>
+                    <td className="py-2 text-xs text-neutral-400">{stat.rank}</td>
+                    <td className="py-2 text-xs font-medium">{stat.name}{stat.is_your_brand && <span className="ml-1 rounded-full bg-[#5B4BFF] px-1.5 py-0.5 text-[10px] text-white">You</span>}</td>
+                    <td className="py-2 text-center text-xs text-neutral-600">{stat.gemini_mentions}</td>
+                    <td className="py-2 text-center text-xs text-neutral-600">{stat.chatgpt_mentions}</td>
+                    <td className="py-2 text-right text-xs font-semibold">{stat.mention_rate}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 p-6">
+            <h2 className="mb-4 text-lg font-bold">Top Prompts by Brand Mentions</h2>
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-neutral-100"><th className="pb-2 text-left text-xs font-medium text-neutral-400">Rank</th><th className="pb-2 text-left text-xs font-medium text-neutral-400">Prompt</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">G</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">GPT</th></tr></thead>
+              <tbody>
+                {sortedPrompts.slice(0, 5).map((r, i) => (
+                  <tr key={i} className="border-b border-neutral-50">
+                    <td className="py-2 text-xs text-neutral-400">{i + 1}</td>
+                    <td className="py-2 pr-2 text-xs text-neutral-700 max-w-[180px] truncate">{r.prompt}</td>
+                    <td className="py-2 text-center text-xs">{r.gemini.mentioned ? <span className="text-emerald-600 font-medium">1</span> : <span className="text-neutral-400">0</span>}</td>
+                    <td className="py-2 text-center text-xs">{r.chatgpt.mentioned ? <span className="text-emerald-600 font-medium">1</span> : <span className="text-neutral-400">0</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button onClick={() => setShowAllPrompts(!showAllPrompts)} className="mt-3 text-xs text-[#5B4BFF] hover:underline">View full report →</button>
+          </div>
         </div>
-        <div className="mb-10 rounded-2xl border border-neutral-200 p-6">
-          <h2 className="mb-4 text-xl font-bold">Prompt Results</h2>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-neutral-100"><th className="pb-3 text-left font-medium text-neutral-500">Prompt</th><th className="pb-3 text-center font-medium text-neutral-500">Gemini</th><th className="pb-3 text-center font-medium text-neutral-500">ChatGPT</th></tr></thead>
-            <tbody>
-              {data.results.map((r, i) => (
-                <tr key={i} className="border-b border-neutral-50">
-                  <td className="py-3 pr-4 text-neutral-700">{r.prompt}</td>
-                  <td className="py-3 text-center">{r.gemini.mentioned ? "✅" : "❌"}</td>
-                  <td className="py-3 text-center">{r.chatgpt.mentioned ? "✅" : "❌"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+        {/* Section 3: Citations */}
+        {data.citations && data.citations.length > 0 && (
+          <div className="mb-8 rounded-2xl border border-neutral-200 p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Citations</h2>
+                <p className="text-xs text-neutral-500">See which URLs are most frequently referenced by AI</p>
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-neutral-100"><th className="pb-2 text-left text-xs font-medium text-neutral-400">Rank</th><th className="pb-2 text-left text-xs font-medium text-neutral-400">URL</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">Gemini</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">ChatGPT</th><th className="pb-2 text-right text-xs font-medium text-neutral-400">Total</th></tr></thead>
+              <tbody>
+                {visibleCitations.map((c, i) => (
+                  <tr key={i} className="border-b border-neutral-50">
+                    <td className="py-2 text-xs text-neutral-400">{i + 1}</td>
+                    <td className="py-2 pr-4 text-xs">
+                      <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-[#5B4BFF] hover:underline truncate block max-w-[400px]">{c.url}</a>
+                      <span className="text-neutral-400">{c.domain}</span>
+                    </td>
+                    <td className="py-2 text-center text-xs text-neutral-600">{c.gemini_count}</td>
+                    <td className="py-2 text-center text-xs text-neutral-600">{c.chatgpt_count}</td>
+                    <td className="py-2 text-right text-xs font-semibold">{c.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {data.citations.length > 10 && (
+              <button onClick={() => setShowAllCitations(!showAllCitations)} className="mt-3 text-xs text-[#5B4BFF] hover:underline">
+                {showAllCitations ? "Show less" : `View all ${data.citations.length} citations →`}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Section 4: All Prompts */}
+        {showAllPrompts && (
+          <div className="mb-8 rounded-2xl border border-neutral-200 p-6">
+            <h2 className="mb-4 text-lg font-bold">All Prompts</h2>
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-neutral-100"><th className="pb-2 text-left text-xs font-medium text-neutral-400">#</th><th className="pb-2 text-left text-xs font-medium text-neutral-400">Prompt</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">Gemini</th><th className="pb-2 text-center text-xs font-medium text-neutral-400">ChatGPT</th></tr></thead>
+              <tbody>
+                {visiblePrompts.map((r, i) => (
+                  <tr key={i} className="border-b border-neutral-50">
+                    <td className="py-2 text-xs text-neutral-400">{i + 1}</td>
+                    <td className="py-2 pr-4 text-xs text-neutral-700">{r.prompt}</td>
+                    <td className="py-2 text-center text-xs">{r.gemini.mentioned ? <span className="text-emerald-600 font-medium">1</span> : <span className="text-neutral-400">0</span>}</td>
+                    <td className="py-2 text-center text-xs">{r.chatgpt.mentioned ? <span className="text-emerald-600 font-medium">1</span> : <span className="text-neutral-400">0</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Section 5: Recommendations */}
         <div className="rounded-2xl border border-neutral-200 p-6">
-          <h2 className="mb-4 text-xl font-bold">🎯 Recommendations</h2>
+          <h2 className="mb-4 text-lg font-bold">🎯 Recommendations</h2>
           <div className="space-y-4">
             {recs.map((rec, i) => {
               const priority = rec.includes("High") ? "High" : rec.includes("Medium") ? "Medium" : "Low";
@@ -102,6 +186,7 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
             })}
           </div>
         </div>
+
       </main>
     </div>
   );
@@ -147,9 +232,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-        <button onClick={onClose} className="absolute right-4 top-4 text-neutral-400 hover:text-neutral-600">
-          <X className="h-5 w-5" />
-        </button>
+        <button onClick={onClose} className="absolute right-4 top-4 text-neutral-400 hover:text-neutral-600"><X className="h-5 w-5" /></button>
         <h2 className="text-2xl font-bold tracking-tight">Audit your brand</h2>
         <p className="mt-1 text-sm text-neutral-500">See how often AI recommends you vs competitors.</p>
         <form onSubmit={startAudit} className="mt-6 flex flex-col gap-3">
