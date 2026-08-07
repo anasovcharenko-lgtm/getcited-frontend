@@ -326,7 +326,7 @@ export default function App() {
       </header>
 
       {/* Hero */}
-      <section className="relative mx-auto max-w-5xl px-6 pb-20 pt-24 md:pt-32"><svg id="herosvg" className="absolute inset-0 h-full w-full overflow-visible pointer-events-none" viewBox="0 0 1200 500" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"></svg><script dangerouslySetInnerHTML={{__html: `(function(){var s=document.getElementById('herosvg');var colors=[['#D4D4D4',1,0.4],['#A3A3A3',1,0.35],['#E5E5E5',1.2,0.3],['#737373',0.8,0.25],['#22C55E',1.5,0.5],['#16A34A',2,0.75]];colors.forEach(function(c,ci){var p=document.createElementNS('http://www.w3.org/2000/svg','path');var pts=[];var y=480-ci*8;for(var x=100;x<=1150;x+=35){y+=(-22+Math.random()*28)*(1-x/2400);if(y<20)y=20;if(y>490)y=490;pts.push(x+' '+y);}var d='M'+pts.join(' L');p.setAttribute('d',d);p.setAttribute('fill','none');p.setAttribute('stroke',c[0]);p.setAttribute('stroke-width',c[1]);p.setAttribute('stroke-linecap','round');p.setAttribute('stroke-linejoin','round');p.setAttribute('opacity',c[2]);var len=p.getTotalLength()||3000;p.style.strokeDasharray=len;p.style.strokeDashoffset=len;p.style.animation='drawline 4s '+(ci*0.2)+'s ease forwards';s.appendChild(p);});var st=document.createElementNS('http://www.w3.org/2000/svg','style');st.textContent='@keyframes drawline{to{stroke-dashoffset:0}}';s.appendChild(st);})();`}}/>
+      <section className="relative mx-auto max-w-5xl px-6 pb-20 pt-24 md:pt-32"><HeroLines />
         <Reveal>
           <p className="text-sm text-neutral-400">Now tracking ChatGPT · Claude · Gemini · YandexGPT</p>
         </Reveal>
