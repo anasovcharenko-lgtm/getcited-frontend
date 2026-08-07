@@ -5,6 +5,54 @@ const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
 const AI_LOGOS = ["ChatGPT", "Claude", "Gemini", "Perplexity", "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok"];
 
+
+function HeroLines() {
+  const lines = [
+    { color: '#D4D4D4', width: 1, opacity: 0.4 },
+    { color: '#A3A3A3', width: 1, opacity: 0.35 },
+    { color: '#E5E5E5', width: 1.2, opacity: 0.3 },
+    { color: '#737373', width: 0.8, opacity: 0.25 },
+    { color: '#22C55E', width: 1.5, opacity: 0.5 },
+    { color: '#16A34A', width: 2, opacity: 0.75 },
+  ];
+  const seeds = [42, 17, 93, 58, 31, 76];
+  function seededRand(seed: number) {
+    let s = seed;
+    return () => { s = (s * 16807 + 0) % 2147483647; return (s - 1) / 2147483646; };
+  }
+  return (
+    <svg className="absolute inset-0 h-full w-full overflow-visible pointer-events-none" viewBox="0 0 1200 500" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <style>{lines.map((_, i) => `@keyframes draw${i}{to{stroke-dashoffset:0}} .hl${i}{stroke-dasharray:3500;stroke-dashoffset:3500;animation:draw${i} 4s ${i*0.18}s ease forwards}`).join(' ')}</style>
+      </defs>
+      {lines.map((line, i) => {
+        const rand = seededRand(seeds[i]);
+        const pts: string[] = [];
+        let y = 460 - i * 5;
+        for (let x = 80; x <= 1150; x += 30) {
+          const drift = (x / 1200) * 0.8;
+          y += (-18 + rand() * 36) * (1 - drift) - drift * 2;
+          y = Math.max(30, Math.min(490, y));
+          pts.push(`${x},${y}`);
+        }
+        return (
+          <polyline
+            key={i}
+            className={`hl${i}`}
+            points={pts.join(' ')}
+            fill="none"
+            stroke={line.color}
+            strokeWidth={line.width}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={line.opacity}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
 function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
