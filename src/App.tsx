@@ -28,10 +28,10 @@ function HeroLines() {
       {lines.map((line, i) => {
         const rand = seededRand(seeds[i]);
         const pts: string[] = [];
-        let y = 460 - i * 5;
+        let y = 480 - i * 8;
         for (let x = 80; x <= 1150; x += 30) {
-          const drift = (x / 1200) * 0.8;
-          y += (-18 + rand() * 36) * (1 - drift) - drift * 2;
+          const drift = (x / 1200) * 1.5;
+          y += (-20 + rand() * 40) * (1 - drift * 0.5) - drift * 12;
           y = Math.max(30, Math.min(490, y));
           pts.push(`${x},${y}`);
         }
