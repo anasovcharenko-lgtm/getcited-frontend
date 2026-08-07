@@ -34,13 +34,14 @@ function HeroLines() {
     const pointSets = lines.map((l, i) => {
       const rand = seeded(l.seed);
       const pts: [number, number][] = [];
-      let y = H * (0.95 - i * 0.02);
-      const steps = 32;
+      let y = H * (0.88 + i * 0.015);
+      const steps = 28;
       for (let s = 0; s <= steps; s++) {
         const x = (s / steps) * W;
         const progress = s / steps;
-        y += (-0.04 + rand() * 0.08) * H - progress * 0.018 * H;
-        y = Math.max(H * 0.05, Math.min(H * 0.98, y));
+        const spike = rand() > 0.7 ? (rand() - 0.3) * 0.18 * H : 0;
+        y += (-0.055 + rand() * 0.11) * H - progress * 0.022 * H + spike;
+        y = Math.max(H * 0.04, Math.min(H * 0.96, y));
         pts.push([x, y]);
       }
       return pts;
