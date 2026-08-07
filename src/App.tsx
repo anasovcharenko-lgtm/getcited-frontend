@@ -278,7 +278,7 @@ export default function App() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto max-w-5xl px-6 pb-20 pt-24 md:pt-32">
+      <section className="relative mx-auto max-w-5xl px-6 pb-20 pt-24 md:pt-32"><svg className="absolute right-0 top-0 h-full w-3/5 overflow-visible pointer-events-none" viewBox="0 0 680 400" xmlns="http://www.w3.org/2000/svg"><path d="M0 300 C 80 280, 140 320, 220 290 C 300 260, 340 230, 420 210 C 500 190, 540 240, 620 210 C 650 198, 665 195, 700 190" fill="none" stroke="#D4D4D4" strokeWidth="1" strokeLinecap="round"/><path d="M0 340 C 70 328, 120 350, 200 335 C 280 320, 320 295, 400 278 C 480 261, 520 290, 600 272 C 640 263, 658 260, 700 256" fill="none" stroke="#A3A3A3" strokeWidth="1.5" strokeLinecap="round" opacity="0.6"/><path d="M0 370 C 60 355, 110 375, 190 360 C 280 343, 330 315, 420 298 C 510 281, 555 308, 640 288 C 665 282, 678 280, 700 276" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round"/></svg>
         <Reveal>
           <p className="text-sm text-neutral-400">Now tracking ChatGPT · Claude · Gemini · YandexGPT</p>
         </Reveal>
