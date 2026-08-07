@@ -284,7 +284,7 @@ export default function App() {
         </Reveal>
         <Reveal>
           <h1 className="mt-4 max-w-3xl text-balance text-5xl font-bold leading-tight tracking-tight md:text-6xl">
-            Win more clients.<br />Get <span className="text-[#FF4D00]">cited</span> by AI.
+            Win more clients.<br />Get cited by AI.
           </h1>
         </Reveal>
         <Reveal>
