@@ -6,51 +6,79 @@ const API_URL = "https://web-production-b2168.up.railway.app";
 const AI_LOGOS = ["ChatGPT", "Claude", "Gemini", "Perplexity", "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok"];
 
 
+
+
 function HeroLines() {
-  const lines = [
-    { color: '#D4D4D4', width: 1, opacity: 0.4 },
-    { color: '#A3A3A3', width: 1, opacity: 0.35 },
-    { color: '#E5E5E5', width: 1.2, opacity: 0.3 },
-    { color: '#737373', width: 0.8, opacity: 0.25 },
-    { color: '#22C55E', width: 1.5, opacity: 0.5 },
-    { color: '#16A34A', width: 2, opacity: 0.75 },
-  ];
-  const seeds = [42, 17, 93, 58, 31, 76];
-  function seededRand(seed: number) {
-    let s = seed;
-    return () => { s = (s * 16807 + 0) % 2147483647; return (s - 1) / 2147483646; };
-  }
-  return (
-    <svg className="absolute inset-0 h-full w-full overflow-visible pointer-events-none" viewBox="0 0 1200 500" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <style>{lines.map((_, i) => `@keyframes draw${i}{to{stroke-dashoffset:0}} .hl${i}{stroke-dasharray:3500;stroke-dashoffset:3500;animation:draw${i} 4s ${i*0.18}s ease forwards}`).join(' ')}</style>
-      </defs>
-      {lines.map((line, i) => {
-        const rand = seededRand(seeds[i]);
-        const pts: string[] = [];
-        let y = 480 - i * 8;
-        for (let x = 80; x <= 1150; x += 30) {
-          const drift = (x / 1200) * 1.5;
-          y += (-20 + rand() * 40) * (1 - drift * 0.5) - drift * 12;
-          y = Math.max(30, Math.min(490, y));
-          pts.push(`${x},${y}`);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    const W = canvas.width;
+    const H = canvas.height;
+    const lines = [
+      { color: 'rgba(212,212,212,0.45)', width: 1, seed: 42 },
+      { color: 'rgba(163,163,163,0.35)', width: 1, seed: 17 },
+      { color: 'rgba(229,229,229,0.3)', width: 1.2, seed: 93 },
+      { color: 'rgba(115,115,115,0.25)', width: 0.8, seed: 58 },
+      { color: 'rgba(34,197,94,0.5)', width: 1.5, seed: 31 },
+      { color: 'rgba(22,163,74,0.8)', width: 2.2, seed: 76 },
+    ];
+    function seeded(s: number) {
+      let n = s;
+      return () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646; };
+    }
+    const pointSets = lines.map((l, i) => {
+      const rand = seeded(l.seed);
+      const pts: [number, number][] = [];
+      let y = H * (0.95 - i * 0.02);
+      const steps = 32;
+      for (let s = 0; s <= steps; s++) {
+        const x = (s / steps) * W;
+        const progress = s / steps;
+        y += (-0.04 + rand() * 0.08) * H - progress * 0.018 * H;
+        y = Math.max(H * 0.05, Math.min(H * 0.98, y));
+        pts.push([x, y]);
+      }
+      return pts;
+    });
+    const duration = 3500;
+    const start = performance.now();
+    function draw(now: number) {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      ctx.clearRect(0, 0, W, H);
+      lines.forEach((l, i) => {
+        const pts = pointSets[i];
+        const maxIdx = Math.floor(eased * (pts.length - 1));
+        if (maxIdx < 1) return;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let j = 1; j <= maxIdx; j++) {
+          const mx = (pts[j-1][0] + pts[j][0]) / 2;
+          const my = (pts[j-1][1] + pts[j][1]) / 2;
+          ctx.quadraticCurveTo(pts[j-1][0], pts[j-1][1], mx, my);
         }
-        return (
-          <polyline
-            key={i}
-            className={`hl${i}`}
-            points={pts.join(' ')}
-            fill="none"
-            stroke={line.color}
-            strokeWidth={line.width}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={line.opacity}
-          />
-        );
-      })}
-    </svg>
-  );
+        if (maxIdx < pts.length - 1) {
+          const frac = (eased * (pts.length - 1)) - maxIdx;
+          const px = pts[maxIdx][0] + (pts[maxIdx+1][0] - pts[maxIdx][0]) * frac;
+          const py = pts[maxIdx][1] + (pts[maxIdx+1][1] - pts[maxIdx][1]) * frac;
+          ctx.lineTo(px, py);
+        }
+        ctx.strokeStyle = l.color;
+        ctx.lineWidth = l.width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      });
+      if (progress < 1) requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  }, []);
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />;
 }
 
 function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
