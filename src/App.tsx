@@ -8,78 +8,6 @@ const AI_LOGOS = ["ChatGPT", "Claude", "Gemini", "Perplexity", "YandexGPT", "AI 
 
 
 
-function HeroLines() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
-    if (!ctx) return;
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    const W = canvas.width;
-    const H = canvas.height;
-    const lines = [
-      { color: 'rgba(212,212,212,0.45)', width: 1, seed: 42 },
-      { color: 'rgba(163,163,163,0.35)', width: 1, seed: 17 },
-      { color: 'rgba(229,229,229,0.3)', width: 1.2, seed: 93 },
-      { color: 'rgba(115,115,115,0.25)', width: 0.8, seed: 58 },
-      { color: 'rgba(34,197,94,0.5)', width: 1.5, seed: 31 },
-      { color: 'rgba(22,163,74,0.8)', width: 2.2, seed: 76 },
-    ];
-    function seeded(s: number) {
-      let n = s;
-      return () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646; };
-    }
-    const pointSets = lines.map((l, i) => {
-      const rand = seeded(l.seed);
-      const pts: [number, number][] = [];
-      let y = H * (0.95 - i * 0.02);
-      const steps = 32;
-      for (let s = 0; s <= steps; s++) {
-        const x = (s / steps) * W;
-        const progress = s / steps;
-        y += (-0.04 + rand() * 0.08) * H - progress * 0.018 * H;
-        y = Math.max(H * 0.05, Math.min(H * 0.98, y));
-        pts.push([x, y]);
-      }
-      return pts;
-    });
-    const duration = 3500;
-    const start = performance.now();
-    function draw(now: number) {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-      ctx.clearRect(0, 0, W, H);
-      lines.forEach((l, i) => {
-        const pts = pointSets[i];
-        const maxIdx = Math.floor(eased * (pts.length - 1));
-        if (maxIdx < 1) return;
-        ctx.beginPath();
-        ctx.moveTo(pts[0][0], pts[0][1]);
-        for (let j = 1; j <= maxIdx; j++) {
-          const mx = (pts[j-1][0] + pts[j][0]) / 2;
-          const my = (pts[j-1][1] + pts[j][1]) / 2;
-          ctx.quadraticCurveTo(pts[j-1][0], pts[j-1][1], mx, my);
-        }
-        if (maxIdx < pts.length - 1) {
-          const frac = (eased * (pts.length - 1)) - maxIdx;
-          const px = pts[maxIdx][0] + (pts[maxIdx+1][0] - pts[maxIdx][0]) * frac;
-          const py = pts[maxIdx][1] + (pts[maxIdx+1][1] - pts[maxIdx][1]) * frac;
-          ctx.lineTo(px, py);
-        }
-        ctx.strokeStyle = l.color;
-        ctx.lineWidth = l.width;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.stroke();
-      });
-      if (progress < 1) requestAnimationFrame(draw);
-    }
-    requestAnimationFrame(draw);
-  }, []);
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />;
-}
 
 function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -354,7 +282,7 @@ export default function App() {
       </header>
 
       {/* Hero */}
-      <section className="relative mx-auto max-w-5xl px-6 pb-20 pt-24 md:pt-32"><HeroLines />
+      <section className="relative mx-auto max-w-5xl px-6 pb-20 pt-24 md:pt-32">
         <Reveal>
           <p className="text-sm text-neutral-400">Now tracking ChatGPT · Claude · Gemini · YandexGPT</p>
         </Reveal>
