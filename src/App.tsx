@@ -267,6 +267,14 @@ export default function App() {
 
   if (auditData) return <Dashboard data={auditData} onBack={() => setAuditData(null)} />;
 
+  const handleStartAudit = () => {
+    if (!user) {
+      signInWithGoogle();
+    } else {
+      setShowModal(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white text-neutral-900">
       <style>{`@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
@@ -291,7 +299,7 @@ export default function App() {
               <a href="/ru" className="hover:text-neutral-900">RU</a>
             </div>
             <button onClick={user ? signOut : signInWithGoogle} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">{user ? user.email?.split("@")[0] : "Sign in"}</button>
-            <button onClick={() => setShowModal(true)} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Start free</button>
+            <button onClick={handleStartAudit} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Start free</button>
           </div>
         </div>
       </header>
@@ -313,7 +321,7 @@ export default function App() {
         </Reveal>
         <Reveal>
           <div className="mt-8 flex items-center gap-4">
-            <button onClick={() => setShowModal(true)} className="flex items-center gap-2 rounded-lg bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-800">
+            <button onClick={handleStartAudit} className="flex items-center gap-2 rounded-lg bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-800">
               Start free audit <ArrowRight className="h-4 w-4" />
             </button>
           </div>
