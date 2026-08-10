@@ -262,7 +262,9 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           .from('audits')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id);
-        if ((count ?? 0) >= 1) {
+        const adminEmails = ["anas.ovcharenko@gmail.com"];
+        const isAdmin = user.email && adminEmails.includes(user.email);
+        if (!isAdmin && (count ?? 0) >= 1) {
           setError("Free trial limit reached. Upgrade to run more audits.");
           setLoading(false);
           return;
