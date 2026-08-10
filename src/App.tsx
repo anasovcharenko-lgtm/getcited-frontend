@@ -191,6 +191,42 @@ function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
   );
 }
 
+
+function LoadingScreen({ brand }: { brand: string }) {
+  const [step, setStep] = useState(0);
+  const steps = [
+    "Определяем категорию бренда...",
+    "Генерируем релевантные промпты...",
+    "Проверяем видимость в Gemini...",
+    "Проверяем видимость в ChatGPT...",
+    "Анализируем конкурентов...",
+    "Генерируем рекомендации...",
+  ];
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStep(s => s < steps.length - 1 ? s + 1 : s);
+    }, 7000);
+    return () => clearInterval(interval);
+  }, []);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">
+      <div className="text-center max-w-sm px-6">
+        <div className="mb-8 flex justify-center">
+          <div className="h-12 w-12 rounded-full border-2 border-neutral-200 border-t-neutral-900 animate-spin" />
+        </div>
+        <h2 className="text-xl font-bold text-neutral-900 mb-2">Анализируем {brand}</h2>
+        <p className="text-sm text-neutral-500 mb-6">{steps[step]}</p>
+        <div className="flex gap-1 justify-center">
+          {steps.map((_, i) => (
+            <div key={i} className={`h-1 rounded-full transition-all duration-500 ${i <= step ? "bg-neutral-900 w-6" : "bg-neutral-200 w-3"}`} />
+          ))}
+        </div>
+        <p className="mt-6 text-xs text-neutral-400">Обычно занимает 30-60 секунд</p>
+      </div>
+    </div>
+  );
+}
+
 function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditComplete: (data: AuditData) => void }) {
   const [brand, setBrand] = useState("");
   const [competitorsInput, setCompetitorsInput] = useState("");
@@ -244,7 +280,8 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      {loading && <LoadingScreen brand={brand} />}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={loading ? undefined : onClose} />
       <div className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
         <button onClick={onClose} className="absolute right-4 top-4 text-neutral-300 hover:text-neutral-600"><X className="h-5 w-5" /></button>
         <h2 className="text-2xl font-bold">Audit your brand</h2>
@@ -256,7 +293,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           <input value={competitorsInput} onChange={(e) => setCompetitorsInput(e.target.value)} placeholder="Competitors (optional): Notion, Confluence" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button type="submit" disabled={loading} className="h-12 rounded-lg bg-neutral-900 text-sm text-white hover:bg-neutral-800 disabled:opacity-50 flex items-center gap-2 justify-center font-medium">
-            {loading ? "Running audit..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
+            {loading ? "Analysing..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
           </button>
         </form>
         <p className="mt-3 text-center text-xs text-neutral-400">Free to start · no credit card</p>
