@@ -220,8 +220,23 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
     setLoading(true);
     setError("");
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { count } = await supabase
+          .from('audits')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        if ((count ?? 0) >= 1) {
+          setError("Free trial limit reached. Upgrade to run more audits.");
+          setLoading(false);
+          return;
+        }
+      }
       const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean), description: description.trim() }) });
       const data = await res.json();
+      if (user) {
+        await supabase.from('audits').insert({ user_id: user.id, brand: brand.trim() });
+      }
       onAuditComplete(data);
     } catch { setError("Something went wrong. Please try again."); }
     finally { setLoading(false); }
