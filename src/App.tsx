@@ -262,7 +262,6 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
-
   }, []);
 
   const [auditData, setAuditData] = useState<AuditData | null>(null);
