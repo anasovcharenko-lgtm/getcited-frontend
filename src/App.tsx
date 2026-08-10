@@ -290,7 +290,7 @@ export default function App() {
               <span>|</span>
               <a href="/ru" className="hover:text-neutral-900">RU</a>
             </div>
-            <button className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">Sign in</button>
+            <button onClick={user ? signOut : signInWithGoogle} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">{user ? user.email?.split("@")[0] : "Sign in"}</button>
             <button onClick={() => setShowModal(true)} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Start free</button>
           </div>
         </div>
