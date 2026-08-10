@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { supabase } from './supabase'
+import { signInWithGoogle, signOut } from './auth'
+
+import { supabase } from './supabase'
+import { signInWithGoogle, signOut } from './auth'
+
 import { ArrowRight, Check, X } from "lucide-react";
 
 const BRAND = "GetCited";
@@ -248,6 +254,28 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
 
 export default function App() {
   const [showModal, setShowModal] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const [user, setUser] = useState<any>(null);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const [auditData, setAuditData] = useState<AuditData | null>(null);
 
   if (auditData) return <Dashboard data={auditData} onBack={() => setAuditData(null)} />;
