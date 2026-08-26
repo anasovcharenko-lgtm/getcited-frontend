@@ -4,6 +4,7 @@ import { signInWithGoogle, signOut } from './auth'
 
 
 import { ArrowRight, Check, X } from "lucide-react";
+import { Dashboard, type AuditData } from "./Dashboard";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -25,172 +26,6 @@ function Reveal({ children, className = "" }: { children: React.ReactNode; class
   }, []);
   return <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"} ${className}`}>{children}</div>;
 }
-
-type AuditResult = { prompt: string; gemini: { mentioned: boolean; competitors_found: string[]; }; chatgpt: { mentioned: boolean; competitors_found: string[]; }; };
-type CompetitorStat = { name: string; is_your_brand: boolean; gemini_mentions: number; chatgpt_mentions: number; total_mentions: number; mention_rate: number; rank: number; };
-type Citation = { url: string; domain: string; gemini_count: number; chatgpt_count: number; total: number; };
-type AuditData = { brand: string; category: string; visibility_score: number; gemini_score: number; chatgpt_score: number; total_prompts: number; results: AuditResult[]; competitor_ranking: CompetitorStat[]; citations: Citation[]; recommendations: string; };
-
-function Dashboard({ data, onBack }: { data: AuditData; onBack: () => void }) {
-  const [showAllCitations, setShowAllCitations] = useState(false);
-  const recs = data.recommendations.split("\n\n").filter(Boolean);
-  const sortedPrompts = [...data.results].sort((a, b) => {
-    const aT = (a.gemini.mentioned ? 1 : 0) + (a.chatgpt.mentioned ? 1 : 0);
-    const bT = (b.gemini.mentioned ? 1 : 0) + (b.chatgpt.mentioned ? 1 : 0);
-    return bT - aT;
-  });
-  const visibleCitations = showAllCitations ? data.citations : data.citations.slice(0, 10);
-
-  return (
-    <div className="min-h-screen bg-white text-neutral-900">
-      <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <button onClick={onBack} className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
-            <span className="text-lg font-semibold">{BRAND}</span>
-          </button>
-          <button onClick={onBack} className="text-sm text-neutral-400 hover:text-neutral-900">← Back</button>
-        </div>
-      </header>
-      <main className="mx-auto max-w-5xl px-6 py-10">
-
-        {/* Visibility Score */}
-        <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-8">
-          <div className="flex items-start justify-between gap-8">
-            <div className="flex-1">
-              <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Visibility Score</p>
-              <p className="mt-1 text-sm text-neutral-500">How often your brand appears in AI-generated answers</p>
-              <div className="mt-6 flex items-end gap-6">
-                <div>
-                  <div className="text-7xl font-bold tracking-tight text-neutral-900">{data.visibility_score}%</div>
-                  {data.category && <span className="mt-2 inline-block rounded-full bg-neutral-100 px-3 py-1 text-xs text-neutral-500">{data.category}</span>}
-                </div>
-                <div className="mb-2 flex gap-4">
-                  <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-center">
-                    <p className="text-xs text-neutral-400">Gemini</p>
-                    <p className="mt-1 text-2xl font-bold text-neutral-900">{Math.round(data.gemini_score / data.total_prompts * 100)}%</p>
-                    <p className="text-xs text-neutral-400">{data.gemini_score}/{data.total_prompts}</p>
-                  </div>
-                  <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-center">
-                    <p className="text-xs text-neutral-400">ChatGPT</p>
-                    <p className="mt-1 text-2xl font-bold text-neutral-900">{Math.round(data.chatgpt_score / data.total_prompts * 100)}%</p>
-                    <p className="text-xs text-neutral-400">{data.chatgpt_score}/{data.total_prompts}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="w-72 shrink-0">
-              <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Visibility Score Rank</p>
-              <p className="mt-1 text-4xl font-bold">#{data.competitor_ranking.find(s => s.is_your_brand)?.rank ?? "—"}</p>
-              <div className="mt-4 space-y-2">
-                {data.competitor_ranking.slice(0, 5).map((stat) => (
-                  <div key={stat.name} className={`flex items-center justify-between rounded-lg px-3 py-2 ${stat.is_your_brand ? "bg-neutral-900 text-white" : "bg-white border border-neutral-100"}`}>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs ${stat.is_your_brand ? "text-neutral-400" : "text-neutral-400"}`}>{stat.rank}</span>
-                      <span className="text-sm font-medium truncate max-w-[140px]">{stat.name}</span>
-                      {stat.is_your_brand && <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] text-white">You</span>}
-                    </div>
-                    <span className={`text-sm font-bold ${stat.is_your_brand ? "text-white" : "text-neutral-900"}`}>{stat.mention_rate}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Brand Ranking + Top Prompts */}
-        <div className="mb-6 grid grid-cols-2 gap-6">
-          <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Brand Ranking</p>
-            <table className="mt-4 w-full text-sm">
-              <thead><tr className="border-b border-neutral-100"><th className="pb-2 text-left text-xs text-neutral-400">#</th><th className="pb-2 text-left text-xs text-neutral-400">Brand</th><th className="pb-2 text-center text-xs text-neutral-400">Gemini</th><th className="pb-2 text-center text-xs text-neutral-400">ChatGPT</th><th className="pb-2 text-right text-xs text-neutral-400">Rate</th></tr></thead>
-              <tbody>
-                {data.competitor_ranking.map((stat) => (
-                  <tr key={stat.name} className="border-b border-neutral-50">
-                    <td className="py-2 text-xs text-neutral-400">{stat.rank}</td>
-                    <td className="py-2 text-xs font-medium">{stat.name}{stat.is_your_brand && <span className="ml-1 rounded-full bg-neutral-900 px-1.5 py-0.5 text-[10px] text-white">You</span>}</td>
-                    <td className="py-2 text-center text-xs">{stat.gemini_mentions}</td>
-                    <td className="py-2 text-center text-xs">{stat.chatgpt_mentions}</td>
-                    <td className="py-2 text-right text-xs font-semibold">{stat.mention_rate}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Top Prompts by Brand Mentions</p>
-            <table className="mt-4 w-full text-sm">
-              <thead><tr className="border-b border-neutral-100"><th className="pb-2 text-left text-xs text-neutral-400">Rank</th><th className="pb-2 text-left text-xs text-neutral-400">Prompt</th><th className="pb-2 text-center text-xs text-neutral-400">G</th><th className="pb-2 text-center text-xs text-neutral-400">GPT</th></tr></thead>
-              <tbody>
-                {sortedPrompts.slice(0, 6).map((r, i) => (
-                  <tr key={i} className="border-b border-neutral-50">
-                    <td className="py-2 text-xs text-neutral-400">{i + 1}</td>
-                    <td className="py-2 pr-2 text-xs text-neutral-700 max-w-[180px] truncate">{r.prompt}</td>
-                    <td className="py-2 text-center text-xs">{r.gemini.mentioned ? <span className="font-medium text-emerald-600">1</span> : <span className="text-neutral-300">0</span>}</td>
-                    <td className="py-2 text-center text-xs">{r.chatgpt.mentioned ? <span className="font-medium text-emerald-600">1</span> : <span className="text-neutral-300">0</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Citations */}
-        {data.citations && data.citations.length > 0 && (
-          <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Citations</p>
-            <p className="mt-1 text-xs text-neutral-500">URLs most frequently referenced by AI in your category</p>
-            <table className="mt-4 w-full text-sm">
-              <thead><tr className="border-b border-neutral-100"><th className="pb-2 text-left text-xs text-neutral-400">Rank</th><th className="pb-2 text-left text-xs text-neutral-400">URL</th><th className="pb-2 text-center text-xs text-neutral-400">Gemini</th><th className="pb-2 text-center text-xs text-neutral-400">ChatGPT</th><th className="pb-2 text-right text-xs text-neutral-400">Total</th></tr></thead>
-              <tbody>
-                {visibleCitations.map((c, i) => (
-                  <tr key={i} className="border-b border-neutral-50">
-                    <td className="py-2 text-xs text-neutral-400">{i + 1}</td>
-                    <td className="py-2 pr-4">
-                      <a href={c.url} target="_blank" rel="noopener noreferrer" className="block truncate max-w-[360px] text-xs text-neutral-700 hover:text-neutral-900">{c.url}</a>
-                      <span className="text-[10px] text-neutral-400">{c.domain}</span>
-                    </td>
-                    <td className="py-2 text-center text-xs text-neutral-600">{c.gemini_count}</td>
-                    <td className="py-2 text-center text-xs text-neutral-600">{c.chatgpt_count}</td>
-                    <td className="py-2 text-right text-xs font-semibold">{c.total}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {data.citations.length > 10 && (
-              <button onClick={() => setShowAllCitations(!showAllCitations)} className="mt-3 text-xs text-neutral-500 hover:text-neutral-900">
-                {showAllCitations ? "Show less" : `View all ${data.citations.length} →`}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Recommendations */}
-        <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
-          <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Recommendations</p>
-          <p className="mt-1 text-xs text-neutral-500">Actionable steps to improve your AI visibility</p>
-          <div className="mt-4 space-y-3">
-            {recs.map((rec, i) => {
-              const priority = rec.includes("High") ? "High" : rec.includes("Medium") ? "Medium" : "Low";
-              const dot = priority === "High" ? "bg-red-500" : priority === "Medium" ? "bg-amber-500" : "bg-green-500";
-              return (
-                <div key={i} className="rounded-xl border border-neutral-100 bg-white p-4">
-                  <div className="flex items-center gap-2">
-                    <span className={`h-2 w-2 rounded-full ${dot}`} />
-                    <span className="text-xs font-medium text-neutral-500">{priority} priority</span>
-                  </div>
-                  <p className="mt-2 text-sm text-neutral-800 whitespace-pre-wrap">{rec.replace(/PRIORITY:.*\n/, "").trim()}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-      </main>
-    </div>
-  );
-}
-
 
 function LoadingScreen({ brand }: { brand: string }) {
   const [step, setStep] = useState(0);
@@ -231,6 +66,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   const [brand, setBrand] = useState("");
   const [competitorsInput, setCompetitorsInput] = useState("");
   const [description, setDescription] = useState("");
+  const [website, setWebsite] = useState("");
   const [showDescription, setShowDescription] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -270,10 +106,20 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean), description: description.trim() }) });
+      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean), description: description.trim(), website: website.trim() }) });
       const data = await res.json();
       if (user) {
-        await supabase.from('audits').insert({ user_id: user.id, brand: brand.trim() });
+        await supabase.from('audits').insert({
+          user_id: user.id,
+          brand: brand.trim(),
+          visibility_score: data.visibility_score,
+          gemini_score: data.gemini_score,
+          chatgpt_score: data.chatgpt_score,
+          total_prompts: data.total_prompts,
+          category: data.category,
+          mentions_score: data.mentions_score,
+          citations_score: data.citations_score,
+        });
       }
       onAuditComplete(data);
     } catch { setError("Something went wrong. Please try again."); }
@@ -292,6 +138,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Your brand name" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
           {checking && <p className="text-xs text-neutral-400">Checking brand...</p>}
           {showDescription && <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does your brand do? (e.g. CRM for small teams)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />}
+          <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="Your website (optional, improves accuracy)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
           <input value={competitorsInput} onChange={(e) => setCompetitorsInput(e.target.value)} placeholder="Competitors (optional): Notion, Confluence" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button type="submit" disabled={loading} className="h-12 rounded-lg bg-neutral-900 text-sm text-white hover:bg-neutral-800 disabled:opacity-50 flex items-center gap-2 justify-center font-medium">
@@ -319,7 +166,7 @@ export default function App() {
 
   const [auditData, setAuditData] = useState<AuditData | null>(null);
 
-  if (auditData) return <Dashboard data={auditData} onBack={() => setAuditData(null)} />;
+  if (auditData) return <Dashboard data={auditData} onBack={() => setAuditData(null)} lang="en" brandName={BRAND} />;
 
   const handleStartAudit = () => {
     if (!user) {
