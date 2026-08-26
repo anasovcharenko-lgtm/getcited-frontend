@@ -16,6 +16,8 @@ export type ModelMentionInfo = {
   competitors_found: string[];
   competitors_with_link: string[];
   competitors_without_link: string[];
+  answer?: string;
+  cited_domains?: string[];
 };
 
 export type AuditResult = {
@@ -49,6 +51,9 @@ export type AuditData = {
   brand: string;
   category: string;
   brand_domain?: string;
+  run_at?: string;
+  models_used?: Record<string, string>;
+  model_status?: Record<string, { ok: boolean; error?: string | null }>;
   visibility_score: number;
   gemini_score: number;
   chatgpt_score: number;
@@ -137,6 +142,15 @@ interface Strings {
   withoutLink: string;
   covered: string;
   notCovered: string;
+  modelFailed: (names: string) => string;
+  seeAiResponse: string;
+  hideAiResponse: string;
+  citedDomains: string;
+  noAnswerCaptured: string;
+  youAppear: string;
+  youDontAppear: string;
+  runProvenance: (model: string, date: string) => string;
+  responseHeading: string;
 }
 
 const STR: Record<Lang, Strings> = {
@@ -207,6 +221,15 @@ const STR: Record<Lang, Strings> = {
     withoutLink: "no link",
     covered: "Covered",
     notCovered: "Not covered",
+    modelFailed: (names: string) => `${names} didn't respond during this audit — the numbers below are incomplete.`,
+    seeAiResponse: "See what AI answered",
+    hideAiResponse: "Hide answer",
+    citedDomains: "Cited",
+    noAnswerCaptured: "This model didn't return an answer for this prompt.",
+    youAppear: "You appear",
+    youDontAppear: "You don't appear",
+    runProvenance: (model, date) => `${model} API · ${date}`,
+    responseHeading: "Model response",
   },
   ru: {
     back: "← Назад",
@@ -275,6 +298,15 @@ const STR: Record<Lang, Strings> = {
     withoutLink: "без ссылки",
     covered: "Покрыто",
     notCovered: "Не покрыто",
+    modelFailed: (names: string) => `${names} не ответил(а) во время аудита — цифры ниже неполные.`,
+    seeAiResponse: "Смотреть ответ AI",
+    hideAiResponse: "Свернуть ответ",
+    citedDomains: "Ссылки",
+    noAnswerCaptured: "Эта модель не вернула ответ на этот промпт.",
+    youAppear: "Вы есть в ответе",
+    youDontAppear: "Вас нет в ответе",
+    runProvenance: (model, date) => `${model} API · ${date}`,
+    responseHeading: "Ответ модели",
   },
 } as const;
 
@@ -356,6 +388,63 @@ function statLabel(name: string, isYou: boolean, youLabel: string) {
   return isYou ? `${name} (${youLabel})` : name;
 }
 
+/* Expandable row showing what each model actually answered for one prompt.
+   This is the "why don't I appear / what did competitors get" view. */
+function PromptRow({ result, t, tab, modelsUsed, runDate }: { result: AuditResult; t: Strings; tab: ModelKey; modelsUsed?: Record<string, string>; runDate: string }) {
+  const [open, setOpen] = useState(false);
+  const models: { key: "chatgpt" | "gemini"; label: string; info: ModelMentionInfo }[] = [
+    { key: "chatgpt", label: "ChatGPT", info: result.chatgpt },
+    { key: "gemini", label: "Gemini", info: result.gemini },
+  ].filter((m) => tab === "all" || tab === m.key) as never;
+
+  const youMentioned = models.some((m) => m.info.mentioned);
+  const competitors = Array.from(new Set(models.flatMap((m) => m.info.competitors_found)));
+
+  return (
+    <div className="bg-neutral-50/50">
+      <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between gap-4 p-4 text-left transition-colors hover:bg-neutral-100/60">
+        <div className="min-w-0">
+          <p className="text-sm">{result.prompt}</p>
+          {competitors.length > 0 && <p className="mt-1 truncate text-xs text-neutral-400">{t.mentionedBy(competitors.join(", "))}</p>}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${youMentioned ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
+            {youMentioned ? t.youAppear : t.youDontAppear}
+          </span>
+          {open ? <ChevronDown className="h-4 w-4 text-neutral-400" /> : <ChevronRight className="h-4 w-4 text-neutral-400" />}
+        </div>
+      </button>
+
+      {open && (
+        <div className="space-y-4 border-t border-neutral-100 bg-white px-4 py-4">
+          {models.map((m) => (
+            <div key={m.key}>
+              <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">{m.label}</span>
+                <span className="text-[10px] text-neutral-400">{t.runProvenance(modelsUsed?.[m.key] ?? m.label, runDate)}</span>
+                {m.info.mentioned && <span className="text-[10px] text-emerald-600">✓ {m.info.mentioned_with_link ? t.withLink : t.withoutLink}</span>}
+              </div>
+              {m.info.answer ? (
+                <p className="whitespace-pre-wrap text-xs leading-relaxed text-neutral-700">{m.info.answer}</p>
+              ) : (
+                <p className="text-xs italic text-neutral-400">{t.noAnswerCaptured}</p>
+              )}
+              {m.info.cited_domains && m.info.cited_domains.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wide text-neutral-400">{t.citedDomains}</span>
+                  {m.info.cited_domains.map((d) => (
+                    <span key={d} className="rounded-full border border-neutral-200 px-2 py-0.5 text-[10px] text-neutral-600">{d}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ────────────────────────────────────────────────────────────────
    Dashboard
    ──────────────────────────────────────────────────────────────── */
@@ -405,7 +494,7 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
         const ms = modelsForTab(r);
         const youMentioned = ms.some((m) => m.mentioned);
         const competitors = Array.from(new Set(ms.flatMap((m) => m.competitors_found)));
-        return { prompt: r.prompt, competitors, youMentioned };
+        return { prompt: r.prompt, competitors, youMentioned, result: r };
       })
       .filter((r) => !r.youMentioned && r.competitors.length > 0);
   }, [tab, data.results]);
@@ -416,13 +505,25 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
         const ms = modelsForTab(r);
         const youMentioned = ms.some((m) => m.mentioned);
         const competitors = Array.from(new Set(ms.flatMap((m) => m.competitors_found)));
-        return { prompt: r.prompt, youMentioned, competitorCount: competitors.length };
+        return { prompt: r.prompt, youMentioned, competitorCount: competitors.length, result: r };
       })
       .filter((r) => r.youMentioned)
       .sort((a, b) => a.competitorCount - b.competitorCount);
   }, [tab, data.results]);
 
+  const runDate = useMemo(() => {
+    const d = data.run_at ? new Date(data.run_at) : new Date();
+    return d.toLocaleDateString(lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  }, [data.run_at, lang]);
+
   const visibleCitations = showAllCitations ? data.citations : data.citations.slice(0, 10);
+
+  const failedModels = useMemo(() => {
+    const status = data.model_status;
+    if (!status) return [];
+    const labels: Record<string, string> = { gemini: "Gemini", chatgpt: "ChatGPT" };
+    return Object.entries(status).filter(([, v]) => !v.ok).map(([k]) => labels[k] ?? k);
+  }, [data.model_status]);
 
   /* ---- recommendations, categorised ---- */
   const recCategories = useMemo(() => {
@@ -439,16 +540,26 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
   /* ---- bubble chart geometry (Mentions x, Citations y) ---- */
   const bubbleData = useMemo(() => {
     const all = data.competitor_ranking;
-    const maxX = Math.max(...all.map((c) => c.mentions_with_link), 1);
-    const maxY = Math.max(...all.map((c) => c.mentions_without_link), 1);
+    const maxX = Math.max(...all.map((c) => c.mentions_with_link), 0);
+    const maxY = Math.max(...all.map((c) => c.mentions_without_link), 0);
     const maxTotal = Math.max(...all.map((c) => c.total_mentions), 1);
     const plotW = 390, plotH = 200, left = 50, top = 20;
-    return all.map((c) => ({
-      ...c,
-      cx: left + (c.mentions_with_link / maxX) * plotW,
-      cy: top + plotH - (c.mentions_without_link / maxY) * plotH,
-      r: 10 + (c.total_mentions / maxTotal) * 32,
-    }));
+    // When every brand scores zero on an axis, a plain ratio would stack all
+    // bubbles on one point and the labels would collide. Spread them evenly
+    // along that axis instead so the chart stays readable.
+    const flatX = maxX === 0;
+    const flatY = maxY === 0;
+    return all.map((c, i) => {
+      const fracX = flatX ? (all.length === 1 ? 0.5 : i / (all.length - 1)) * 0.8 + 0.1 : c.mentions_with_link / maxX;
+      const fracY = flatY ? 0.12 : c.mentions_without_link / maxY;
+      return {
+        ...c,
+        cx: left + fracX * plotW,
+        cy: top + plotH - fracY * plotH,
+        r: 10 + (c.total_mentions / maxTotal) * 32,
+        labelAbove: i % 2 === 0,
+      };
+    });
   }, [data.competitor_ranking]);
 
   /* ---- history chart geometry ---- */
@@ -544,22 +655,9 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
             </p>
           ) : (
             <div className="mt-6 divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-150">
-              {isUncovered
-                ? uncoveredPrompts.map((p, i) => (
-                    <div key={i} className="flex items-center justify-between gap-4 bg-neutral-50/50 p-4">
-                      <div>
-                        <p className="text-sm">{p.prompt}</p>
-                        <p className="mt-1 text-xs text-neutral-400">{t.mentionedBy(p.competitors.join(", "))}</p>
-                      </div>
-                      <span className="whitespace-nowrap rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-600">{t.notCovered}</span>
-                    </div>
-                  ))
-                : bestCoveredPrompts.map((p, i) => (
-                    <div key={i} className="flex items-center justify-between gap-4 bg-neutral-50/50 p-4">
-                      <p className="text-sm">{p.prompt}</p>
-                      <span className="whitespace-nowrap rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600">{t.covered}</span>
-                    </div>
-                  ))}
+              {(isUncovered ? uncoveredPrompts : bestCoveredPrompts).map((p, i) => (
+                <PromptRow key={i} result={p.result} t={t} tab={tab} modelsUsed={data.models_used} runDate={runDate} />
+              ))}
             </div>
           )}
 
@@ -591,10 +689,16 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">{data.brand}</h1>
-            <p className="text-xs text-neutral-400">{t.lastRun}{data.category ? ` · ${data.category}` : ""}</p>
+            <p className="text-xs text-neutral-400">{runDate}{data.category ? ` · ${data.category}` : ""}</p>
           </div>
           <ModelSwitcher tab={tab} setTab={setTab} t={t} />
         </div>
+
+        {failedModels.length > 0 && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm text-amber-800">{t.modelFailed(failedModels.join(", "))}</p>
+          </div>
+        )}
 
         {/* 3 metric cards */}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -676,7 +780,7 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
               {bubbleData.map((b) => (
                 <g key={b.name}>
                   <circle cx={b.cx} cy={b.cy} r={b.r} fill={b.is_your_brand ? "#171717" : "#a3a3a3"} opacity={b.is_your_brand ? 0.9 : 0.35} />
-                  <text x={b.cx} y={b.cy - b.r - 6} fontSize="11" fontWeight={500} textAnchor="middle" fill="#171717">
+                  <text x={b.cx} y={b.labelAbove ? b.cy - b.r - 6 : b.cy + b.r + 14} fontSize="11" fontWeight={500} textAnchor="middle" fill="#171717">
                     {statLabel(b.name, b.is_your_brand, t.you)}
                   </text>
                 </g>
@@ -703,10 +807,10 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
           ) : (
             <div className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-100">
               {bestCoveredPrompts.slice(0, 3).map((p, i) => (
-                <div key={i} className="flex items-center justify-between bg-white px-4 py-2.5">
+                <button key={i} onClick={() => setView("covered")} className="flex w-full items-center justify-between bg-white px-4 py-2.5 text-left transition-colors hover:bg-neutral-50">
                   <span className="text-xs">{p.prompt}</span>
-                  <span className="text-[11px] text-neutral-400">{p.competitorCount === 0 ? "—" : `+${p.competitorCount}`}</span>
-                </div>
+                  <span className="flex items-center gap-1 text-[11px] text-neutral-400">{t.seeAiResponse} <ChevronRight className="h-3 w-3" /></span>
+                </button>
               ))}
             </div>
           )}
@@ -765,11 +869,14 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
 
         {/* What AI says */}
         <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
-          <p className="text-sm font-medium">{t.whatAiSays}</p>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-sm font-medium">{t.responseHeading}</p>
+            <span className="text-[11px] text-neutral-400">{t.runProvenance(data.models_used?.chatgpt ?? "ChatGPT", runDate)}</span>
+          </div>
           {data.sample_quote ? (
             <>
               <p className="mt-3 text-sm italic text-neutral-600">"{data.sample_quote}"</p>
-              <button onClick={() => setView("covered")} className="mt-3 text-xs text-neutral-500 hover:text-neutral-900">{t.seeHowAccurate}</button>
+              <button onClick={() => setView("covered")} className="mt-3 text-xs text-neutral-500 hover:text-neutral-900">{t.seeAiResponse} →</button>
             </>
           ) : (
             <p className="mt-3 text-sm text-neutral-400">{t.whatAiSaysEmpty}</p>
