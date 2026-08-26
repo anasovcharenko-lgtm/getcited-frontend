@@ -544,22 +544,24 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
     const maxX = Math.max(...all.map((c) => c.mentions_with_link), 0);
     const maxY = Math.max(...all.map((c) => c.mentions_without_link), 0);
     const maxTotal = Math.max(...all.map((c) => c.total_mentions), 1);
-    const plotW = 390, plotH = 200, left = 50, top = 20;
-    // When every brand scores zero on an axis, a plain ratio would stack all
-    // bubbles on one point and the labels would collide. Spread them evenly
-    // along that axis instead so the chart stays readable.
+    const plotW = 340, plotH = 150, left = 60, top = 40;
     const flatX = maxX === 0;
     const flatY = maxY === 0;
-    return all.map((c, i) => {
+
+    const placed = all.map((c, i) => {
       const fracX = flatX ? (all.length === 1 ? 0.5 : i / (all.length - 1)) * 0.8 + 0.1 : c.mentions_with_link / maxX;
-      const fracY = flatY ? 0.12 : c.mentions_without_link / maxY;
-      return {
-        ...c,
-        cx: left + fracX * plotW,
-        cy: top + plotH - fracY * plotH,
-        r: 10 + (c.total_mentions / maxTotal) * 32,
-        labelAbove: i % 2 === 0,
-      };
+      const fracY = flatY ? 0.1 : c.mentions_without_link / maxY;
+      const r = 8 + (c.total_mentions / maxTotal) * 22;
+      // Clamp so a big bubble near the edge doesn't get clipped by the viewBox.
+      const cx = Math.min(Math.max(left + fracX * plotW, left + r), left + plotW);
+      const cy = Math.min(Math.max(top + plotH - fracY * plotH, top + r), top + plotH);
+      return { ...c, cx, cy, r };
+    });
+
+    // Nudge labels apart when bubbles sit close together horizontally.
+    return placed.map((b, i) => {
+      const crowded = placed.some((o, j) => j < i && Math.abs(o.cx - b.cx) < 70 && Math.abs(o.cy - b.cy) < 30);
+      return { ...b, labelY: crowded ? b.cy + b.r + 14 : b.cy - b.r - 7 };
     });
   }, [data.competitor_ranking]);
 
@@ -774,14 +776,14 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
             <p className="text-sm font-medium">{t.landscapeTitle}</p>
             <p className="mt-0.5 text-xs text-neutral-400">{t.landscapeSub}</p>
             <svg viewBox="0 0 460 260" width="100%" height="240" className="mt-2">
-              <line x1="50" y1="20" x2="50" y2="220" stroke="#e5e5e5" strokeWidth={1} />
-              <line x1="50" y1="220" x2="440" y2="220" stroke="#e5e5e5" strokeWidth={1} />
-              <text x="16" y="120" fontSize="11" fill="#a3a3a3" transform="rotate(-90 16 120)" textAnchor="middle">{t.landscapeYAxis}</text>
-              <text x="245" y="248" fontSize="11" fill="#a3a3a3" textAnchor="middle">{t.landscapeXAxis}</text>
+              <line x1="60" y1="30" x2="60" y2="190" stroke="#e5e5e5" strokeWidth={1} />
+              <line x1="60" y1="190" x2="410" y2="190" stroke="#e5e5e5" strokeWidth={1} />
+              <text x="20" y="110" fontSize="11" fill="#a3a3a3" transform="rotate(-90 20 110)" textAnchor="middle">{t.landscapeYAxis}</text>
+              <text x="235" y="220" fontSize="11" fill="#a3a3a3" textAnchor="middle">{t.landscapeXAxis}</text>
               {bubbleData.map((b) => (
                 <g key={b.name}>
                   <circle cx={b.cx} cy={b.cy} r={b.r} fill={b.is_your_brand ? "#171717" : "#a3a3a3"} opacity={b.is_your_brand ? 0.9 : 0.35} />
-                  <text x={b.cx} y={b.labelAbove ? b.cy - b.r - 6 : b.cy + b.r + 14} fontSize="11" fontWeight={500} textAnchor="middle" fill="#171717">
+                  <text x={b.cx} y={b.labelY} fontSize="11" fontWeight={500} textAnchor="middle" fill="#171717">
                     {statLabel(b.name, b.is_your_brand, t.you)}
                   </text>
                 </g>
