@@ -53,7 +53,7 @@ export type AuditData = {
   brand_domain?: string;
   run_at?: string;
   models_used?: Record<string, string>;
-  model_status?: Record<string, { ok: boolean; error?: string | null }>;
+  model_status?: Record<string, { ok: boolean; enabled?: boolean; error?: string | null }>;
   visibility_score: number;
   gemini_score: number;
   chatgpt_score: number;
@@ -522,7 +522,8 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
     const status = data.model_status;
     if (!status) return [];
     const labels: Record<string, string> = { gemini: "Gemini", chatgpt: "ChatGPT" };
-    return Object.entries(status).filter(([, v]) => !v.ok).map(([k]) => labels[k] ?? k);
+    // A model we deliberately turned off isn't a failure — don't alarm the user about it.
+    return Object.entries(status).filter(([, v]) => !v.ok && v.enabled !== false).map(([k]) => labels[k] ?? k);
   }, [data.model_status]);
 
   /* ---- recommendations, categorised ---- */
@@ -821,11 +822,11 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
           <p className="mb-3 text-sm font-medium">{t.distributionTitle}</p>
           <div className="space-y-3">
             {[
-              { label: "ChatGPT", pct: data.total_prompts ? Math.round((data.chatgpt_score / data.total_prompts) * 100) : 0, locked: false },
-              { label: "Gemini", pct: data.total_prompts ? Math.round((data.gemini_score / data.total_prompts) * 100) : 0, locked: false },
-              { label: "Perplexity", pct: 0, locked: true },
-              { label: "Claude", pct: 0, locked: true },
-            ].map((m) => (
+              { label: "ChatGPT", pct: data.total_prompts ? Math.round((data.chatgpt_score / data.total_prompts) * 100) : 0, locked: false, hidden: false },
+              { label: "Gemini", pct: data.total_prompts ? Math.round((data.gemini_score / data.total_prompts) * 100) : 0, locked: false, hidden: data.model_status?.gemini?.enabled === false },
+              { label: "Perplexity", pct: 0, locked: true, hidden: false },
+              { label: "Claude", pct: 0, locked: true, hidden: false },
+            ].filter((m) => !m.hidden).map((m) => (
               <div key={m.label} className="flex items-center gap-3">
                 <span className="flex w-24 shrink-0 items-center gap-1 text-xs font-medium text-neutral-700">
                   {m.label}{m.locked && <Lock className="h-3 w-3 text-neutral-300" />}
