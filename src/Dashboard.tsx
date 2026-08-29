@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, ChevronRight, Lock } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { supabase } from "./supabase";
 
 /* ────────────────────────────────────────────────────────────────
@@ -155,7 +157,7 @@ interface Strings {
 
 const STR: Record<Lang, Strings> = {
   en: {
-    back: "← Back",
+    back: "Back",
     lastRun: "Last run: today",
     aiVisibilityScore: "AI visibility score",
     vsCompetitorsAvg: (n) => `vs competitors avg ${n}%`,
@@ -198,7 +200,7 @@ const STR: Record<Lang, Strings> = {
     viewRecommendations: "View actionable recommendations",
     recommendationsTitle: "Actionable recommendations",
     recommendationsSub: "Prioritised fixes to close the gap with your competitors",
-    backToDashboard: "← Back to dashboard",
+    backToDashboard: "Back to dashboard",
     catMentions: "Mentions — off-page",
     catMentionsDesc: "Close the gaps where AI models rely on outside sources to know about you.",
     catTechnical: "Technical",
@@ -232,7 +234,7 @@ const STR: Record<Lang, Strings> = {
     responseHeading: "Model response",
   },
   ru: {
-    back: "← Назад",
+    back: "Назад",
     lastRun: "Последний запуск: сегодня",
     aiVisibilityScore: "AI visibility score",
     vsCompetitorsAvg: (n) => `в среднем у конкурентов ${n}%`,
@@ -275,7 +277,7 @@ const STR: Record<Lang, Strings> = {
     viewRecommendations: "Смотреть рекомендации",
     recommendationsTitle: "Рекомендации к действию",
     recommendationsSub: "Приоритетные шаги, чтобы догнать конкурентов",
-    backToDashboard: "← Назад к дашборду",
+    backToDashboard: "Назад к дашборду",
     catMentions: "Упоминания — вне сайта",
     catMentionsDesc: "Закройте пробелы там, где AI полагается на внешние источники, чтобы узнать о вас.",
     catTechnical: "Техническое",
@@ -388,6 +390,44 @@ function statLabel(name: string, isYou: boolean, youLabel: string) {
   return isYou ? `${name} (${youLabel})` : name;
 }
 
+/* AI answers come back as markdown — headings, bold, and comparison tables.
+   Rendering them raw showed literal ** and pipe characters, so we render
+   properly but keep the type small to fit inside an expanded row. */
+function AnswerMarkdown({ text }: { text: string }) {
+  return (
+    <div className="text-xs leading-relaxed text-neutral-700">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => <p className="mb-1 mt-3 text-sm font-semibold text-neutral-900">{children}</p>,
+          h2: ({ children }) => <p className="mb-1 mt-3 text-sm font-semibold text-neutral-900">{children}</p>,
+          h3: ({ children }) => <p className="mb-1 mt-2 text-xs font-semibold text-neutral-900">{children}</p>,
+          p: ({ children }) => <p className="mb-2">{children}</p>,
+          strong: ({ children }) => <strong className="font-semibold text-neutral-900">{children}</strong>,
+          ul: ({ children }) => <ul className="mb-2 list-disc space-y-0.5 pl-4">{children}</ul>,
+          ol: ({ children }) => <ol className="mb-2 list-decimal space-y-0.5 pl-4">{children}</ol>,
+          li: ({ children }) => <li>{children}</li>,
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="text-neutral-900 underline underline-offset-2">{children}</a>
+          ),
+          code: ({ children }) => <code className="rounded bg-neutral-100 px-1 py-0.5 text-[11px]">{children}</code>,
+          table: ({ children }) => (
+            <div className="mb-2 overflow-x-auto">
+              <table className="w-full border-collapse text-[11px]">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className="border-b border-neutral-200">{children}</thead>,
+          th: ({ children }) => <th className="px-2 py-1.5 text-left align-top font-medium text-neutral-900">{children}</th>,
+          td: ({ children }) => <td className="border-b border-neutral-100 px-2 py-1.5 align-top">{children}</td>,
+          hr: () => <hr className="my-2 border-neutral-100" />,
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 /* Expandable row showing what each model actually answered for one prompt.
    This is the "why don't I appear / what did competitors get" view. */
 function PromptRow({ result, t, tab, modelsUsed, runDate }: { result: AuditResult; t: Strings; tab: ModelKey; modelsUsed?: Record<string, string>; runDate: string }) {
@@ -405,7 +445,11 @@ function PromptRow({ result, t, tab, modelsUsed, runDate }: { result: AuditResul
       <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between gap-4 p-4 text-left transition-colors hover:bg-neutral-100/60">
         <div className="min-w-0">
           <p className="text-sm">{result.prompt}</p>
-          {competitors.length > 0 && <p className="mt-1 truncate text-xs text-neutral-400">{t.mentionedBy(competitors.join(", "))}</p>}
+          {competitors.length > 0 && (
+            <p className="mt-1 truncate text-xs text-neutral-400">
+              {competitors.map((c, i) => `${i + 1}. ${c}`).join("  ")}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${youMentioned ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
@@ -425,7 +469,7 @@ function PromptRow({ result, t, tab, modelsUsed, runDate }: { result: AuditResul
                 {m.info.mentioned && <span className="text-[10px] text-emerald-600">✓ {m.info.mentioned_with_link ? t.withLink : t.withoutLink}</span>}
               </div>
               {m.info.answer ? (
-                <p className="whitespace-pre-wrap text-xs leading-relaxed text-neutral-700">{m.info.answer}</p>
+                <AnswerMarkdown text={m.info.answer} />
               ) : (
                 <p className="text-xs italic text-neutral-400">{t.noAnswerCaptured}</p>
               )}
@@ -683,7 +727,7 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
             <span className="text-lg font-semibold">{brandName}</span>
           </button>
-          <button onClick={onBack} className="text-sm text-neutral-400 hover:text-neutral-900">{t.back}</button>
+          <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-900"><ArrowLeft className="h-4 w-4" /> {t.back}</button>
         </div>
       </header>
 
