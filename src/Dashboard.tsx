@@ -24,6 +24,7 @@ export type ModelMentionInfo = {
 
 export type AuditResult = {
   prompt: string;
+  prompt_type?: "problem" | "comparison" | "brand";
   gemini: ModelMentionInfo;
   chatgpt: ModelMentionInfo;
 };
@@ -47,6 +48,15 @@ export type Citation = {
   chatgpt_count: number;
   total: number;
   prompt: string;
+};
+
+export type SourceCheck = {
+  url: string;
+  domain: string;
+  status: "absent" | "present" | "unreadable";
+  reason: string;
+  competitors_on_page: string[];
+  found_in?: "post" | "comment" | "";
 };
 
 export type AuditData = {
@@ -145,6 +155,22 @@ interface Strings {
   covered: string;
   notCovered: string;
   modelFailed: (names: string) => string;
+  sourcesTitle: string;
+  sourcesSub: string;
+  sourcesRun: string;
+  sourcesRunning: string;
+  sourcesEmpty: string;
+  colSource: string;
+  colNamed: string;
+  colYou: string;
+  youAbsent: string;
+  youPresent: string;
+  youUnknown: string;
+  presentHint: string;
+  inPost: string;
+  inComment: string;
+  commentHint: string;
+  pagesCount: (n: number) => string;
   seeAiResponse: string;
   hideAiResponse: string;
   citedDomains: string;
@@ -224,6 +250,22 @@ const STR: Record<Lang, Strings> = {
     covered: "Covered",
     notCovered: "Not covered",
     modelFailed: (names: string) => `${names} didn't respond during this audit — the numbers below are incomplete.`,
+    sourcesTitle: "Where AI gets its answers",
+    sourcesSub: "We open each cited page and check whether your brand is on it.",
+    sourcesRun: "Check these sources",
+    sourcesRunning: "Opening pages…",
+    sourcesEmpty: "No sources were cited in this audit.",
+    colSource: "Source",
+    colNamed: "Names",
+    colYou: "You",
+    youAbsent: "not on page",
+    youPresent: "on page",
+    youUnknown: "couldn't check",
+    presentHint: "You are on this page but the model didn't name you — look at how you're described there.",
+    inPost: "in the post",
+    inComment: "in a comment",
+    commentHint: "Only a commenter mentioned you — weaker than being named in the post itself.",
+    pagesCount: (n) => `${n} page${n === 1 ? "" : "s"}`,
     seeAiResponse: "See what AI answered",
     hideAiResponse: "Hide answer",
     citedDomains: "Cited",
@@ -301,6 +343,22 @@ const STR: Record<Lang, Strings> = {
     covered: "Покрыто",
     notCovered: "Не покрыто",
     modelFailed: (names: string) => `${names} не ответил(а) во время аудита — цифры ниже неполные.`,
+    sourcesTitle: "Откуда AI берёт ответы",
+    sourcesSub: "Открываем каждую процитированную страницу и проверяем, есть ли там ваш бренд.",
+    sourcesRun: "Проверить источники",
+    sourcesRunning: "Открываем страницы…",
+    sourcesEmpty: "В этом аудите не было процитированных источников.",
+    colSource: "Источник",
+    colNamed: "Кого называет",
+    colYou: "Вы",
+    youAbsent: "вас нет",
+    youPresent: "вы есть",
+    youUnknown: "не проверено",
+    presentHint: "Вы есть на этой странице, но модель вас не назвала — посмотрите, как вы там описаны.",
+    inPost: "в посте",
+    inComment: "в комментарии",
+    commentHint: "Вас упомянули только в комментарии — это слабее, чем упоминание в самом посте.",
+    pagesCount: (n) => `${n} стр.`,
     seeAiResponse: "Смотреть ответ AI",
     hideAiResponse: "Свернуть ответ",
     citedDomains: "Ссылки",
@@ -424,6 +482,163 @@ function AnswerMarkdown({ text }: { text: string }) {
       >
         {text}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+
+const API_URL = "https://web-production-b2168.up.railway.app";
+
+type SourceRow = {
+  domain: string;
+  urls: string[];
+  named: string[];
+  foundIn: string;
+  status: "absent" | "present" | "unreadable" | "unchecked";
+  reason: string;
+};
+
+/* Which pages the models cited, and whether the brand is actually on them.
+
+   Runs on demand rather than as part of the audit: opening 10-20 pages takes
+   10-30 seconds, and nobody should wait that long before seeing their score. */
+function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
+  const [checks, setChecks] = useState<SourceCheck[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // Every cited URL, tagged with the kind of query that surfaced it.
+  const cited = useMemo(() => {
+    const byDomain = new Map<string, { urls: string[] }>();
+    for (const c of data.citations) {
+      const entry = byDomain.get(c.domain) || { urls: [] };
+      entry.urls.push(c.url);
+      byDomain.set(c.domain, entry);
+    }
+    return byDomain;
+  }, [data.citations]);
+
+  const run = async () => {
+    setLoading(true);
+    setFailed(false);
+    try {
+      const urls = Array.from(cited.values()).flatMap((e) => e.urls);
+      const res = await fetch(`${API_URL}/source-gap`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          urls,
+          brand: data.brand,
+          brand_domain: data.brand_domain || "",
+          competitors: data.competitor_ranking.filter((c) => !c.is_your_brand).map((c) => c.name),
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const json = await res.json();
+      setChecks(json.results || []);
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // One row per domain: four pages of the same site is one place to act on,
+  // not four separate findings.
+  const rows: SourceRow[] = useMemo(() => {
+    const out: SourceRow[] = [];
+    for (const [domain, entry] of cited) {
+      const mine = (checks || []).filter((c) => c.domain === domain);
+      const named = Array.from(new Set(mine.flatMap((c) => c.competitors_on_page)));
+
+      let status: SourceRow["status"] = "unchecked";
+      let reason = "";
+      let foundIn = "";
+      if (mine.length) {
+        const hit = mine.find((c) => c.status === "present");
+        if (hit) {
+          status = "present";
+          // A mention in the post outranks one buried in a reply.
+          foundIn = mine.some((c) => c.found_in === "post") ? "post" : (hit.found_in || "");
+        } else if (mine.some((c) => c.status === "absent")) {
+          status = "absent";
+        } else {
+          status = "unreadable";
+          reason = mine[0].reason;
+        }
+      }
+      out.push({ domain, urls: entry.urls, named, status, reason, foundIn });
+    }
+    const order = { absent: 0, present: 1, unreadable: 2, unchecked: 3 };
+    return out.sort((a, b) => order[a.status] - order[b.status] || b.named.length - a.named.length);
+  }, [cited, checks]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">{t.sourcesTitle}</p>
+          <p className="mt-0.5 text-xs text-neutral-400">{t.sourcesSub}</p>
+        </div>
+        {!checks && (
+          <button
+            onClick={run}
+            disabled={loading}
+            className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 disabled:opacity-50"
+          >
+            {loading ? t.sourcesRunning : t.sourcesRun}
+          </button>
+        )}
+      </div>
+
+      <table className="mt-4 w-full text-sm">
+        <thead>
+          <tr className="border-b border-neutral-100 text-left">
+            <th className="pb-2 text-xs font-normal text-neutral-400">{t.colSource}</th>
+            <th className="pb-2 text-xs font-normal text-neutral-400">{t.colNamed}</th>
+            <th className="pb-2 text-right text-xs font-normal text-neutral-400">{t.colYou}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.domain} className="border-b border-neutral-50 align-top">
+              <td className="py-2.5 pr-3">
+                <a href={r.urls[0]} target="_blank" rel="noopener noreferrer" className="text-xs text-neutral-800 hover:underline">
+                  {r.domain}
+                </a>
+                {r.urls.length > 1 && (
+                  <span className="ml-1.5 text-[10px] text-neutral-400">{t.pagesCount(r.urls.length)}</span>
+                )}
+                {r.status === "unreadable" && r.reason && (
+                  <p className="mt-0.5 text-[10px] leading-snug text-neutral-400">{r.reason}</p>
+                )}
+                {r.status === "present" && (
+                  <p className="mt-0.5 text-[10px] leading-snug text-amber-700">
+                    {r.foundIn === "comment" ? t.commentHint : t.presentHint}
+                  </p>
+                )}
+              </td>
+              <td className="py-2.5 pr-3 text-xs text-neutral-500">
+                {r.named.length ? r.named.join(", ") : "—"}
+              </td>
+              <td className="py-2.5 text-right">
+                {r.status === "absent" && <span className="text-xs font-medium text-red-600">{t.youAbsent}</span>}
+                {r.status === "present" && (
+                  <span className="text-xs font-medium text-emerald-600">
+                    {r.foundIn === "post" ? t.inPost : r.foundIn === "comment" ? t.inComment : t.youPresent}
+                  </span>
+                )}
+                {r.status === "unreadable" && <span className="text-xs text-neutral-400">{t.youUnknown}</span>}
+                {r.status === "unchecked" && <span className="text-xs text-neutral-300">—</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {failed && <p className="mt-3 text-xs text-red-500">{t.sourcesEmpty}</p>}
     </div>
   );
 }
@@ -929,6 +1144,8 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
             <p className="mt-3 text-sm text-neutral-400">{t.whatAiSaysEmpty}</p>
           )}
         </div>
+
+        <SourceGap data={data} t={t} />
 
         {/* Citations table */}
         {data.citations && data.citations.length > 0 && (
