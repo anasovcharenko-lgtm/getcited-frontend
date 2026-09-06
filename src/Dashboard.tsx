@@ -531,6 +531,36 @@ const API_URL = "https://web-production-b2168.up.railway.app";
    Runs on demand rather than as part of the audit: opening 10-20 pages takes
    10-30 seconds, and nobody should wait that long before seeing their score. */
 
+/* The excerpt is a slice out of a markdown answer, so it arrives carrying
+   ## headings and ** marks. Rendering full markdown here would pull in
+   headings and tables mid-sentence; stripping the syntax and keeping only
+   bold reads as prose while preserving the emphasis the model intended. */
+function excerptToNodes(text: string, limit = 150): React.ReactNode[] {
+  const cleaned = text
+    .replace(/^[-*]\s+/gm, "")        // bullet markers at line start
+    .replace(/\s+/g, " ")
+    // Headings are matched after collapsing newlines, so a "###" that ended up
+    // mid-sentence gets removed too rather than showing as literal hashes.
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/`+/g, "")
+    .trim();
+  const clipped = cleaned.length > limit ? cleaned.slice(0, limit) + "…" : cleaned;
+
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  const bold = /\*\*(.+?)\*\*/g;
+  let m: RegExpExecArray | null;
+  while ((m = bold.exec(clipped)) !== null) {
+    if (m.index > last) out.push(clipped.slice(last, m.index));
+    out.push(<strong key={m.index} className="font-medium text-neutral-700">{m[1]}</strong>);
+    last = m.index + m[0].length;
+  }
+  // Strip stray asterisks from the tail: a bold marker cut in half by the
+  // character limit would otherwise render as literal "**".
+  if (last < clipped.length) out.push(clipped.slice(last).replace(/\*+/g, ""));
+  return out.length ? out : [clipped.replace(/\*+/g, "")];
+}
+
 /* Screen 2: the prompts competitors answer and the brand does not.
 
    Selecting prompts writes them to Supabase. That list is what the next audit
@@ -627,7 +657,7 @@ function CompetitorPrompts({ data, t, onBack }: { data: AuditData; t: Strings; o
                 {/* No search-volume source yet. An honest dash beats a number we made up. */}
                 <span className="text-xs text-neutral-300">{t.noVolume}</span>
                 <span className="pr-2 text-[11px] leading-relaxed text-neutral-500">
-                  {r.answer ? r.answer.slice(0, 150) + (r.answer.length > 150 ? "…" : "") : "—"}
+                  {r.answer ? excerptToNodes(r.answer) : "—"}
                 </span>
                 <span className="text-[11px] leading-relaxed text-neutral-500">
                   {r.rivals.join(", ")}
