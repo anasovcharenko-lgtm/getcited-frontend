@@ -81,7 +81,7 @@ export type AuditData = {
 
 type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "claude" | "ai_overview";
 type Lang = "en" | "ru";
-type View = "overview" | "recommendations" | "uncovered" | "covered";
+type View = "overview" | "recommendations" | "uncovered" | "covered" | "competitors";
 
 /* ────────────────────────────────────────────────────────────────
    Copy
@@ -156,21 +156,31 @@ interface Strings {
   notCovered: string;
   modelFailed: (names: string) => string;
   sourcesTitle: string;
-  sourcesSub: string;
+  sourcesSummary: (n: number) => string;
+  sourcesChecked: (n: number, present: number) => string;
   sourcesRun: string;
   sourcesRunning: string;
-  sourcesEmpty: string;
-  colSource: string;
-  colNamed: string;
-  colYou: string;
-  youAbsent: string;
-  youPresent: string;
-  youUnknown: string;
-  presentHint: string;
+  sourcesFailed: string;
+  andMore: (n: number) => string;
   inPost: string;
   inComment: string;
-  commentHint: string;
-  pagesCount: (n: number) => string;
+  ofTotal: (a: number, b: number) => string;
+  wholeBarAvailable: string;
+  competitorsTitle: string;
+  competitorsSub: (n: number) => string;
+  colPrompt2: string;
+  colVolume: string;
+  colAnswer: string;
+  colMentions: string;
+  noVolume: string;
+  showMore: string;
+  selectedCount: (n: number) => string;
+  trackHint: string;
+  trackButton: string;
+  trackSaving: string;
+  trackSaved: string;
+  trackFailed: string;
+  lockedRow: string;
   seeAiResponse: string;
   hideAiResponse: string;
   citedDomains: string;
@@ -250,22 +260,35 @@ const STR: Record<Lang, Strings> = {
     covered: "Covered",
     notCovered: "Not covered",
     modelFailed: (names: string) => `${names} didn't respond during this audit — the numbers below are incomplete.`,
-    sourcesTitle: "Where AI gets its answers",
-    sourcesSub: "We open each cited page and check whether your brand is on it.",
-    sourcesRun: "Check these sources",
+    sourcesTitle: "Where AI looks for answers",
+    sourcesSummary: (n) => `${n} source${n === 1 ? "" : "s"} shaped these answers.`,
+    sourcesChecked: (n, present) =>
+      present === 0
+        ? `Checked all ${n}. None of them mention you.`
+        : `Checked all ${n}. ${present} mention${present === 1 ? "s" : ""} you.`,
+    sourcesRun: "Check which of them mention you →",
     sourcesRunning: "Opening pages…",
-    sourcesEmpty: "No sources were cited in this audit.",
-    colSource: "Source",
-    colNamed: "Names",
-    colYou: "You",
-    youAbsent: "not on page",
-    youPresent: "on page",
-    youUnknown: "couldn't check",
-    presentHint: "You are on this page but the model didn't name you — look at how you're described there.",
+    sourcesFailed: "Could not reach the checker. Try again in a moment.",
+    andMore: (n) => `+${n} more`,
     inPost: "in the post",
     inComment: "in a comment",
-    commentHint: "Only a commenter mentioned you — weaker than being named in the post itself.",
-    pagesCount: (n) => `${n} page${n === 1 ? "" : "s"}`,
+    ofTotal: (a, b) => `${a} of ${b}`,
+    wholeBarAvailable: "the whole bar is available",
+    competitorsTitle: "Prompts your competitors answer",
+    competitorsSub: (n) => `${n} prompt${n === 1 ? "" : "s"} where they appear and you don't.`,
+    colPrompt2: "Prompt",
+    colVolume: "Volume",
+    colAnswer: "Answer",
+    colMentions: "Mentions",
+    noVolume: "—",
+    showMore: "more",
+    selectedCount: (n) => `${n} prompt${n === 1 ? "" : "s"} selected`,
+    trackHint: "We'll track these and tell you when you start appearing",
+    trackButton: "Get these queries too →",
+    trackSaving: "Saving…",
+    trackSaved: "Tracked. We'll check these on your next audit.",
+    trackFailed: "Could not save. Try again.",
+    lockedRow: "Paid plans",
     seeAiResponse: "See what AI answered",
     hideAiResponse: "Hide answer",
     citedDomains: "Cited",
@@ -344,21 +367,34 @@ const STR: Record<Lang, Strings> = {
     notCovered: "Не покрыто",
     modelFailed: (names: string) => `${names} не ответил(а) во время аудита — цифры ниже неполные.`,
     sourcesTitle: "Откуда AI берёт ответы",
-    sourcesSub: "Открываем каждую процитированную страницу и проверяем, есть ли там ваш бренд.",
-    sourcesRun: "Проверить источники",
+    sourcesSummary: (n) => `${n} источник(ов) сформировали эти ответы.`,
+    sourcesChecked: (n, present) =>
+      present === 0
+        ? `Проверили все ${n}. Ни один вас не упоминает.`
+        : `Проверили все ${n}. Вас упоминают: ${present}.`,
+    sourcesRun: "Проверить, кто из них вас упоминает →",
     sourcesRunning: "Открываем страницы…",
-    sourcesEmpty: "В этом аудите не было процитированных источников.",
-    colSource: "Источник",
-    colNamed: "Кого называет",
-    colYou: "Вы",
-    youAbsent: "вас нет",
-    youPresent: "вы есть",
-    youUnknown: "не проверено",
-    presentHint: "Вы есть на этой странице, но модель вас не назвала — посмотрите, как вы там описаны.",
+    sourcesFailed: "Не удалось связаться с проверкой. Попробуйте ещё раз.",
+    andMore: (n) => `+ещё ${n}`,
     inPost: "в посте",
     inComment: "в комментарии",
-    commentHint: "Вас упомянули только в комментарии — это слабее, чем упоминание в самом посте.",
-    pagesCount: (n) => `${n} стр.`,
+    ofTotal: (a, b) => `${a} из ${b}`,
+    wholeBarAvailable: "вся полоса свободна",
+    competitorsTitle: "Промпты, на которые отвечают конкуренты",
+    competitorsSub: (n) => `${n} промптов, где есть они и нет вас.`,
+    colPrompt2: "Промпт",
+    colVolume: "Частотность",
+    colAnswer: "Ответ",
+    colMentions: "Упоминают",
+    noVolume: "—",
+    showMore: "ещё",
+    selectedCount: (n) => `Выбрано промптов: ${n}`,
+    trackHint: "Будем следить за ними и сообщим, когда вы начнёте появляться",
+    trackButton: "Хочу быть в этих запросах →",
+    trackSaving: "Сохраняем…",
+    trackSaved: "Отслеживаем. Проверим при следующем аудите.",
+    trackFailed: "Не удалось сохранить. Попробуйте ещё раз.",
+    lockedRow: "Платные тарифы",
     seeAiResponse: "Смотреть ответ AI",
     hideAiResponse: "Свернуть ответ",
     citedDomains: "Ссылки",
@@ -489,45 +525,173 @@ function AnswerMarkdown({ text }: { text: string }) {
 
 const API_URL = "https://web-production-b2168.up.railway.app";
 
-type SourceRow = {
-  domain: string;
-  urls: string[];
-  named: string[];
-  foundIn: string;
-  status: "absent" | "present" | "unreadable" | "unchecked";
-  reason: string;
-};
 
 /* Which pages the models cited, and whether the brand is actually on them.
 
    Runs on demand rather than as part of the audit: opening 10-20 pages takes
    10-30 seconds, and nobody should wait that long before seeing their score. */
+
+/* Screen 2: the prompts competitors answer and the brand does not.
+
+   Selecting prompts writes them to Supabase. That list is what the next audit
+   compares against - it is the reason to come back rather than just re-read a
+   report. */
+function CompetitorPrompts({ data, t, onBack }: { data: AuditData; t: Strings; onBack: () => void }) {
+  const rows = useMemo(() => {
+    return data.results
+      .map((r) => {
+        const models = [r.chatgpt, r.gemini];
+        const youHere = models.some((m) => m.mentioned);
+        const rivals = Array.from(new Set(models.flatMap((m) => m.competitors_found || [])));
+        const answer = r.chatgpt.answer || r.gemini.answer || "";
+        return { prompt: r.prompt, rivals, answer, youHere };
+      })
+      .filter((r) => !r.youHere && r.rivals.length > 0);
+  }, [data.results]);
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const toggle = (p: string) => {
+    setSaved(false);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      return next;
+    });
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setFailed(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("not signed in");
+      const rowsToSave = Array.from(selected).map((prompt) => ({
+        user_id: user.id,
+        brand: data.brand,
+        prompt,
+      }));
+      // Re-selecting a prompt already tracked should not error.
+      const { error } = await supabase
+        .from("tracked_prompts")
+        .upsert(rowsToSave, { onConflict: "user_id,brand,prompt" });
+      if (error) throw error;
+      setSaved(true);
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white text-neutral-900">
+      <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+          <button onClick={onBack} className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900">
+            <ArrowLeft className="h-4 w-4" /> {t.backToDashboard}
+          </button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-6 py-10 pb-28">
+        <h1 className="text-xl font-semibold">{t.competitorsTitle}</h1>
+        <p className="mt-1 text-sm text-neutral-500">{t.competitorsSub(rows.length)}</p>
+
+        {rows.length === 0 ? (
+          <p className="mt-6 rounded-xl border border-dashed border-neutral-200 p-6 text-center text-sm text-neutral-400">
+            {t.uncoveredEmpty}
+          </p>
+        ) : (
+          <div className="mt-6 overflow-hidden rounded-2xl border border-neutral-150">
+            <div className="grid grid-cols-[26px_1.4fr_0.6fr_2fr_0.9fr] gap-2 bg-neutral-50 px-4 py-2.5 text-[10px] uppercase tracking-wide text-neutral-400">
+              <span />
+              <span>{t.colPrompt2}</span>
+              <span>{t.colVolume}</span>
+              <span>{t.colAnswer}</span>
+              <span>{t.colMentions}</span>
+            </div>
+            {rows.map((r, i) => (
+              <div key={i} className="grid grid-cols-[26px_1.4fr_0.6fr_2fr_0.9fr] items-start gap-2 border-t border-neutral-100 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={selected.has(r.prompt)}
+                  onChange={() => toggle(r.prompt)}
+                  className="mt-0.5"
+                />
+                <span className="pr-2 text-xs">{r.prompt}</span>
+                {/* No search-volume source yet. An honest dash beats a number we made up. */}
+                <span className="text-xs text-neutral-300">{t.noVolume}</span>
+                <span className="pr-2 text-[11px] leading-relaxed text-neutral-500">
+                  {r.answer ? r.answer.slice(0, 150) + (r.answer.length > 150 ? "…" : "") : "—"}
+                </span>
+                <span className="text-[11px] leading-relaxed text-neutral-500">
+                  {r.rivals.join(", ")}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {selected.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 border-t border-neutral-150 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-4">
+            <div>
+              <p className="text-sm font-medium">{t.selectedCount(selected.size)}</p>
+              <p className="mt-0.5 text-xs text-neutral-400">
+                {saved ? t.trackSaved : failed ? t.trackFailed : t.trackHint}
+              </p>
+            </div>
+            <button
+              onClick={save}
+              disabled={saving || saved}
+              className="whitespace-nowrap rounded-lg bg-neutral-900 px-4 py-2.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 disabled:opacity-50"
+            >
+              {saving ? t.trackSaving : saved ? t.trackSaved : t.trackButton}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Which sites the models drew on, and whether the brand is on any of them.
+
+   Domains show immediately from the audit. Opening 10-20 pages to check for the
+   brand takes 10-30 seconds, so that part runs only when asked. */
 function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
   const [checks, setChecks] = useState<SourceCheck[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  // Every cited URL, tagged with the kind of query that surfaced it.
-  const cited = useMemo(() => {
-    const byDomain = new Map<string, { urls: string[] }>();
+  const domains = useMemo(() => {
+    const byDomain = new Map<string, { urls: string[]; count: number }>();
     for (const c of data.citations) {
-      const entry = byDomain.get(c.domain) || { urls: [] };
-      entry.urls.push(c.url);
-      byDomain.set(c.domain, entry);
+      const e = byDomain.get(c.domain) || { urls: [], count: 0 };
+      e.urls.push(c.url);
+      e.count += c.total || 1;
+      byDomain.set(c.domain, e);
     }
-    return byDomain;
+    return Array.from(byDomain, ([domain, e]) => ({ domain, ...e }))
+      .sort((a, b) => b.count - a.count);
   }, [data.citations]);
 
   const run = async () => {
     setLoading(true);
     setFailed(false);
     try {
-      const urls = Array.from(cited.values()).flatMap((e) => e.urls);
       const res = await fetch(`${API_URL}/source-gap`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          urls,
+          urls: domains.flatMap((d) => d.urls),
           brand: data.brand,
           brand_domain: data.brand_domain || "",
           competitors: data.competitor_ranking.filter((c) => !c.is_your_brand).map((c) => c.name),
@@ -536,6 +700,7 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
       if (!res.ok) throw new Error(String(res.status));
       const json = await res.json();
       setChecks(json.results || []);
+      setExpanded(true);
     } catch {
       setFailed(true);
     } finally {
@@ -543,102 +708,67 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
     }
   };
 
-  // One row per domain: four pages of the same site is one place to act on,
-  // not four separate findings.
-  const rows: SourceRow[] = useMemo(() => {
-    const out: SourceRow[] = [];
-    for (const [domain, entry] of cited) {
-      const mine = (checks || []).filter((c) => c.domain === domain);
-      const named = Array.from(new Set(mine.flatMap((c) => c.competitors_on_page)));
+  const statusFor = (domain: string) => {
+    const mine = (checks || []).filter((c) => c.domain === domain);
+    if (!mine.length) return null;
+    const hit = mine.find((c) => c.status === "present");
+    if (hit) return { status: "present" as const, foundIn: hit.found_in || "", reason: "" };
+    if (mine.some((c) => c.status === "absent")) return { status: "absent" as const, foundIn: "", reason: "" };
+    return { status: "unreadable" as const, foundIn: "", reason: mine[0].reason };
+  };
 
-      let status: SourceRow["status"] = "unchecked";
-      let reason = "";
-      let foundIn = "";
-      if (mine.length) {
-        const hit = mine.find((c) => c.status === "present");
-        if (hit) {
-          status = "present";
-          // A mention in the post outranks one buried in a reply.
-          foundIn = mine.some((c) => c.found_in === "post") ? "post" : (hit.found_in || "");
-        } else if (mine.some((c) => c.status === "absent")) {
-          status = "absent";
-        } else {
-          status = "unreadable";
-          reason = mine[0].reason;
-        }
-      }
-      out.push({ domain, urls: entry.urls, named, status, reason, foundIn });
-    }
-    const order = { absent: 0, present: 1, unreadable: 2, unchecked: 3 };
-    return out.sort((a, b) => order[a.status] - order[b.status] || b.named.length - a.named.length);
-  }, [cited, checks]);
+  const presentCount = (checks || []).filter((c) => c.status === "present").length;
 
-  if (rows.length === 0) return null;
+  if (domains.length === 0) return null;
+
+  const visible = expanded ? domains : domains.slice(0, 3);
 
   return (
     <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium">{t.sourcesTitle}</p>
-          <p className="mt-0.5 text-xs text-neutral-400">{t.sourcesSub}</p>
-        </div>
-        {!checks && (
-          <button
-            onClick={run}
-            disabled={loading}
-            className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700 disabled:opacity-50"
-          >
-            {loading ? t.sourcesRunning : t.sourcesRun}
+      <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.sourcesTitle}</p>
+      <p className="mt-1.5 text-xs text-neutral-500">
+        {checks
+          ? t.sourcesChecked(domains.length, presentCount)
+          : t.sourcesSummary(domains.length)}
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {visible.map((d) => {
+          const st = statusFor(d.domain);
+          return (
+            <span
+              key={d.domain}
+              title={st?.reason || undefined}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${
+                st?.status === "present"
+                  ? "border-neutral-900 text-neutral-900"
+                  : "border-neutral-200 text-neutral-500"
+              }`}
+            >
+              {d.domain}
+              <b className="font-medium text-neutral-900">{d.count}×</b>
+              {st?.status === "present" && (
+                <span className="text-[10px] text-neutral-500">
+                  {st.foundIn === "comment" ? t.inComment : t.inPost}
+                </span>
+              )}
+              {st?.status === "unreadable" && <span className="text-[10px] text-neutral-300">?</span>}
+            </span>
+          );
+        })}
+        {!expanded && domains.length > 3 && (
+          <button onClick={() => setExpanded(true)} className="rounded-full border border-neutral-200 px-2.5 py-1 text-[11px] text-neutral-500 hover:text-neutral-900">
+            {t.andMore(domains.length - 3)}
           </button>
         )}
       </div>
 
-      <table className="mt-4 w-full text-sm">
-        <thead>
-          <tr className="border-b border-neutral-100 text-left">
-            <th className="pb-2 text-xs font-normal text-neutral-400">{t.colSource}</th>
-            <th className="pb-2 text-xs font-normal text-neutral-400">{t.colNamed}</th>
-            <th className="pb-2 text-right text-xs font-normal text-neutral-400">{t.colYou}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.domain} className="border-b border-neutral-50 align-top">
-              <td className="py-2.5 pr-3">
-                <a href={r.urls[0]} target="_blank" rel="noopener noreferrer" className="text-xs text-neutral-800 hover:underline">
-                  {r.domain}
-                </a>
-                {r.urls.length > 1 && (
-                  <span className="ml-1.5 text-[10px] text-neutral-400">{t.pagesCount(r.urls.length)}</span>
-                )}
-                {r.status === "unreadable" && r.reason && (
-                  <p className="mt-0.5 text-[10px] leading-snug text-neutral-400">{r.reason}</p>
-                )}
-                {r.status === "present" && (
-                  <p className="mt-0.5 text-[10px] leading-snug text-amber-700">
-                    {r.foundIn === "comment" ? t.commentHint : t.presentHint}
-                  </p>
-                )}
-              </td>
-              <td className="py-2.5 pr-3 text-xs text-neutral-500">
-                {r.named.length ? r.named.join(", ") : "—"}
-              </td>
-              <td className="py-2.5 text-right">
-                {r.status === "absent" && <span className="text-xs font-medium text-red-600">{t.youAbsent}</span>}
-                {r.status === "present" && (
-                  <span className="text-xs font-medium text-emerald-600">
-                    {r.foundIn === "post" ? t.inPost : r.foundIn === "comment" ? t.inComment : t.youPresent}
-                  </span>
-                )}
-                {r.status === "unreadable" && <span className="text-xs text-neutral-400">{t.youUnknown}</span>}
-                {r.status === "unchecked" && <span className="text-xs text-neutral-300">—</span>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {failed && <p className="mt-3 text-xs text-red-500">{t.sourcesEmpty}</p>}
+      {!checks && (
+        <button onClick={run} disabled={loading} className="mt-4 text-xs text-neutral-500 hover:text-neutral-900 disabled:opacity-50">
+          {loading ? t.sourcesRunning : t.sourcesRun}
+        </button>
+      )}
+      {failed && <p className="mt-3 text-xs text-neutral-400">{t.sourcesFailed}</p>}
     </div>
   );
 }
@@ -896,6 +1026,10 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
   /* ────────────────────────────────────────────────────────────
      Uncovered / covered prompts drill-down view
      ──────────────────────────────────────────────────────────── */
+  if (view === "competitors") {
+    return <CompetitorPrompts data={data} t={t} onBack={() => setView("overview")} />;
+  }
+
   if (view === "uncovered" || view === "covered") {
     const isUncovered = view === "uncovered";
     return (
@@ -1005,27 +1139,39 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
         <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.comparedTo}</p>
-            <button onClick={() => setView("uncovered")} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900">
+            <button onClick={() => setView("competitors")} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900">
               {t.seeUncovered} <ChevronRight className="h-3 w-3" />
             </button>
           </div>
           <div className="space-y-2">
             {data.competitor_ranking.slice(0, 5).map((stat) => {
+              // Counts, not percentages: "0 of 18" gives the gap a size you can
+              // aim at, where "0%" is just a score you are losing.
+              const total = data.total_prompts || 1;
+              const covered = Math.round((stat.mention_rate / 100) * total);
               const max = Math.max(...data.competitor_ranking.map((s) => s.mention_rate), 1);
+              const empty = covered === 0;
               return (
                 <div key={stat.name} className="flex items-center gap-3">
                   <span className="w-28 shrink-0 truncate text-xs font-medium">
                     {stat.name}
                     {stat.is_your_brand && <span className="ml-1 rounded-full bg-neutral-900 px-1.5 py-0.5 text-[10px] text-white">{t.you}</span>}
                   </span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-neutral-100">
-                    <div className={`h-full rounded-full ${stat.is_your_brand ? "bg-neutral-900" : "bg-neutral-300"}`} style={{ width: `${(stat.mention_rate / max) * 100}%` }} />
-                  </div>
-                  <span className="w-10 shrink-0 text-right text-xs font-semibold">{stat.mention_rate}%</span>
+                  {empty ? (
+                    <div className="h-2 flex-1 rounded-full border border-dashed border-neutral-300" />
+                  ) : (
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-neutral-100">
+                      <div className={`h-full rounded-full ${stat.is_your_brand ? "bg-neutral-900" : "bg-neutral-300"}`} style={{ width: `${(stat.mention_rate / max) * 100}%` }} />
+                    </div>
+                  )}
+                  <span className="w-14 shrink-0 text-right text-xs font-semibold">{t.ofTotal(covered, total)}</span>
                 </div>
               );
             })}
           </div>
+          {data.competitor_ranking.some((s) => s.is_your_brand && s.mention_rate === 0) && (
+            <p className="mt-1.5 pl-[7.75rem] text-[10px] text-neutral-400">{t.wholeBarAvailable}</p>
+          )}
           <button onClick={() => setView("recommendations")} className="mt-3 block w-full text-right text-xs text-neutral-400 hover:text-neutral-900">{t.howToFix}</button>
         </div>
 
