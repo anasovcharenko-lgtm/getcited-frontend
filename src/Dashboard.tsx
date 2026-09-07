@@ -184,6 +184,11 @@ interface Strings {
   trackFailed: string;
   lockedRow: string;
   openAnswer: string;
+  trackedTitle: string;
+  trackedEmpty: string;
+  addedOn: (d: string) => string;
+  youAppearShort: string;
+  youDontAppearShort: string;
   closeAnswer: string;
   seeAiResponse: string;
   hideAiResponse: string;
@@ -294,6 +299,11 @@ const STR: Record<Lang, Strings> = {
     trackFailed: "Could not save. Try again.",
     lockedRow: "Paid plans",
     openAnswer: "Read the full answer",
+    trackedTitle: "Prompts you are tracking",
+    trackedEmpty: "Nothing tracked yet. Pick prompts above and they will run in every audit.",
+    addedOn: (d: string) => `Tracked since ${d}`,
+    youAppearShort: "mentioned",
+    youDontAppearShort: "no mention",
     closeAnswer: "Hide",
     seeAiResponse: "See what AI answered",
     hideAiResponse: "Hide answer",
@@ -402,6 +412,11 @@ const STR: Record<Lang, Strings> = {
     trackFailed: "Не удалось сохранить. Попробуйте ещё раз.",
     lockedRow: "Платные тарифы",
     openAnswer: "Читать ответ целиком",
+    trackedTitle: "Промпты на отслеживании",
+    trackedEmpty: "Пока ничего не отслеживается. Выберите промпты выше — они будут проверяться в каждом аудите.",
+    addedOn: (d: string) => `На отслеживании с ${d}`,
+    youAppearShort: "упоминание есть",
+    youDontAppearShort: "упоминания нет",
     closeAnswer: "Свернуть",
     seeAiResponse: "Смотреть ответ AI",
     hideAiResponse: "Свернуть ответ",
@@ -574,7 +589,7 @@ function excerptToNodes(text: string, limit = 150): React.ReactNode[] {
    Selecting prompts writes them to Supabase. That list is what the next audit
    compares against - it is the reason to come back rather than just re-read a
    report. */
-function CompetitorPrompts({ data, t, onBack }: { data: AuditData; t: Strings; onBack: () => void }) {
+function CompetitorPrompts({ data, t, lang, onBack }: { data: AuditData; t: Strings; lang: Lang; onBack: () => void }) {
   const rows = useMemo(() => {
     return data.results
       .map((r) => {
@@ -589,6 +604,49 @@ function CompetitorPrompts({ data, t, onBack }: { data: AuditData; t: Strings; o
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openRow, setOpenRow] = useState<string | null>(null);
+  const [tracked, setTracked] = useState<{ prompt: string; created_at: string }[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { if (!cancelled) setTracked([]); return; }
+        const { data: rows } = await supabase
+          .from("tracked_prompts")
+          .select("prompt, created_at")
+          .eq("user_id", user.id)
+          .ilike("brand", data.brand);
+        if (!cancelled) setTracked((rows || []) as { prompt: string; created_at: string }[]);
+      } catch {
+        if (!cancelled) setTracked([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [data.brand]);
+
+  /* A tracked prompt may not have been in this run at all - the audit may have
+     been made before it was picked. Saying "not yet" in that case would be a
+     lie, so the three states are kept apart. */
+  const trackedRows = useMemo(() => {
+    if (!tracked) return [];
+    return tracked.map((row) => {
+      const p = row.prompt;
+      const added = row.created_at
+        ? new Date(row.created_at).toLocaleDateString(lang === "ru" ? "ru-RU" : "en-GB",
+            { day: "numeric", month: "long", year: "numeric" })
+        : "";
+      const hit = data.results.find((r) => r.prompt.toLowerCase() === p.toLowerCase());
+      if (!hit) return { prompt: p, state: "unknown" as const, rivals: [] as string[], added };
+      const models = [hit.chatgpt, hit.gemini];
+      return {
+        prompt: p,
+        state: models.some((m) => m.mentioned) ? ("present" as const) : ("absent" as const),
+        rivals: Array.from(new Set(models.flatMap((m) => m.competitors_found || []))),
+        added,
+      };
+    });
+  }, [tracked, data.results, lang]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -696,6 +754,34 @@ function CompetitorPrompts({ data, t, onBack }: { data: AuditData; t: Strings; o
             })}
           </div>
         )}
+        <div className="mt-10">
+          <h2 className="text-sm font-medium">{t.trackedTitle}</h2>
+          {trackedRows.length === 0 ? (
+            <p className="mt-2 text-xs text-neutral-400">{t.trackedEmpty}</p>
+          ) : (
+            <div className="mt-3 overflow-hidden rounded-2xl border border-neutral-150">
+              {trackedRows.map((r, i) => (
+                <div key={i} className="flex items-start justify-between gap-4 border-b border-neutral-100 px-4 py-3 last:border-0">
+                  <div>
+                    <p className="text-xs">{r.prompt}</p>
+                    {r.rivals.length > 0 && (
+                      <p className="mt-0.5 text-[11px] text-neutral-400">{r.rivals.join(", ")}</p>
+                    )}
+                  </div>
+                  <span className={`whitespace-nowrap text-[11px] font-medium ${
+                    r.state === "present" ? "text-emerald-600"
+                    : r.state === "absent" ? "text-neutral-400"
+                    : "text-neutral-300"
+                  }`}>
+                    {r.state === "present" ? t.youAppearShort
+                      : r.state === "absent" ? t.youDontAppearShort
+                      : t.addedOn(r.added)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
       {selected.size > 0 && (
@@ -1101,7 +1187,7 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
      Uncovered / covered prompts drill-down view
      ──────────────────────────────────────────────────────────── */
   if (view === "competitors") {
-    return <CompetitorPrompts data={data} t={t} onBack={() => setView("overview")} />;
+    return <CompetitorPrompts data={data} t={t} lang={lang} onBack={() => setView("overview")} />;
   }
 
   if (view === "uncovered" || view === "covered") {

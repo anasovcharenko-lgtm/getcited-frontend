@@ -116,6 +116,8 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   // what is typed and skips generation entirely.
   const [mode, setMode] = useState<"generate" | "manual">("generate");
   const [customRows, setCustomRows] = useState<string[]>([""]);
+  const [tracked, setTracked] = useState<string[]>([]);
+  const [trackedLoading, setTrackedLoading] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -135,7 +137,38 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
     return () => clearTimeout(timer);
   }, [brand]);
 
+  /* Prompts the user chose to track run in every audit - otherwise they would
+     sit in the list forever with no status, and tracking would mean nothing. */
+  useEffect(() => {
+    if (step !== 2 || !brand.trim()) return;
+    let cancelled = false;
+    (async () => {
+      setTrackedLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+          .from("tracked_prompts")
+          .select("prompt")
+          .eq("user_id", user.id)
+          .ilike("brand", brand.trim());
+        if (!cancelled) setTracked((data || []).map((r: { prompt: string }) => r.prompt));
+      } catch {
+        if (!cancelled) setTracked([]);
+      } finally {
+        if (!cancelled) setTrackedLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [step, brand]);
+
   const customLines = customRows.map((l) => l.trim()).filter(Boolean);
+  // Tracked prompts are added on top of whichever mode is chosen, and
+  // de-duplicated so typing one by hand does not run it twice.
+  const promptsToRun = Array.from(new Set([
+    ...(mode === "manual" ? customLines : []),
+    ...tracked,
+  ]));
 
   /* Pasting a block of prompts should fill the rows rather than dumping every
      line into one field, which is what people actually do when they have a
@@ -152,7 +185,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   const startAudit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!brand.trim()) return;
-    if (mode === "manual" && customLines.length === 0) { setError("Add at least one prompt, or switch to generate."); return; }
+    if (mode === "manual" && promptsToRun.length === 0) { setError("Add at least one prompt, or switch to generate."); return; }
     setLoading(true);
     setError("");
     try {
@@ -170,7 +203,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, custom_prompts: mode === "manual" ? customLines : [] }) });
+      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, custom_prompts: mode === "manual" || tracked.length > 0 ? promptsToRun : [] }) });
       const data = await res.json();
       if (user) {
         await supabase.from('audits').insert({
@@ -236,6 +269,13 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
             <h3 className="text-sm font-medium">Which prompts to check</h3>
             <p className="mt-0.5 text-xs text-neutral-500">Write your own, or let us generate them from your category.</p>
           </div>
+          {trackedLoading && <p className="text-xs text-neutral-400">Loading your tracked prompts…</p>}
+          {tracked.length > 0 && (
+            <div className="rounded-lg border border-neutral-200 p-3">
+              <p className="text-xs font-medium">{`${tracked.length} tracked prompt(s) will run too`}</p>
+              <p className="mt-1 text-xs text-neutral-400">You chose to track these earlier. They run every audit so you can see when you start appearing.</p>
+            </div>
+          )}
           <div className="flex gap-2">
             <button type="button" onClick={() => setMode("generate")} className={`h-10 flex-1 rounded-lg border text-xs font-medium ${mode === "generate" ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 text-neutral-600"}`}>Generate for me</button>
             <button type="button" onClick={() => setMode("manual")} className={`h-10 flex-1 rounded-lg border text-xs font-medium ${mode === "manual" ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 text-neutral-600"}`}>Write my own</button>
