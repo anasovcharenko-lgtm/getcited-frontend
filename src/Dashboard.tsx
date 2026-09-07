@@ -965,7 +965,21 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
     return d.toLocaleDateString(lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   }, [data.run_at, lang]);
 
-  const visibleCitations = showAllCitations ? data.citations : data.citations.slice(0, 10);
+  /* The API returns one entry per cited URL, so a prompt that pulled three
+     sources produced three identical-looking rows. Group by prompt: the prompt
+     is the unit a reader thinks in, the domains are its detail. */
+  const citationGroups = useMemo(() => {
+    const byPrompt = new Map<string, { prompt: string; sources: Citation[] }>();
+    for (const c of data.citations) {
+      const key = c.prompt || "—";
+      const g = byPrompt.get(key) || { prompt: key, sources: [] };
+      g.sources.push(c);
+      byPrompt.set(key, g);
+    }
+    return Array.from(byPrompt.values());
+  }, [data.citations]);
+
+  const visibleCitations = showAllCitations ? citationGroups : citationGroups.slice(0, 10);
 
   const failedModels = useMemo(() => {
     const status = data.model_status;
@@ -1371,23 +1385,31 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
                 </tr>
               </thead>
               <tbody>
-                {visibleCitations.map((c, i) => (
-                  <tr key={i} className="border-b border-neutral-50">
-                    <td className="max-w-[260px] truncate py-2 pr-4 text-xs text-neutral-700">{c.prompt || "—"}</td>
-                    <td className="py-2 text-center text-xs text-neutral-400">{t.svPending}</td>
-                    <td className="py-2 text-center">
-                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">{c.gemini_count >= c.chatgpt_count ? "Gemini" : "ChatGPT"}</span>
+                {visibleCitations.map((g, i) => (
+                  <tr key={i} className="border-b border-neutral-50 align-top">
+                    <td className="max-w-[280px] py-2.5 pr-4 text-xs text-neutral-700">{g.prompt}</td>
+                    <td className="py-2.5 text-center text-xs text-neutral-400">{t.svPending}</td>
+                    <td className="py-2.5 text-center">
+                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
+                        {g.sources[0].gemini_count >= g.sources[0].chatgpt_count ? "Gemini" : "ChatGPT"}
+                      </span>
                     </td>
-                    <td className="py-2 text-right">
-                      <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-xs text-neutral-700 hover:text-neutral-900 hover:underline">{c.domain}</a>
+                    <td className="py-2.5 text-right">
+                      <div className="flex flex-wrap justify-end gap-x-2 gap-y-1">
+                        {g.sources.map((c, j) => (
+                          <a key={j} href={c.url} target="_blank" rel="noopener noreferrer" className="text-xs text-neutral-700 hover:text-neutral-900 hover:underline">
+                            {c.domain}
+                          </a>
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {data.citations.length > 10 && (
+            {citationGroups.length > 10 && (
               <button onClick={() => setShowAllCitations(!showAllCitations)} className="mt-3 text-xs text-neutral-500 hover:text-neutral-900">
-                {showAllCitations ? t.showLess : t.viewAllCitations(data.citations.length)}
+                {showAllCitations ? t.showLess : t.viewAllCitations(citationGroups.length)}
               </button>
             )}
           </div>
