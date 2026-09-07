@@ -180,8 +180,8 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-        <button onClick={onClose} className="absolute right-4 top-4 text-neutral-300 hover:text-neutral-600"><X className="h-5 w-5" /></button>
+      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto overscroll-contain rounded-2xl bg-white p-8 shadow-2xl">
+        <button onClick={onClose} className="sticky top-0 float-right -mr-2 -mt-2 text-neutral-300 hover:text-neutral-600"><X className="h-5 w-5" /></button>
         <h2 className="text-2xl font-bold">Аудит вашего бренда</h2>
         <p className="mt-1 text-sm text-neutral-500">Узнайте как часто AI рекомендует вас по сравнению с конкурентами.</p>
         <form onSubmit={startAudit} className="mt-6 flex flex-col gap-3">
