@@ -9,6 +9,9 @@ import { Dashboard, type AuditData } from "./Dashboard";
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
 
+// Every prompt costs money, so the hand-written list has a ceiling too.
+const MAX_PROMPTS = 20;
+
 const LANGUAGES = [
   "English", "Russian", "German", "French", "Spanish", "Italian",
   "Portuguese", "Dutch", "Polish", "Turkish", "Ukrainian",
@@ -108,6 +111,11 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   const [country, setCountry] = useState("US");
   const [language, setLanguage] = useState(COUNTRY_LANGUAGE["US"]);
   const [comps, setComps] = useState([{ name: "", website: "" }]);
+  const [step, setStep] = useState(1);
+  // "generate" asks the model to build the prompt set; "manual" runs exactly
+  // what is typed and skips generation entirely.
+  const [mode, setMode] = useState<"generate" | "manual">("generate");
+  const [customRows, setCustomRows] = useState<string[]>([""]);
   const [showDescription, setShowDescription] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -127,9 +135,24 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
     return () => clearTimeout(timer);
   }, [brand]);
 
+  const customLines = customRows.map((l) => l.trim()).filter(Boolean);
+
+  /* Pasting a block of prompts should fill the rows rather than dumping every
+     line into one field, which is what people actually do when they have a
+     list ready in a document. */
+  const pasteIntoRows = (index: number, text: string) => {
+    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 2) return false;
+    const next = [...customRows];
+    next.splice(index, 1, ...lines);
+    setCustomRows(next.slice(0, MAX_PROMPTS));
+    return true;
+  };
+
   const startAudit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!brand.trim()) return;
+    if (mode === "manual" && customLines.length === 0) { setError("Add at least one prompt, or switch to generate."); return; }
     setLoading(true);
     setError("");
     try {
@@ -147,7 +170,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language }) });
+      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, custom_prompts: mode === "manual" ? customLines : [] }) });
       const data = await res.json();
       if (user) {
         await supabase.from('audits').insert({
@@ -176,6 +199,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
         <h2 className="text-2xl font-bold">Audit your brand</h2>
         <p className="mt-1 text-sm text-neutral-500">See how often AI recommends you vs competitors.</p>
         <form onSubmit={startAudit} className="mt-6 flex flex-col gap-3">
+          {step === 1 && (<>
           <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Your brand name" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
           {checking && <p className="text-xs text-neutral-400">Checking brand...</p>}
           {showDescription && <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does your brand do? (e.g. CRM for small teams)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />}
@@ -204,10 +228,55 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
               <button type="button" onClick={() => setComps([...comps, { name: "", website: "" }])} className="text-xs text-neutral-500 hover:text-neutral-900">+ Add competitor</button>
             )}
           </div>
+          <button type="button" onClick={() => setStep(2)} disabled={!brand.trim()} className="h-12 rounded-lg bg-neutral-900 text-sm text-white hover:bg-neutral-800 disabled:opacity-50 font-medium">Next →</button>
+          </>)}
+
+          {step === 2 && (<>
+          <div>
+            <h3 className="text-sm font-medium">Which prompts to check</h3>
+            <p className="mt-0.5 text-xs text-neutral-500">Write your own, or let us generate them from your category.</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setMode("generate")} className={`h-10 flex-1 rounded-lg border text-xs font-medium ${mode === "generate" ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 text-neutral-600"}`}>Generate for me</button>
+            <button type="button" onClick={() => setMode("manual")} className={`h-10 flex-1 rounded-lg border text-xs font-medium ${mode === "manual" ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 text-neutral-600"}`}>Write my own</button>
+          </div>
+          {mode === "manual" ? (
+            <div>
+              {customRows.map((row, i) => (
+                <div key={i} className="mb-2 flex items-center gap-2">
+                  <span className="w-5 shrink-0 text-right text-xs text-neutral-400">{i + 1}.</span>
+                  <input
+                    value={row}
+                    onChange={(e) => setCustomRows(customRows.map((x, j) => (j === i ? e.target.value : x)))}
+                    onPaste={(e) => {
+                      if (pasteIntoRows(i, e.clipboardData.getData("text"))) e.preventDefault();
+                    }}
+                    placeholder="Prompt"
+                    className="h-11 flex-1 rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-900"
+                  />
+                  {customRows.length > 1 && (
+                    <button type="button" onClick={() => setCustomRows(customRows.filter((_, j) => j !== i))} className="shrink-0 text-neutral-300 hover:text-neutral-600">
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <div className="flex items-center justify-between">
+                {customRows.length < MAX_PROMPTS ? (
+                  <button type="button" onClick={() => setCustomRows([...customRows, ""])} className="text-xs text-neutral-500 hover:text-neutral-900">+ Add prompt</button>
+                ) : <span />}
+                <span className="text-xs text-neutral-400">{customLines.length} prompt(s)</span>
+              </div>
+            </div>
+          ) : (
+            <p className="rounded-lg bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-500">Generated prompts cover six kinds of query: comparison, commercial, problem, brand, industry and technical.</p>
+          )}
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button type="submit" disabled={loading} className="h-12 rounded-lg bg-neutral-900 text-sm text-white hover:bg-neutral-800 disabled:opacity-50 flex items-center gap-2 justify-center font-medium">
-            {loading ? "Analysing..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
+            {loading ? "..." : <><span>{mode === "manual" ? "Run these prompts" : "Generate and run"}</span><ArrowRight className="h-4 w-4" /></>}
           </button>
+          <button type="button" onClick={() => setStep(1)} className="text-xs text-neutral-400 hover:text-neutral-900">← Back</button>
+          </>)}
         </form>
         <p className="mt-3 text-center text-xs text-neutral-400">Free to start · no credit card</p>
       </div>
