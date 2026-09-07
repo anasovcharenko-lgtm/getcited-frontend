@@ -183,6 +183,8 @@ interface Strings {
   trackSaved: string;
   trackFailed: string;
   lockedRow: string;
+  openAnswer: string;
+  closeAnswer: string;
   seeAiResponse: string;
   hideAiResponse: string;
   citedDomains: string;
@@ -291,6 +293,8 @@ const STR: Record<Lang, Strings> = {
     trackSaved: "Tracked. We'll check these on your next audit.",
     trackFailed: "Could not save. Try again.",
     lockedRow: "Paid plans",
+    openAnswer: "Read the full answer",
+    closeAnswer: "Hide",
     seeAiResponse: "See what AI answered",
     hideAiResponse: "Hide answer",
     citedDomains: "Cited",
@@ -397,6 +401,8 @@ const STR: Record<Lang, Strings> = {
     trackSaved: "Отслеживаем. Проверим при следующем аудите.",
     trackFailed: "Не удалось сохранить. Попробуйте ещё раз.",
     lockedRow: "Платные тарифы",
+    openAnswer: "Читать ответ целиком",
+    closeAnswer: "Свернуть",
     seeAiResponse: "Смотреть ответ AI",
     hideAiResponse: "Свернуть ответ",
     citedDomains: "Ссылки",
@@ -582,6 +588,7 @@ function CompetitorPrompts({ data, t, onBack }: { data: AuditData; t: Strings; o
   }, [data.results]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [openRow, setOpenRow] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -647,25 +654,46 @@ function CompetitorPrompts({ data, t, onBack }: { data: AuditData; t: Strings; o
               <span>{t.colAnswer}</span>
               <span>{t.colMentions}</span>
             </div>
-            {rows.map((r, i) => (
-              <div key={i} className="grid grid-cols-[26px_1.4fr_0.6fr_2fr_0.9fr] items-start gap-2 border-t border-neutral-100 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={selected.has(r.prompt)}
-                  onChange={() => toggle(r.prompt)}
-                  className="mt-0.5"
-                />
-                <span className="pr-2 text-xs">{r.prompt}</span>
-                {/* No search-volume source yet. An honest dash beats a number we made up. */}
-                <span className="text-xs text-neutral-300">{t.noVolume}</span>
-                <span className="pr-2 text-[11px] leading-relaxed text-neutral-500">
-                  {r.answer ? excerptToNodes(r.answer) : "—"}
-                </span>
-                <span className="text-[11px] leading-relaxed text-neutral-500">
-                  {r.rivals.join(", ")}
-                </span>
-              </div>
-            ))}
+            {rows.map((r, i) => {
+              const open = openRow === r.prompt;
+              return (
+                <div key={i} className="border-t border-neutral-100">
+                  <div className="grid grid-cols-[26px_1.4fr_0.6fr_2fr_0.9fr] items-start gap-2 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(r.prompt)}
+                      onChange={() => toggle(r.prompt)}
+                      className="mt-0.5"
+                    />
+                    <span className="pr-2 text-xs">{r.prompt}</span>
+                    {/* No search-volume source yet. An honest dash beats a number we made up. */}
+                    <span className="text-xs text-neutral-300">{t.noVolume}</span>
+                    <div className="pr-2">
+                      <p className="text-[11px] leading-relaxed text-neutral-500">
+                        {r.answer ? excerptToNodes(r.answer) : "—"}
+                      </p>
+                      {r.answer && (
+                        <button
+                          onClick={() => setOpenRow(open ? null : r.prompt)}
+                          className="mt-1 text-[11px] text-neutral-400 underline underline-offset-2 hover:text-neutral-900"
+                        >
+                          {open ? t.closeAnswer : t.openAnswer}
+                        </button>
+                      )}
+                    </div>
+                    <span className="text-[11px] leading-relaxed text-neutral-500">
+                      {r.rivals.join(", ")}
+                    </span>
+                  </div>
+
+                  {open && r.answer && (
+                    <div className="border-t border-neutral-100 bg-neutral-50/60 px-4 py-4">
+                      <AnswerMarkdown text={r.answer} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </main>
