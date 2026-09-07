@@ -9,6 +9,22 @@ import { Dashboard, type AuditData } from "./Dashboard";
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
 
+const LANGUAGES = [
+  "English", "Russian", "German", "French", "Spanish", "Italian",
+  "Portuguese", "Dutch", "Polish", "Turkish", "Ukrainian",
+  "Japanese", "Korean", "Chinese", "Swedish", "Norwegian", "Danish",
+];
+
+// Default language for a market. Editable, because country and language are
+// different questions: a UK-targeted brand can have a Russian-speaking audience.
+const COUNTRY_LANGUAGE: Record<string, string> = {
+  US: "English", GB: "English", CA: "English", AU: "English", IN: "English",
+  RU: "Russian", KZ: "Russian", UA: "Ukrainian",
+  DE: "German", FR: "French", ES: "Spanish", IT: "Italian",
+  NL: "Dutch", PL: "Polish", TR: "Turkish",
+  BR: "Portuguese", MX: "Spanish", JP: "Japanese",
+};
+
 const MARKETS = [
   { code: "US", label: "United States" },
   { code: "GB", label: "United Kingdom" },
@@ -87,10 +103,11 @@ function LoadingScreen({ brand }: { brand: string }) {
 
 function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditComplete: (data: AuditData) => void }) {
   const [brand, setBrand] = useState("");
-  const [competitorsInput, setCompetitorsInput] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
   const [country, setCountry] = useState("US");
+  const [language, setLanguage] = useState(COUNTRY_LANGUAGE["US"]);
+  const [comps, setComps] = useState([{ name: "", website: "" }]);
   const [showDescription, setShowDescription] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -130,7 +147,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean), description: description.trim(), website: website.trim(), country }) });
+      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language }) });
       const data = await res.json();
       if (user) {
         await supabase.from('audits').insert({
@@ -164,12 +181,29 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           {showDescription && <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does your brand do? (e.g. CRM for small teams)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />}
           <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="Your website (optional, improves accuracy)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
           <label className="block">
-            <span className="mb-1 block text-xs text-neutral-500">Target market — where your buyers are</span>
-            <select value={country} onChange={(e) => setCountry(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
+            <span className="mb-1 block text-xs text-neutral-500">Country for AI results</span>
+            <select value={country} onChange={(e) => { setCountry(e.target.value); setLanguage(COUNTRY_LANGUAGE[e.target.value] || "English"); }} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
               {MARKETS.map((m) => (<option key={m.code} value={m.code}>{m.label}</option>))}
             </select>
           </label>
-          <input value={competitorsInput} onChange={(e) => setCompetitorsInput(e.target.value)} placeholder="Competitors (optional): Notion, Confluence" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
+          <label className="block">
+            <span className="mb-1 block text-xs text-neutral-500">Language for AI results</span>
+            <select value={language} onChange={(e) => setLanguage(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
+              {LANGUAGES.map((l) => (<option key={l} value={l}>{l}</option>))}
+            </select>
+          </label>
+          <div>
+            <span className="mb-1 block text-xs text-neutral-500">Competitors</span>
+            {comps.map((c, i) => (
+              <div key={i} className="mb-2 flex gap-2">
+                <input value={c.name} onChange={(e) => setComps(comps.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Name" className="h-12 w-1/2 rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
+                <input value={c.website} onChange={(e) => setComps(comps.map((x, j) => j === i ? { ...x, website: e.target.value } : x))} placeholder="Website (optional)" className="h-12 w-1/2 rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
+              </div>
+            ))}
+            {comps.length < 5 && (
+              <button type="button" onClick={() => setComps([...comps, { name: "", website: "" }])} className="text-xs text-neutral-500 hover:text-neutral-900">+ Add competitor</button>
+            )}
+          </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button type="submit" disabled={loading} className="h-12 rounded-lg bg-neutral-900 text-sm text-white hover:bg-neutral-800 disabled:opacity-50 flex items-center gap-2 justify-center font-medium">
             {loading ? "Analysing..." : <><span>Start Free Audit</span><ArrowRight className="h-4 w-4" /></>}
