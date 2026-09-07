@@ -6,6 +6,29 @@ import { Dashboard, type AuditData } from "./Dashboard";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
+
+const MARKETS = [
+  { code: "US", label: "United States" },
+  { code: "GB", label: "United Kingdom" },
+  { code: "RU", label: "Russia" },
+  { code: "DE", label: "Germany" },
+  { code: "FR", label: "France" },
+  { code: "ES", label: "Spain" },
+  { code: "IT", label: "Italy" },
+  { code: "NL", label: "Netherlands" },
+  { code: "PL", label: "Poland" },
+  { code: "CA", label: "Canada" },
+  { code: "AU", label: "Australia" },
+  { code: "IN", label: "India" },
+  { code: "BR", label: "Brazil" },
+  { code: "MX", label: "Mexico" },
+  { code: "JP", label: "Japan" },
+  { code: "UA", label: "Ukraine" },
+  { code: "KZ", label: "Kazakhstan" },
+  { code: "TR", label: "Turkey" },
+];
+
+
 const AI_LOGOS = ["ChatGPT", "Claude", "Gemini", "Perplexity", "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok"];
 
 function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -26,6 +49,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   const [competitorsInput, setCompetitorsInput] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
+  const [country, setCountry] = useState("RU");
   const [showDescription, setShowDescription] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -60,7 +84,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean), description: description.trim(), website: website.trim() }) });
+      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitors: competitorsInput.split(",").map(c => c.trim()).filter(Boolean), description: description.trim(), website: website.trim(), country }) });
       const data = await res.json();
       if (user) {
         await supabase.from('audits').insert({
@@ -92,6 +116,12 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           {checking && <p className="text-xs text-neutral-400">Проверяем бренд...</p>}
           {showDescription && <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Чем занимается ваш бренд? (например: CRM для малых команд)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />}
           <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="Ваш сайт (необязательно, повышает точность)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
+          <label className="block">
+            <span className="mb-1 block text-xs text-neutral-500">Целевой рынок — где ваши покупатели</span>
+            <select value={country} onChange={(e) => setCountry(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
+              {MARKETS.map((m) => (<option key={m.code} value={m.code}>{m.label}</option>))}
+            </select>
+          </label>
           <input value={competitorsInput} onChange={(e) => setCompetitorsInput(e.target.value)} placeholder="Конкуренты (необязательно): Notion, Confluence" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button type="submit" disabled={loading} className="h-12 rounded-lg bg-neutral-900 text-sm text-white hover:bg-neutral-800 disabled:opacity-50 flex items-center gap-2 justify-center font-medium">

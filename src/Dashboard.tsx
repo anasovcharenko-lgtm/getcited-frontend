@@ -63,6 +63,8 @@ export type AuditData = {
   brand: string;
   category: string;
   brand_domain?: string;
+  country?: string;
+  language?: string;
   run_at?: string;
   models_used?: Record<string, string>;
   model_status?: Record<string, { ok: boolean; enabled?: boolean; error?: string | null }>;
@@ -1115,7 +1117,11 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">{data.brand}</h1>
-            <p className="text-xs text-neutral-400">{runDate}{data.category ? ` · ${data.category}` : ""}</p>
+            <p className="text-xs text-neutral-400">
+              {runDate}{data.category ? ` · ${data.category}` : ""}
+              {/* A score without its market is not comparable to anything. */}
+              {data.country ? ` · ${data.country}` : ""}
+            </p>
           </div>
           <ModelSwitcher tab={tab} setTab={setTab} t={t} />
         </div>
