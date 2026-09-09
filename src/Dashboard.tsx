@@ -20,6 +20,7 @@ export type ModelMentionInfo = {
   competitors_without_link: string[];
   answer?: string;
   cited_domains?: string[];
+  discovered_brands?: string[];
 };
 
 export type AuditResult = {
@@ -187,6 +188,7 @@ interface Strings {
   trackedTitle: string;
   trackedEmpty: string;
   addedOn: (d: string) => string;
+  alsoNamed: string;
   youAppearShort: string;
   youDontAppearShort: string;
   closeAnswer: string;
@@ -302,6 +304,7 @@ const STR: Record<Lang, Strings> = {
     trackedTitle: "Prompts you are tracking",
     trackedEmpty: "Nothing tracked yet. Pick prompts above and they will run in every audit.",
     addedOn: (d: string) => `Tracked since ${d}`,
+    alsoNamed: "also named",
     youAppearShort: "mentioned",
     youDontAppearShort: "no mention",
     closeAnswer: "Hide",
@@ -415,6 +418,7 @@ const STR: Record<Lang, Strings> = {
     trackedTitle: "Промпты на отслеживании",
     trackedEmpty: "Пока ничего не отслеживается. Выберите промпты выше — они будут проверяться в каждом аудите.",
     addedOn: (d: string) => `На отслеживании с ${d}`,
+    alsoNamed: "также названы",
     youAppearShort: "упоминание есть",
     youDontAppearShort: "упоминания нет",
     closeAnswer: "Свернуть",
@@ -596,8 +600,11 @@ function CompetitorPrompts({ data, t, lang, onBack }: { data: AuditData; t: Stri
         const models = [r.chatgpt, r.gemini];
         const youHere = models.some((m) => m.mentioned);
         const rivals = Array.from(new Set(models.flatMap((m) => m.competitors_found || [])));
+        // Names the models brought up that nobody asked us to track. Often the
+        // more useful finding, so they are shown but kept visually apart.
+        const found = Array.from(new Set(models.flatMap((m) => m.discovered_brands || [])));
         const answer = r.chatgpt.answer || r.gemini.answer || "";
-        return { prompt: r.prompt, rivals, answer, youHere };
+        return { prompt: r.prompt, rivals, found, answer, youHere };
       })
       .filter((r) => !r.youHere && r.rivals.length > 0);
   }, [data.results]);
@@ -739,9 +746,15 @@ function CompetitorPrompts({ data, t, lang, onBack }: { data: AuditData; t: Stri
                         </button>
                       )}
                     </div>
-                    <span className="text-[11px] leading-relaxed text-neutral-500">
-                      {r.rivals.join(", ")}
-                    </span>
+                    <div className="text-[11px] leading-relaxed">
+                      <span className="text-neutral-500">{r.rivals.join(", ") || "—"}</span>
+                      {r.found.length > 0 && (
+                        <p className="mt-1 text-neutral-400">
+                          <span className="text-[10px] uppercase tracking-wide text-neutral-300">{t.alsoNamed}</span>
+                          <br />{r.found.join(", ")}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {open && r.answer && (
@@ -1094,22 +1107,46 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
     const maxY = Math.max(...all.map((c) => c.mentions_without_link), 0);
     const maxTotal = Math.max(...all.map((c) => c.total_mentions), 1);
     const plotW = 340, plotH = 150, left = 60, top = 40;
-    const flatX = maxX === 0;
-    const flatY = maxY === 0;
 
-    const placed = all.map((c, i) => {
-      const fracX = flatX ? (all.length === 1 ? 0.5 : i / (all.length - 1)) * 0.8 + 0.1 : c.mentions_with_link / maxX;
-      const fracY = flatY ? 0.1 : c.mentions_without_link / maxY;
+    /* Zero maps to an inset, not to the axis itself. Brands with no mentions
+       were landing exactly on the lines, which read as a rendering fault rather
+       than as data. */
+    const INSET = 0.12;
+    const scale = (v: number, max: number) => (max === 0 ? INSET : INSET + (v / max) * (1 - INSET * 2));
+
+    const placed = all.map((c) => {
+      const fracX = scale(c.mentions_with_link, maxX);
+      const fracY = scale(c.mentions_without_link, maxY);
       const r = 8 + (c.total_mentions / maxTotal) * 22;
-      // Clamp so a big bubble near the edge doesn't get clipped by the viewBox.
-      const cx = Math.min(Math.max(left + fracX * plotW, left + r), left + plotW);
-      const cy = Math.min(Math.max(top + plotH - fracY * plotH, top + r), top + plotH);
+      const cx = Math.min(Math.max(left + fracX * plotW, left + r), left + plotW - r);
+      const cy = Math.min(Math.max(top + plotH - fracY * plotH, top + r), top + plotH - r);
       return { ...c, cx, cy, r };
     });
 
-    // Nudge labels apart when bubbles sit close together horizontally.
-    return placed.map((b, i) => {
-      const crowded = placed.some((o, j) => j < i && Math.abs(o.cx - b.cx) < 70 && Math.abs(o.cy - b.cy) < 30);
+    /* Brands with identical numbers land on the same point and their labels
+       overlap into an unreadable smudge. Spread a tied cluster along an arc. */
+    const byPoint = new Map<string, typeof placed>();
+    for (const b of placed) {
+      const key = `${Math.round(b.cx)}:${Math.round(b.cy)}`;
+      byPoint.set(key, [...(byPoint.get(key) || []), b]);
+    }
+    const spread = placed.map((b) => {
+      const key = `${Math.round(b.cx)}:${Math.round(b.cy)}`;
+      const group = byPoint.get(key)!;
+      if (group.length < 2) return b;
+      const idx = group.indexOf(b);
+      const angle = (idx / group.length) * Math.PI * 2;
+      const offset = 14 + b.r;
+      return {
+        ...b,
+        cx: Math.min(Math.max(b.cx + Math.cos(angle) * offset, left + b.r), left + plotW - b.r),
+        cy: Math.min(Math.max(b.cy + Math.sin(angle) * offset, top + b.r), top + plotH - b.r),
+      };
+    });
+
+    // Labels above by default, below when a neighbour is close.
+    return spread.map((b, i) => {
+      const crowded = spread.some((o, j) => j < i && Math.abs(o.cx - b.cx) < 70 && Math.abs(o.cy - b.cy) < 30);
       return { ...b, labelY: crowded ? b.cy + b.r + 14 : b.cy - b.r - 7 };
     });
   }, [data.competitor_ranking]);
