@@ -593,7 +593,7 @@ function excerptToNodes(text: string, limit = 150): React.ReactNode[] {
    Selecting prompts writes them to Supabase. That list is what the next audit
    compares against - it is the reason to come back rather than just re-read a
    report. */
-function CompetitorPrompts({ data, t, lang, onBack }: { data: AuditData; t: Strings; lang: Lang; onBack: () => void }) {
+function CompetitorPrompts({ data, t, lang, setLang, onBack }: { data: AuditData; t: Strings; lang: Lang; setLang: (l: Lang) => void; onBack: () => void }) {
   const rows = useMemo(() => {
     return data.results
       .map((r) => {
@@ -699,6 +699,7 @@ function CompetitorPrompts({ data, t, lang, onBack }: { data: AuditData; t: Stri
           <button onClick={onBack} className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900">
             <ArrowLeft className="h-4 w-4" /> {t.backToDashboard}
           </button>
+          <LangSwitch lang={lang} setLang={setLang} />
         </div>
       </header>
 
@@ -997,7 +998,31 @@ function PromptRow({ result, t, tab, modelsUsed, runDate }: { result: AuditResul
    Dashboard
    ──────────────────────────────────────────────────────────────── */
 
-export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }: { data: AuditData; onBack: () => void; lang?: Lang; brandName?: string }) {
+/* Two labels rather than a dropdown: with two options a dropdown costs an extra
+   click and hides the alternative. */
+function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
+  return (
+    <div className="flex items-center gap-0.5 rounded-lg border border-neutral-200 p-0.5">
+      {(["en", "ru"] as Lang[]).map((l) => (
+        <button
+          key={l}
+          onClick={() => setLang(l)}
+          className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+            lang === l ? "bg-neutral-900 text-white" : "text-neutral-400 hover:text-neutral-900"
+          }`}
+        >
+          {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function Dashboard({ data, onBack, lang: initialLang = "en", brandName = "GetCited" }: { data: AuditData; onBack: () => void; lang?: Lang; brandName?: string }) {
+  /* The page URL sets the starting language, but the reader can change it.
+     The audit itself can be in a different language from the interface - a
+     Russian-market audit is often read by an English-speaking colleague. */
+  const [lang, setLang] = useState<Lang>(initialLang);
   const t = STR[lang];
   const [view, setView] = useState<View>("overview");
   const [tab, setTab] = useState<ModelKey>("all");
@@ -1187,6 +1212,7 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
             <button onClick={() => setView("overview")} className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900">
               <ArrowLeft className="h-4 w-4" /> {t.backToDashboard}
             </button>
+            <LangSwitch lang={lang} setLang={setLang} />
           </div>
         </header>
         <main className="mx-auto max-w-4xl px-6 py-10">
@@ -1224,7 +1250,7 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
      Uncovered / covered prompts drill-down view
      ──────────────────────────────────────────────────────────── */
   if (view === "competitors") {
-    return <CompetitorPrompts data={data} t={t} lang={lang} onBack={() => setView("overview")} />;
+    return <CompetitorPrompts data={data} t={t} lang={lang} setLang={setLang} onBack={() => setView("overview")} />;
   }
 
   if (view === "uncovered" || view === "covered") {
@@ -1236,6 +1262,7 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
             <button onClick={() => setView("overview")} className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900">
               <ArrowLeft className="h-4 w-4" /> {t.backToDashboard}
             </button>
+            <LangSwitch lang={lang} setLang={setLang} />
           </div>
         </header>
         <main className="mx-auto max-w-4xl px-6 py-10">
@@ -1273,7 +1300,10 @@ export function Dashboard({ data, onBack, lang = "en", brandName = "GetCited" }:
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
             <span className="text-lg font-semibold">{brandName}</span>
           </button>
-          <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-900"><ArrowLeft className="h-4 w-4" /> {t.back}</button>
+          <div className="flex items-center gap-3">
+            <LangSwitch lang={lang} setLang={setLang} />
+            <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-900"><ArrowLeft className="h-4 w-4" /> {t.back}</button>
+          </div>
         </div>
       </header>
 
