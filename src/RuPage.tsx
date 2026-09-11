@@ -122,17 +122,11 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   }, [step, brand]);
 
   const customLines = customRows.map((l) => l.trim()).filter(Boolean);
-  // Tracked prompts are added on top of whichever mode is chosen, and
-  // de-duplicated so typing one by hand does not run it twice.
-  const promptsToRun = Array.from(new Set([
-    ...(mode === "manual" ? customLines : []),
-    ...tracked,
-  ]));
 
-  /* Pasting a block of prompts should fill the rows rather than dumping every
-     line into one field, which is what people actually do when they have a
-     list ready in a document. */
-  const pasteIntoRows = (index: number, text: string) => {
+  /* Pasting a whole list into any row spreads it across rows. People arrive
+     with the list already written somewhere, so refusing multi-line paste
+     would mean retyping it line by line. */
+  const spreadPaste = (index: number, text: string) => {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     if (lines.length < 2) return false;
     const next = [...customRows];
@@ -140,6 +134,12 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
     setCustomRows(next.slice(0, MAX_PROMPTS));
     return true;
   };
+  // Tracked prompts are added on top of whichever mode is chosen, and
+  // de-duplicated so typing one by hand does not run it twice.
+  const promptsToRun = Array.from(new Set([
+    ...(mode === "manual" ? customLines.slice(0, MAX_PROMPTS) : []),
+    ...tracked,
+  ]));
 
   const startAudit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -242,7 +242,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
                     value={row}
                     onChange={(e) => setCustomRows(customRows.map((x, j) => (j === i ? e.target.value : x)))}
                     onPaste={(e) => {
-                      if (pasteIntoRows(i, e.clipboardData.getData("text"))) e.preventDefault();
+                      if (spreadPaste(i, e.clipboardData.getData("text"))) e.preventDefault();
                     }}
                     placeholder="Промпт"
                     className="h-11 flex-1 rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-900"
