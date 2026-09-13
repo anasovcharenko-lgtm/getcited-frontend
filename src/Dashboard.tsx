@@ -65,6 +65,9 @@ export type AuditData = {
   category: string;
   brand_domain?: string;
   country?: string;
+  category_source?: string;
+  needs_description?: boolean;
+  site_issue?: string;
   language?: string;
   run_at?: string;
   models_used?: Record<string, string>;
@@ -189,6 +192,8 @@ interface Strings {
   trackedEmpty: string;
   addedOn: (d: string) => string;
   alsoNamed: string;
+  unknownCategory: string;
+  unknownCategoryWhy: (reason: string) => string;
   youAppearShort: string;
   youDontAppearShort: string;
   closeAnswer: string;
@@ -305,6 +310,10 @@ const STR: Record<Lang, Strings> = {
     trackedEmpty: "Nothing tracked yet. Pick prompts above and they will run in every audit.",
     addedOn: (d: string) => `Tracked since ${d}`,
     alsoNamed: "also named",
+    unknownCategory: "We could not work out which market you compete in, so the prompts below are generic.",
+    unknownCategoryWhy: (reason) =>
+      reason ? `We tried to read your website but ${reason}. Add a short description and run the audit again.`
+             : "Add a short description of what you do and run the audit again.",
     youAppearShort: "mentioned",
     youDontAppearShort: "no mention",
     closeAnswer: "Hide",
@@ -419,6 +428,10 @@ const STR: Record<Lang, Strings> = {
     trackedEmpty: "Пока ничего не отслеживается. Выберите промпты выше — они будут проверяться в каждом аудите.",
     addedOn: (d: string) => `На отслеживании с ${d}`,
     alsoNamed: "также названы",
+    unknownCategory: "Не удалось определить ваш рынок, поэтому промпты ниже получились общими.",
+    unknownCategoryWhy: (reason) =>
+      reason ? `Мы пытались прочитать сайт, но ${reason}. Добавьте короткое описание и запустите аудит заново.`
+             : "Добавьте короткое описание того, чем вы занимаетесь, и запустите аудит заново.",
     youAppearShort: "упоминание есть",
     youDontAppearShort: "упоминания нет",
     closeAnswer: "Свернуть",
@@ -1337,6 +1350,13 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
         )}
 
         {/* 3 metric cards */}
+        {data.needs_description && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+            <p className="text-sm font-medium text-amber-900">{t.unknownCategory}</p>
+            <p className="mt-1 text-xs text-amber-800">{t.unknownCategoryWhy(data.site_issue || "")}</p>
+          </div>
+        )}
+
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.aiVisibilityScore}</p>
