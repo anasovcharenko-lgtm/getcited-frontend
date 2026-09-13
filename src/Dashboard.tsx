@@ -1018,12 +1018,21 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
   );
 }
 
-export function Dashboard({ data, onBack, lang: initialLang = "en", brandName = "GetCited" }: { data: AuditData; onBack: () => void; lang?: Lang; brandName?: string }) {
+export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandName = "GetCited" }: { data: AuditData; onBack: () => void; lang?: Lang; brandName?: string }) {
   /* The page URL sets the starting language, but the reader can change it.
      The audit itself can be in a different language from the interface - a
      Russian-market audit is often read by an English-speaking colleague. */
   const [lang, setLang] = useState<Lang>(initialLang);
   const t = STR[lang];
+
+  /* A partial payload should degrade, not blank the page. Missing arrays are
+     normalised here so every use site can assume they exist. */
+  const data = useMemo(() => ({
+    ...raw,
+    results: Array.isArray(raw?.results) ? raw.results : [],
+    citations: Array.isArray(raw?.citations) ? raw.citations : [],
+    competitor_ranking: Array.isArray(raw?.competitor_ranking) ? raw.competitor_ranking : [],
+  }), [raw]);
   const [view, setView] = useState<View>("overview");
   const [tab, setTab] = useState<ModelKey>("all");
   const [showAllCitations, setShowAllCitations] = useState(false);

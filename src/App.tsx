@@ -205,6 +205,25 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
       }
       const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, custom_prompts: mode === "manual" || tracked.length > 0 ? promptsToRun : [] }) });
       const data = await res.json();
+
+      /* A failed response is still JSON, and it used to be handed to the
+         dashboard as if it were an audit. The dashboard then read fields that
+         were not there and the page went blank, hiding the real error. */
+      if (!res.ok) {
+        const detail = Array.isArray(data?.detail)
+          ? data.detail.map((d: { loc?: string[]; msg?: string }) =>
+              `${(d.loc || []).slice(-1)[0] || ""} ${d.msg || ""}`.trim()).join("; ")
+          : typeof data?.detail === "string" ? data.detail : "";
+        setError(detail ? `The audit could not run: ${detail}` : "Something went wrong. Please try again.");
+        setLoading(false);
+        return;
+      }
+      if (!data || !Array.isArray(data.results)) {
+        setError("Something went wrong. Please try again.");
+        setLoading(false);
+        return;
+      }
+
       if (user) {
         await supabase.from('audits').insert({
           user_id: user.id,
