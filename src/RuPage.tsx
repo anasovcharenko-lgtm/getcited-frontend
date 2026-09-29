@@ -4,6 +4,8 @@ import { supabase } from './supabase'
 import { signInWithGoogle, signOut } from './auth'
 import { Dashboard, type AuditData } from "./Dashboard";
 
+import { COMPANY, companyLine } from "./legal/company";
+
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
 
@@ -464,15 +466,23 @@ export default function RuPage() {
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
               <span className="font-semibold">{BRAND}</span>
             </div>
-            <nav className="flex gap-6 text-sm text-neutral-400">
+            <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-neutral-400">
               <a href="#friction" className="hover:text-neutral-900">Как это работает</a>
               <a href="#pricing" className="hover:text-neutral-900">Цены</a>
               <a href="#blog" className="hover:text-neutral-900">Блог</a>
+              <a href="/ru/legal/privacy" className="hover:text-neutral-900">Персональные данные</a>
+              <a href="/ru/legal/terms" className="hover:text-neutral-900">Соглашение</a>
+              <a href="/ru/legal/cookies" className="hover:text-neutral-900">Cookie</a>
             </nav>
           </div>
           <div className="mt-6 flex flex-col gap-1 border-t border-neutral-100 pt-6 text-xs text-neutral-400 md:flex-row md:justify-between">
             <span>Бесплатно · без карты · запуск за несколько минут</span>
             <span>© 2026 {BRAND}</span>
+          </div>
+          {/* Statutory disclosure — Companies Act 2006 s.82, E-Commerce Regs 2002 reg.6 */}
+          <div className="mt-4 space-y-1 text-xs leading-relaxed text-neutral-400">
+            <p>{companyLine(BRAND)}</p>
+            <p>Контакт: <a href={`mailto:${COMPANY.email}`} className="hover:text-neutral-900">{COMPANY.email}</a></p>
           </div>
         </div>
       </footer>
