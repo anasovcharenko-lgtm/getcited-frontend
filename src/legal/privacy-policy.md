@@ -125,13 +125,13 @@ restricts them to acting on our instructions.
 
 | Provider | What for | Where |
 |---|---|---|
-| Supabase | Database, authentication | [SUPABASE REGION] |
+| Supabase | Database, authentication | United Kingdom (London) |
 | Railway | Backend hosting | United States |
 | Vercel | Frontend hosting, CDN | United States and global edge |
 | Google | Sign-in | United States and global |
 | OpenAI | AI model queries | United States |
-| Stripe | Payments | [SUPABASE REGION] |
-| [ANALYTICS, if used] | Usage analytics | [SUPABASE REGION] |
+| Stripe | Payments | United Kingdom, Ireland and United States |
+| [ANALYTICS, if used] | Usage analytics | — |
 
 We do not sell your data. We do not share it with advertisers. We do not trade
 it, rent it, or hand it to data brokers.
@@ -146,10 +146,13 @@ before that happens.
 
 ## 6. Data leaving the UK
 
-Several of the providers above are in the United States. Those transfers rely on
-the **UK International Data Transfer Addendum** to the EU Standard Contractual
-Clauses, or, where the provider is certified, the **UK Extension to the EU–US
-Data Privacy Framework**.
+Our database is in **London**, so the brands, prompts and results you create
+stay in the UK at rest. The services around it — hosting, sign-in and the AI
+models we query — are in the **United States**, which has no UK adequacy
+decision. Those transfers rely on the **UK International Data Transfer
+Addendum** to the EU Standard Contractual Clauses, which forms part of our
+contract with each provider, or, where the provider is certified, the **UK
+Extension to the EU–US Data Privacy Framework**.
 
 If you would like a copy of the safeguards for a specific provider, email
 **hi@absoluteone.ltd** and we will send it.
