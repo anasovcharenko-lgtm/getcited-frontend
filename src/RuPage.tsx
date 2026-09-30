@@ -6,6 +6,8 @@ import { Dashboard, type AuditData } from "./Dashboard";
 
 import { COMPANY, companyLine } from "./legal/company";
 
+import { isAdmin } from "./admins";
+
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
 
@@ -153,7 +155,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { count } = await supabase.from('audits').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
-        if ((count ?? 0) >= 1) {
+        if (!isAdmin(user.email) && (count ?? 0) >= 1) {
           setError("Лимит бесплатного периода исчерпан. Перейдите на платный план.");
           setLoading(false);
           return;
