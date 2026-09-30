@@ -2,12 +2,107 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>getcited-frontend</title>
+
+    <title>GetCited — see how often AI recommends your brand</title>
+    <meta name="description" content="GetCited runs the questions your buyers ask ChatGPT and reports how often you are named, which sources get cited, and which competitors appear instead of you." />
+    <link rel="canonical" href="https://getcited.space/" />
+
+    <!-- The app is one page in two languages; these tell crawlers which is which. -->
+    <link rel="alternate" hreflang="en" href="https://getcited.space/" />
+    <link rel="alternate" hreflang="ru" href="https://getcited.space/ru" />
+    <link rel="alternate" hreflang="x-default" href="https://getcited.space/" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#ffffff" />
+
+    <!-- Open Graph: what a link to the site looks like when someone shares it. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="GetCited" />
+    <meta property="og:url" content="https://getcited.space/" />
+    <meta property="og:title" content="GetCited — see how often AI recommends your brand" />
+    <meta property="og:description" content="Run the questions your buyers ask ChatGPT. See how often you are named, which sources get cited, and which competitors appear instead of you." />
+    <meta property="og:image" content="https://getcited.space/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="GetCited — win more clients, get cited by AI" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:locale:alternate" content="ru_RU" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="GetCited — see how often AI recommends your brand" />
+    <meta name="twitter:description" content="Run the questions your buyers ask ChatGPT. See how often you are named, which sources get cited, and which competitors appear instead of you." />
+    <meta name="twitter:image" content="https://getcited.space/og.png" />
+
+    <!-- Structured data. The page itself is rendered by JavaScript, so this is
+         the only description of the product a crawler gets without running it. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://getcited.space/#org",
+          "name": "GetCited",
+          "url": "https://getcited.space/",
+          "logo": "https://getcited.space/favicon.svg",
+          "email": "hi@absoluteone.ltd",
+          "legalName": "Absolute One Ltd",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "College House, 17 King Edwards Road",
+            "addressLocality": "Ruislip",
+            "postalCode": "HA4 7AE",
+            "addressCountry": "GB"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "GetCited",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "url": "https://getcited.space/",
+          "publisher": { "@id": "https://getcited.space/#org" },
+          "description": "GetCited measures how visible a brand is in AI assistant answers. It runs buyer-style questions through AI models and reports how often the brand is named, how often it is linked, which web pages the models cite, and which competitors appear instead.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "description": "Free trial, no card required"
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Crawlers that do not run JavaScript see an empty page otherwise. This is
+         the same claim the rendered page makes, not a separate one. -->
+    <noscript>
+      <h1>GetCited — see how often AI recommends your brand</h1>
+      <p>
+        GetCited runs the questions your buyers actually ask AI assistants and
+        reports how often your brand is named, how often it is linked, which web
+        pages the models cite as sources, and which competitors show up instead
+        of you.
+      </p>
+      <p>This page needs JavaScript. These do not:</p>
+      <ul>
+        <li><a href="/legal/privacy">Privacy Policy</a></li>
+        <li><a href="/legal/terms">Terms of Service</a></li>
+        <li><a href="/legal/cookies">Cookie Notice</a></li>
+        <li><a href="/ru">Русская версия</a></li>
+      </ul>
+      <p>
+        GetCited is a trading name of Absolute One Ltd, registered in England and
+        Wales, company number 17362397. Registered office: College House,
+        17 King Edwards Road, Ruislip, England, HA4 7AE.
+        Contact: <a href="mailto:hi@absoluteone.ltd">hi@absoluteone.ltd</a>
+      </p>
+    </noscript>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
