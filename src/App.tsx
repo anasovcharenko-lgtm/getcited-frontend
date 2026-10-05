@@ -9,6 +9,7 @@ import { Dashboard, type AuditData } from "./Dashboard";
 import { COMPANY, companyLine } from "./legal/company";
 
 import { isAdmin } from "./admins";
+import { saveAuditRun } from "./saveAudit";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -231,17 +232,21 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
       }
 
       if (user) {
-        await supabase.from('audits').insert({
-          user_id: user.id,
-          brand: brand.trim(),
-          visibility_score: data.visibility_score,
-          gemini_score: data.gemini_score,
-          chatgpt_score: data.chatgpt_score,
-          total_prompts: data.total_prompts,
-          category: data.category,
-          mentions_score: data.mentions_score,
-          citations_score: data.citations_score,
-        });
+        /* The run itself plus one row per prompt per model. A failure here must
+           not stop the audit being shown — the history is for later, the result
+           is for now. */
+        try {
+          await saveAuditRun({
+            userId: user.id,
+            brand: brand.trim(),
+            country,
+            language,
+            brandSize,
+            data,
+          });
+        } catch (e) {
+          console.error("audit history not saved", e);
+        }
       }
       onAuditComplete(data);
     } catch { setError("Something went wrong. Please try again."); }
