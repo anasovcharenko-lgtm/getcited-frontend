@@ -33,6 +33,9 @@ export type AuditResult = {
 export type CompetitorStat = {
   name: string;
   is_your_brand: boolean;
+  /* Carried by the backend so the page check can fetch each rival's page
+     without asking the user to retype URLs the audit already had. */
+  domain?: string;
   gemini_mentions: number;
   chatgpt_mentions: number;
   total_mentions: number;
@@ -83,6 +86,51 @@ export type AuditData = {
   citations: Citation[];
   sample_quote?: string;
   recommendations: string;
+};
+
+/* ── /page-check: measured from the page, not written by a model ── */
+
+export type PageChange = {
+  field: string;
+  where: string;
+  current: string;
+  proposed: string;
+};
+
+export type PageFinding = {
+  id: string;
+  /* The numbers the backend derived its wording from. We phrase the sentence
+     ourselves so a Russian reader does not get English inside Russian
+     headings; the backend's own strings are the fallback. */
+  facts?: Record<string, unknown>;
+  severity: "high" | "medium" | "low";
+  title: string;
+  found: string;
+  why: string;
+  affects_prompts: string[];
+  competitors_doing_it: string[];
+  changes: PageChange[];
+};
+
+export type PageCheckResult = {
+  url?: string;
+  brand?: string;
+  terms?: string[];
+  page?: {
+    title: string; h1: string; meta_description: string;
+    questions: string[]; schema_types: string[]; body_chars: number;
+  };
+  placement?: Record<string, boolean | number | string>;
+  robots?: { sitemaps: string[]; named_ai_agents: string[]; note: string };
+  findings?: PageFinding[];
+  competitors?: {
+    name: string; url: string; unreadable: string;
+    in_title: boolean; in_h1: boolean; in_meta_description: boolean;
+    questions: number; has_faq_schema: boolean; names_ai_crawlers: boolean;
+  }[];
+  blocked_by?: string;
+  error?: string;
+  detail?: string;
 };
 
 type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "claude" | "ai_overview";
@@ -137,6 +185,23 @@ interface Strings {
   viewRecommendations: string;
   recommendationsTitle: string;
   recommendationsSub: string;
+  pageCheckTitle: string;
+  pageCheckSub: string;
+  pageCheckUrlLabel: string;
+  pageCheckRun: string;
+  pageCheckRunning: string;
+  pageCheckRerun: string;
+  pageCheckNoFindings: string;
+  pageCheckFailed: string;
+  pageCheckFound: string;
+  pageCheckWhy: string;
+  pageCheckChange: string;
+  pageCheckNow: string;
+  pageCheckInstead: string;
+  pageCheckAffects: (n: number) => string;
+  pageCheckRivals: string;
+  pageCheckWrittenBelow: string;
+  pageCheckNotChecked: string;
   backToDashboard: string;
   catMentions: string;
   catMentionsDesc: string;
@@ -252,6 +317,23 @@ const STR: Record<Lang, Strings> = {
     viewRecommendations: "View actionable recommendations",
     recommendationsTitle: "Actionable recommendations",
     recommendationsSub: "Prioritised fixes to close the gap with your competitors",
+    pageCheckTitle: "What is actually on your page",
+    pageCheckSub: "Read from your page and compared with the competitors who do get named. Every item below is a change to make, not a suggestion to interpret.",
+    pageCheckUrlLabel: "Which page should we check?",
+    pageCheckRun: "Check this page",
+    pageCheckRunning: "Reading the page…",
+    pageCheckRerun: "Check again",
+    pageCheckNoFindings: "Nothing to fix on this page — the category is declared where it needs to be, and the crawlers can reach it.",
+    pageCheckFailed: "We could not read that page",
+    pageCheckFound: "What we found",
+    pageCheckWhy: "Why it matters",
+    pageCheckChange: "The change",
+    pageCheckNow: "Now",
+    pageCheckInstead: "Instead",
+    pageCheckAffects: (n: number) => `Should affect ${n} prompt${n === 1 ? "" : "s"} you were not named in`,
+    pageCheckRivals: "Competitors already doing this",
+    pageCheckWrittenBelow: "Written from the audit",
+    pageCheckNotChecked: "Enter the page you want checked. Usually the product page, not the homepage — a product competes as a page.",
     backToDashboard: "Back to dashboard",
     catMentions: "Mentions — off-page",
     catMentionsDesc: "Close the gaps where AI models rely on outside sources to know about you.",
@@ -370,6 +452,23 @@ const STR: Record<Lang, Strings> = {
     viewRecommendations: "Смотреть рекомендации",
     recommendationsTitle: "Рекомендации к действию",
     recommendationsSub: "Приоритетные шаги, чтобы догнать конкурентов",
+    pageCheckTitle: "Что на самом деле на вашей странице",
+    pageCheckSub: "Прочитано с вашей страницы и сравнено с конкурентами, которых называют. Ниже не советы, а готовые изменения.",
+    pageCheckUrlLabel: "Какую страницу проверить?",
+    pageCheckRun: "Проверить страницу",
+    pageCheckRunning: "Читаем страницу…",
+    pageCheckRerun: "Проверить снова",
+    pageCheckNoFindings: "На этой странице чинить нечего — категория объявлена там, где нужно, и краулеры до неё доходят.",
+    pageCheckFailed: "Не удалось прочитать страницу",
+    pageCheckFound: "Что нашли",
+    pageCheckWhy: "Почему это важно",
+    pageCheckChange: "Изменение",
+    pageCheckNow: "Сейчас",
+    pageCheckInstead: "Нужно",
+    pageCheckAffects: (n: number) => `Должно повлиять на ${n} ${n === 1 ? "запрос" : n < 5 ? "запроса" : "запросов"}, где вас не назвали`,
+    pageCheckRivals: "Конкуренты, у которых это уже сделано",
+    pageCheckWrittenBelow: "Составлено по результатам аудита",
+    pageCheckNotChecked: "Укажите страницу для проверки. Обычно это страница продукта, а не главная — продукт конкурирует страницей.",
     backToDashboard: "Назад к дашборду",
     catMentions: "Упоминания — вне сайта",
     catMentionsDesc: "Закройте пробелы там, где AI полагается на внешние источники, чтобы узнать о вас.",
@@ -519,6 +618,74 @@ function useVisibilityHistory(brand: string) {
   }, [brand]);
   return points;
 }
+
+/* Phrase a finding in the reader's language from the facts the backend sent.
+   Falls back to the backend's English whenever an id is unknown or the facts
+   are missing, so a new check added server-side still renders. */
+function localizeFinding(f: PageFinding, lang: Lang): { title: string; found: string; why: string } {
+  if (lang !== "ru" || !f.facts) return { title: f.title, found: f.found, why: f.why };
+  const x = f.facts as Record<string, never>;
+  const plural = (n: number, one: string, few: string, many: string) => {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  };
+  const FIELD_RU: Record<string, string> = {
+    title: "title", H1: "H1", "meta description": "meta description",
+  };
+  switch (f.id) {
+    case "self_declaration": {
+      const n = Number(x.body_occurrences) || 0;
+      const missing = (x.missing as unknown as string[] | undefined) || [];
+      return {
+        title: "Страница не объявляет категорию, в которой конкурирует",
+        found: `«${x.term}» встречается в тексте ${n} ${plural(n, "раз", "раза", "раз")}, но отсутствует в ${missing.map((m) => FIELD_RU[m] || m).join(", ")}.`,
+        why: "Отвечая на категорийный вопрос, модель опирается на то, чем страница себя объявляет, а не на то, сколько раз фраза встретилась ниже по тексту. Частота в теле страницы и в кейсах не заменяет title, H1 и описание — страница с втрое меньшим числом упоминаний выигрывает, если ведёт этими тремя.",
+      };
+    }
+    case "question_content": {
+      const own = Number(x.own_questions) || 0;
+      const lost = Number(x.lost_questions) || 0;
+      return {
+        title: "Нет контента в форме вопросов для тех вопросов, которые вы проигрываете",
+        found: `Заголовков в форме вопроса на странице: ${own}${x.has_faq_schema ? "" : ", разметки FAQPage нет"}. Из запросов, где вас не назвали, ${lost} ${plural(lost, "сформулирован", "сформулированы", "сформулированы")} как вопрос.`,
+        why: "Отвечая на вопрос, модель предпочитает фрагмент, который сам является этим вопросом с ответом под ним. Текст, содержащий ответ, но нигде не задающий вопрос, извлекается хуже — поэтому FAQ обходит страницу, написанную лучше, но без него.",
+      };
+    }
+    case "ai_crawlers": {
+      const blocked = (x.blocked as unknown as string[] | undefined) || [];
+      const unnamed = Number(x.unnamed) || 0;
+      return {
+        title: blocked.length ? "ИИ-краулеры заблокированы на этой странице" : (unnamed === Number(x.total_agents) ? "В robots.txt не назван ни один ИИ-краулер" : "У части ИИ-краулеров нет собственных правил"),
+        found: (blocked.length ? `Заблокированы: ${blocked.join(", ")}. ` : "") +
+               (unnamed ? `У ${unnamed} ${plural(unnamed, "краулера", "краулеров", "краулеров")} нет собственных правил, они попадают под общую группу. ` : "") +
+               (x.has_sitemap ? "" : "Sitemap не объявлен."),
+        why: "Заблокированный краулер не лечится никаким контентом — это единственная поломка, из-за которой всё остальное бессмысленно. Краулеры без своих правил не заблокированы, так что само по себе это не срочно: важно, что общая группа писалась под поисковики и может закрывать пути по причинам, которые уже неактуальны.",
+      };
+    }
+    case "js_rendered":
+      return {
+        title: "Пока не выполнится JavaScript, на странице почти нет текста",
+        found: `В самом HTML только ${Number(x.body_chars) || 0} символов текста.`,
+        why: "Большинство краулеров, которые питают ассистентов, не выполняют JavaScript и видят пустую страницу. Пока это так, ничто другое из списка не поможет.",
+      };
+    default:
+      return { title: f.title, found: f.found, why: f.why };
+  }
+}
+
+/* Where in the markup a change goes. Keyed on the field rather than on the
+   backend's sentence, so wording changes there do not silently fall back to
+   English here. */
+const WHERE_RU: Record<string, string> = {
+  title: "<head><title>",
+  h1: "первый <h1> на странице",
+  meta_description: '<meta name="description">',
+  faq: "новый блок FAQ с разметкой FAQPage",
+  "robots.txt": "/robots.txt",
+  rendering: "сборка сайта",
+};
 
 function statLabel(name: string, isYou: boolean, youLabel: string) {
   return isYou ? `${name} (${youLabel})` : name;
@@ -1049,6 +1216,57 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
   const [view, setView] = useState<View>("overview");
   const [tab, setTab] = useState<ModelKey>("all");
   const [showAllCitations, setShowAllCitations] = useState(false);
+
+  /* ---- page check (POST /page-check) ----
+     Runs only when asked. Keeping it off the overview is deliberate: the
+     visibility page answers "are we named", this answers "why not", and
+     mixing them would make the first page slower for no reason. */
+  const [pageUrl, setPageUrl] = useState(data.brand_domain ? `https://${data.brand_domain}` : "");
+  const [pageCheck, setPageCheck] = useState<PageCheckResult | null>(null);
+  const [pageChecking, setPageChecking] = useState(false);
+  const [pageCheckError, setPageCheckError] = useState("");
+
+  /* Prompts where neither model named the brand. These are what the proposed
+     FAQ is built from, which is what later ties a movement in the score to a
+     specific change rather than to "we improved the content". */
+  const missedPrompts = useMemo(() => data.results
+    .filter((r) => !r.gemini?.mentioned && !r.chatgpt?.mentioned)
+    .map((r) => ({ text: r.prompt, type: r.prompt_type || "" })), [data.results]);
+
+  const runPageCheck = async () => {
+    const url = pageUrl.trim();
+    if (!url) return;
+    setPageChecking(true);
+    setPageCheckError("");
+    try {
+      const res = await fetch(`${API_URL}/page-check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          website: url,
+          brand: data.brand,
+          category: data.category || "",
+          competitors: data.competitor_ranking
+            .filter((c) => !c.is_your_brand && c.domain)
+            .slice(0, 5)
+            .map((c) => ({ name: c.name, website: `https://${c.domain}` })),
+          missed_prompts: missedPrompts,
+        }),
+      });
+      const json: PageCheckResult = await res.json();
+      if (json.error) {
+        setPageCheckError(json.detail || json.error);
+        setPageCheck(null);
+      } else {
+        setPageCheck(json);
+      }
+    } catch {
+      setPageCheckError(t.pageCheckFailed);
+      setPageCheck(null);
+    } finally {
+      setPageChecking(false);
+    }
+  };
   const citationsRef = useRef<HTMLDivElement>(null);
   const history = useVisibilityHistory(data.brand);
 
@@ -1240,7 +1458,118 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
         <main className="mx-auto max-w-4xl px-6 py-10">
           <h1 className="text-2xl font-bold">{t.recommendationsTitle}</h1>
           <p className="mt-1 text-sm text-neutral-500">{t.recommendationsSub}</p>
-          <div className="mt-8 space-y-8">
+
+          {/* ── Measured from the page. Sits above the model-written items
+                because a fact about the markup outranks a suggestion. ── */}
+          <section className="mt-8 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
+            <h2 className="text-lg font-semibold">{t.pageCheckTitle}</h2>
+            <p className="mt-1 text-sm text-neutral-500">{t.pageCheckSub}</p>
+
+            <label className="mt-5 block">
+              <span className="mb-1 block text-xs text-neutral-500">{t.pageCheckUrlLabel}</span>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={pageUrl}
+                  onChange={(e) => setPageUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); runPageCheck(); } }}
+                  placeholder="https://example.com/products/loyalty/"
+                  className="h-11 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900"
+                />
+                <button
+                  onClick={runPageCheck}
+                  disabled={pageChecking || !pageUrl.trim()}
+                  className="h-11 shrink-0 rounded-lg bg-neutral-900 px-5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {pageChecking ? t.pageCheckRunning : pageCheck ? t.pageCheckRerun : t.pageCheckRun}
+                </button>
+              </div>
+            </label>
+
+            {!pageCheck && !pageChecking && !pageCheckError && (
+              <p className="mt-3 text-xs text-neutral-400">{t.pageCheckNotChecked}</p>
+            )}
+            {pageCheckError && (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+                {t.pageCheckFailed} — {pageCheckError}
+              </p>
+            )}
+
+            {pageCheck && (pageCheck.findings || []).length === 0 && (
+              <p className="mt-4 rounded-xl border border-dashed border-neutral-200 bg-white p-4 text-sm text-neutral-500">
+                {t.pageCheckNoFindings}
+              </p>
+            )}
+
+            {pageCheck && (pageCheck.findings || []).length > 0 && (
+              <div className="mt-5 space-y-4">
+                {(pageCheck.findings || []).map((f) => {
+                  const dot = f.severity === "high" ? "bg-red-500" : f.severity === "medium" ? "bg-amber-500" : "bg-neutral-400";
+                  const label = f.severity === "high" ? t.high : f.severity === "medium" ? t.medium : t.low;
+                  const loc = localizeFinding(f, lang);
+                  return (
+                    <article key={f.id} className="rounded-xl border border-neutral-150 bg-white p-5">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full ${dot}`} />
+                        <span className="text-xs font-medium text-neutral-500">{label}</span>
+                      </div>
+                      <h3 className="mt-2 text-sm font-semibold text-neutral-900">{loc.title}</h3>
+
+                      <p className="mt-3 text-xs font-medium uppercase tracking-widest text-neutral-400">{t.pageCheckFound}</p>
+                      <p className="mt-1 text-sm text-neutral-800">{loc.found}</p>
+
+                      <p className="mt-3 text-xs font-medium uppercase tracking-widest text-neutral-400">{t.pageCheckWhy}</p>
+                      <p className="mt-1 text-sm text-neutral-600">{loc.why}</p>
+
+                      {f.changes.length > 0 && (
+                        <>
+                          <p className="mt-4 text-xs font-medium uppercase tracking-widest text-neutral-400">{t.pageCheckChange}</p>
+                          <div className="mt-2 space-y-3">
+                            {f.changes.map((c, i) => (
+                              <div key={i} className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
+                                <p className="text-xs text-neutral-500">{c.field} — {(lang === "ru" && WHERE_RU[c.field]) || c.where}</p>
+                                {c.current && (
+                                  <p className="mt-2 text-sm text-neutral-500">
+                                    <span className="text-xs uppercase tracking-wide text-neutral-400">{t.pageCheckNow}</span>{" "}
+                                    <span className="line-through decoration-neutral-300">{c.current}</span>
+                                  </p>
+                                )}
+                                <p className="mt-1 whitespace-pre-wrap text-sm font-medium text-neutral-900">
+                                  <span className="text-xs uppercase tracking-wide text-neutral-400">{t.pageCheckInstead}</span>{" "}
+                                  {c.proposed}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      {f.affects_prompts.length > 0 && (
+                        <details className="mt-4">
+                          <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-900">
+                            {t.pageCheckAffects(f.affects_prompts.length)}
+                          </summary>
+                          <ul className="mt-2 space-y-1">
+                            {f.affects_prompts.map((q, i) => (
+                              <li key={i} className="text-sm text-neutral-600">— {q}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+
+                      {f.competitors_doing_it.length > 0 && (
+                        <p className="mt-3 text-xs text-neutral-500">
+                          {t.pageCheckRivals}: {f.competitors_doing_it.join(", ")}
+                        </p>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <p className="mt-10 text-xs font-medium uppercase tracking-widest text-neutral-400">{t.pageCheckWrittenBelow}</p>
+          <div className="mt-4 space-y-8">
             {cats.map((c) => (
               <div key={c.key}>
                 <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{c.label}</p>
