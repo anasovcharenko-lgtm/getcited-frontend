@@ -73,6 +73,9 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   const [website, setWebsite] = useState("");
   const [country, setCountry] = useState("RU");
   const [language, setLanguage] = useState(COUNTRY_LANGUAGE["RU"]);
+  // Определяет, как запросы делятся между широкими и узкими. Средний бренд не
+  // выигрывает широкий сравнительный запрос, каким бы хорошим ни был его сайт.
+  const [brandSize, setBrandSize] = useState("mid");
   const [comps, setComps] = useState([{ name: "", website: "" }]);
   const [step, setStep] = useState(1);
   // "generate" asks the model to build the prompt set; "manual" runs exactly
@@ -161,7 +164,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, custom_prompts: mode === "manual" || tracked.length > 0 ? promptsToRun : [] }) });
+      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, custom_prompts: mode === "manual" || tracked.length > 0 ? promptsToRun : [] }) });
       const data = await res.json();
 
       /* A failed response is still JSON, and it used to be handed to the
@@ -213,6 +216,15 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           {checking && <p className="text-xs text-neutral-400">Проверяем бренд...</p>}
           {showDescription && <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Чем занимается ваш бренд? (например: CRM для малых команд)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />}
           <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="Ваш сайт (необязательно, повышает точность)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
+          <label className="block">
+            <span className="mb-1 block text-xs text-neutral-500">Насколько известен ваш бренд?</span>
+            <select value={brandSize} onChange={(e) => setBrandSize(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
+              <option value="large">Крупный или известный — нас ищут по названию</option>
+              <option value="mid">Средний, SEO почти не вкладывались</option>
+              <option value="small">Небольшой или новый — о нас мало кто знает</option>
+            </select>
+            <span className="mt-1 block text-xs text-neutral-400">Меняет, какие вопросы мы задаём. Небольшие бренды измеряются на более узких вопросах, где известность не решает.</span>
+          </label>
           <label className="block">
             <span className="mb-1 block text-xs text-neutral-500">Страна для результатов AI</span>
             <select value={country} onChange={(e) => { setCountry(e.target.value); setLanguage(COUNTRY_LANGUAGE[e.target.value] || "English"); }} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
