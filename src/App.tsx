@@ -9,6 +9,7 @@ import { Dashboard, type AuditData } from "./Dashboard";
 import { COMPANY, companyLine } from "./legal/company";
 
 import { isAdmin } from "./admins";
+import { saveAuditRun } from "./saveAudit";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -118,6 +119,12 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   // cannot win a broad comparison query however good its site is, so measuring
   // it mostly on those spends the audit on ground it cannot take.
   const [brandSize, setBrandSize] = useState("mid");
+  /* Which models this audit runs. Unticking one keeps it out of this audit and
+     out of its cost; the backend narrows further if a model is switched off
+     globally, because enabling one is a billing decision, not a per-audit one. */
+  const [models, setModels] = useState<string[]>(["chatgpt", "gemini"]);
+  const toggleModel = (m: string) =>
+    setModels((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
   const [comps, setComps] = useState([{ name: "", website: "" }]);
   const [step, setStep] = useState(1);
   // "generate" asks the model to build the prompt set; "manual" runs exactly
@@ -209,7 +216,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, custom_prompts: mode === "manual" || tracked.length > 0 ? promptsToRun : [] }) });
+      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, custom_prompts: mode === "manual" || tracked.length > 0 ? promptsToRun : [] }) });
       const data = await res.json();
 
       /* A failed response is still JSON, and it used to be handed to the
@@ -231,17 +238,21 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
       }
 
       if (user) {
-        await supabase.from('audits').insert({
-          user_id: user.id,
-          brand: brand.trim(),
-          visibility_score: data.visibility_score,
-          gemini_score: data.gemini_score,
-          chatgpt_score: data.chatgpt_score,
-          total_prompts: data.total_prompts,
-          category: data.category,
-          mentions_score: data.mentions_score,
-          citations_score: data.citations_score,
-        });
+        /* The run itself plus one row per prompt per model. A failure here must
+           not stop the audit being shown — the history is for later, the result
+           is for now. */
+        try {
+          await saveAuditRun({
+            userId: user.id,
+            brand: brand.trim(),
+            country,
+            language,
+            brandSize,
+            data,
+          });
+        } catch (e) {
+          console.error("audit history not saved", e);
+        }
       }
       onAuditComplete(data);
     } catch { setError("Something went wrong. Please try again."); }
@@ -262,6 +273,20 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           {checking && <p className="text-xs text-neutral-400">Checking brand...</p>}
           {showDescription && <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does your brand do? (e.g. CRM for small teams)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />}
           <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="Your website (optional, improves accuracy)" className="h-12 w-full rounded-lg border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-900" />
+          <div>
+            <span className="mb-1 block text-xs text-neutral-500">Which models to check</span>
+            <div className="flex flex-wrap gap-2">
+              <label key="chatgpt" className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
+                <input type="checkbox" checked={models.includes("chatgpt")} onChange={() => toggleModel("chatgpt")} className="h-4 w-4 accent-neutral-900" />
+                ChatGPT
+              </label>
+              <label key="gemini" className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
+                <input type="checkbox" checked={models.includes("gemini")} onChange={() => toggleModel("gemini")} className="h-4 w-4 accent-neutral-900" />
+                Gemini
+              </label>
+            </div>
+            <span className="mt-1 block text-xs text-neutral-400">Untick a model to leave it out of this audit and out of its cost. A model switched off on the server stays off either way.</span>
+          </div>
           <label className="block">
             <span className="mb-1 block text-xs text-neutral-500">How well known is your brand?</span>
             <select value={brandSize} onChange={(e) => setBrandSize(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
