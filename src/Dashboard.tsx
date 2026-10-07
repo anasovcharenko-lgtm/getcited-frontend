@@ -337,7 +337,7 @@ const STR: Record<Lang, Strings> = {
     addPromptsRunning: "Measuring…",
     addPromptsCancel: "Cancel",
     addPromptsFailed: "Could not add those. Try again.",
-    addPromptsDone: (added, total) => `Added ${added}. Every figure above is now over ${total} prompts.`,
+    addPromptsDone: (added, total) => `Added ${added}. The audit now covers ${total} prompts.`,
     addPromptsDates: (first, second) => `Measured in two sittings — ${first} and ${second}. The figure averages both.`,
     recommendationsTitle: "Actionable recommendations",
     recommendationsSub: "Prioritised fixes to close the gap with your competitors",
@@ -481,7 +481,7 @@ const STR: Record<Lang, Strings> = {
     addPromptsRunning: "Измеряем…",
     addPromptsCancel: "Отмена",
     addPromptsFailed: "Не удалось добавить. Попробуйте ещё раз.",
-    addPromptsDone: (added, total) => `Добавлено: ${added}. Все цифры выше теперь по ${total} промптам.`,
+    addPromptsDone: (added, total) => `Добавлено: ${added}. Аудит теперь по ${total} промптам.`,
     addPromptsDates: (first, second) => `Измерено в два приёма — ${first} и ${second} Цифра усредняет оба.`,
     recommendationsTitle: "Рекомендации к действию",
     recommendationsSub: "Приоритетные шаги, чтобы догнать конкурентов",
@@ -720,6 +720,50 @@ const WHERE_RU: Record<string, string> = {
   rendering: "сборка сайта",
 };
 
+/* The add-prompts control. Lives in a component because it is rendered on
+   three screens, and three hand-copied versions is how the admin exemption and
+   the audit-saving block drifted apart before. */
+function AddPromptsBox({ t, open, setOpen, text, setText, busy, error, onSubmit, note }: {
+  t: Strings; open: boolean; setOpen: (v: boolean) => void;
+  text: string; setText: (v: string) => void;
+  busy: boolean; error: string; onSubmit: () => void; note: React.ReactNode;
+}) {
+  if (!open) {
+    return (
+      <div className="mt-6">
+        <button onClick={() => setOpen(true)} className="text-xs text-neutral-400 hover:text-neutral-900">
+          + {t.addPromptsLink}
+        </button>
+        {note}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-6 rounded-2xl border border-neutral-150 p-5">
+      <p className="text-sm font-medium">{t.addPromptsLink}</p>
+      <p className="mt-1 text-xs text-neutral-400">{t.addPromptsHint}</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={t.addPromptsPlaceholder}
+        rows={3}
+        className="mt-3 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+      />
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      <div className="mt-3 flex gap-2">
+        <button onClick={onSubmit} disabled={busy || text.trim().length === 0}
+          className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
+          {busy ? t.addPromptsRunning : t.addPromptsAction}
+        </button>
+        <button onClick={() => setOpen(false)} disabled={busy}
+          className="rounded-lg border border-neutral-200 px-4 py-2 text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-50">
+          {t.addPromptsCancel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function statLabel(name: string, isYou: boolean, youLabel: string) {
   return isYou ? `${name} (${youLabel})` : name;
 }
@@ -806,7 +850,7 @@ function excerptToNodes(text: string, limit = 150): React.ReactNode[] {
    Selecting prompts writes them to Supabase. That list is what the next audit
    compares against - it is the reason to come back rather than just re-read a
    report. */
-function CompetitorPrompts({ data, t, lang, setLang, onBack }: { data: AuditData; t: Strings; lang: Lang; setLang: (l: Lang) => void; onBack: () => void }) {
+function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: AuditData; t: Strings; lang: Lang; setLang: (l: Lang) => void; onBack: () => void; addBox?: React.ReactNode }) {
   const rows = useMemo(() => {
     return data.results
       .map((r) => {
@@ -1009,6 +1053,8 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack }: { data: AuditData
             </div>
           )}
         </div>
+
+        {addBox}
       </main>
 
       {selected.size > 0 && (
@@ -1449,6 +1495,23 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
     }
   };
 
+  const addNote = extendedData ? (
+    <p className="mt-2 text-xs text-neutral-400">
+      {t.addPromptsDone((extendedData.added_prompts || []).length, data.total_prompts)}{" "}
+      {extendedData.extended_at && t.addPromptsDates(
+        runDate,
+        new Date(extendedData.extended_at).toLocaleDateString(
+          lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short", year: "numeric" }))}
+    </p>
+  ) : null;
+
+  const addBox = (
+    <AddPromptsBox
+      t={t} open={addOpen} setOpen={setAddOpen} text={addText} setText={setAddText}
+      busy={adding} error={addError} onSubmit={addPrompts} note={addNote}
+    />
+  );
+
   const recCategories = useMemo(() => {
     const items = data.recommendations.split("\n\n").filter(Boolean);
     const buckets: Record<string, { text: string; priority: string }[]> = { mentions: [], technical: [], content: [], authority: [], keywords: [] };
@@ -1696,7 +1759,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
      Uncovered / covered prompts drill-down view
      ──────────────────────────────────────────────────────────── */
   if (view === "competitors") {
-    return <CompetitorPrompts data={data} t={t} lang={lang} setLang={setLang} onBack={() => setView("overview")} />;
+    return <CompetitorPrompts data={data} t={t} lang={lang} setLang={setLang} onBack={() => setView("overview")} addBox={addBox} />;
   }
 
   if (view === "uncovered" || view === "covered") {
@@ -1730,6 +1793,8 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
           {isUncovered && (
             <button onClick={() => setView("recommendations")} className="mt-6 text-sm text-neutral-500 hover:text-neutral-900">{t.howToFix}</button>
           )}
+
+          {addBox}
         </main>
       </div>
     );
@@ -2029,55 +2094,6 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
           </div>
           <ArrowLeft className="h-5 w-5 rotate-180" />
         </button>
-
-        {/* Adding prompts to this run. Collapsed by default so the screen is
-            unchanged until it is wanted. */}
-        {!addOpen ? (
-          <div className="mt-6">
-            <button onClick={() => setAddOpen(true)} className="text-xs text-neutral-400 hover:text-neutral-900">
-              + {t.addPromptsLink}
-            </button>
-            {extendedData && (
-              <p className="mt-2 text-xs text-neutral-400">
-                {t.addPromptsDone((extendedData.added_prompts || []).length, data.total_prompts)}{" "}
-                {extendedData.extended_at && t.addPromptsDates(
-                  runDate,
-                  new Date(extendedData.extended_at).toLocaleDateString(
-                    lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short", year: "numeric" }))}
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="mt-6 rounded-2xl border border-neutral-150 p-5">
-            <p className="text-sm font-medium">{t.addPromptsLink}</p>
-            <p className="mt-1 text-xs text-neutral-400">{t.addPromptsHint}</p>
-            <textarea
-              value={addText}
-              onChange={(e) => setAddText(e.target.value)}
-              placeholder={t.addPromptsPlaceholder}
-              rows={3}
-              className="mt-3 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-900"
-            />
-            {addError && <p className="mt-2 text-xs text-red-600">{addError}</p>}
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={addPrompts}
-                disabled={adding || addText.trim().length === 0}
-                className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-              >
-                {adding ? t.addPromptsRunning : t.addPromptsAction}
-              </button>
-              <button
-                onClick={() => { setAddOpen(false); setAddError(""); }}
-                disabled={adding}
-                className="rounded-lg border border-neutral-200 px-4 py-2 text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-50"
-              >
-                {t.addPromptsCancel}
-              </button>
-            </div>
-          </div>
-        )}
-
       </main>
     </div>
   );
