@@ -49,7 +49,7 @@ export async function saveAuditRun(opts: {
   language: string;
   brandSize: string;
   data: AuditPayload;
-}): Promise<void> {
+}): Promise<string | number | null> {
   const { userId, brand, country, language, brandSize, data } = opts;
 
   // The id is needed to attach the per-prompt rows, so this insert has to read
@@ -79,15 +79,16 @@ export async function saveAuditRun(opts: {
 
   if (error || !inserted) {
     console.error("audit not saved", error);
-    return;
+    return null;
   }
+  const auditId = (inserted as { id: number | string }).id;
 
   const models = activeModels(data);
   const rows = (data.results || []).flatMap((r) =>
     models.map((m) => {
       const info = (r[m] || {}) as ModelInfo;
       return {
-        audit_id: (inserted as { id: number | string }).id,
+        audit_id: auditId,
         user_id: userId,
         prompt: r.prompt,
         prompt_type: r.prompt_type ?? null,
@@ -98,8 +99,57 @@ export async function saveAuditRun(opts: {
       };
     }));
 
-  if (rows.length === 0) return;
+  if (rows.length === 0) return auditId;
 
   const { error: rowsError } = await supabase.from("audit_prompts").insert(rows);
   if (rowsError) console.error("prompt history not saved", rowsError);
+  return auditId;
+}
+
+/* Prompts added to a run that already exists. The rows carry their own
+   created_at, so the fact that the figure now mixes two measurement moments
+   stays visible in the data rather than only on screen. */
+export async function saveAddedPrompts(opts: {
+  auditId: string | number;
+  userId: string;
+  added: ResultRow[];
+  data: AuditPayload;
+}): Promise<void> {
+  const { auditId, userId, added, data } = opts;
+  const models = activeModels(data);
+
+  const rows = added.flatMap((r) =>
+    models.map((m) => {
+      const info = (r[m] || {}) as ModelInfo;
+      return {
+        audit_id: auditId,
+        user_id: userId,
+        prompt: r.prompt,
+        prompt_type: r.prompt_type ?? null,
+        model: m,
+        mentioned: !!info.mentioned,
+        mentioned_with_link: !!info.mentioned_with_link,
+        competitors_found: info.competitors_found ?? [],
+      };
+    }));
+
+  if (rows.length) {
+    const { error } = await supabase.from("audit_prompts").insert(rows);
+    if (error) console.error("added prompts not saved", error);
+  }
+
+  // The run row carries the figures the history chart reads, so it has to move
+  // with them — otherwise the chart would keep plotting the pre-extension score.
+  const { error: updErr } = await supabase
+    .from("audits")
+    .update({
+      visibility_score: data.visibility_score,
+      gemini_score: data.gemini_score,
+      chatgpt_score: data.chatgpt_score,
+      total_prompts: data.total_prompts,
+      mentions_score: data.mentions_score,
+      citations_score: data.citations_score,
+    })
+    .eq("id", auditId);
+  if (updErr) console.error("audit totals not updated", updErr);
 }

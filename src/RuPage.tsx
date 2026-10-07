@@ -68,7 +68,7 @@ function Reveal({ children, className = "" }: { children: React.ReactNode; class
   return <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"} ${className}`}>{children}</div>;
 }
 
-function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditComplete: (data: AuditData) => void }) {
+function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditComplete: (data: AuditData, auditId: string | number | null) => void }) {
   const [brand, setBrand] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
@@ -193,12 +193,13 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
         return;
       }
 
+      let savedId: string | number | null = null;
       if (user) {
         /* The run itself plus one row per prompt per model. A failure here must
            not stop the audit being shown — the history is for later, the result
            is for now. */
         try {
-          await saveAuditRun({
+          savedId = await saveAuditRun({
             userId: user.id,
             brand: brand.trim(),
             country,
@@ -210,7 +211,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           console.error("audit history not saved", e);
         }
       }
-      onAuditComplete(data);
+      onAuditComplete(data, savedId);
     } catch { setError("Что-то пошло не так. Попробуйте ещё раз."); }
     finally { setLoading(false); }
   };
@@ -341,6 +342,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
 export default function RuPage() {
   const [showModal, setShowModal] = useState(false);
   const [auditData, setAuditData] = useState<AuditData | null>(null);
+  const [auditId, setAuditId] = useState<string | number | null>(null);
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -353,12 +355,12 @@ export default function RuPage() {
     if (!user) { signInWithGoogle(); } else { setShowModal(true); }
   };
 
-  if (auditData) return <Dashboard data={auditData} onBack={() => setAuditData(null)} lang="ru" brandName={BRAND} />;
+  if (auditData) return <Dashboard data={auditData} auditId={auditId} onBack={() => setAuditData(null)} lang="ru" brandName={BRAND} />;
 
   return (
     <div className="min-h-screen bg-white text-neutral-900">
       <style>{`@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
-      {showModal && <Modal onClose={() => setShowModal(false)} onAuditComplete={(data) => { setShowModal(false); setAuditData(data); }} />}
+      {showModal && <Modal onClose={() => setShowModal(false)} onAuditComplete={(data, id) => { setShowModal(false); setAuditData(data); setAuditId(id); }} />}
       <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
         <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-6 py-4 md:grid-cols-3">
           <div className="flex items-center gap-2">
