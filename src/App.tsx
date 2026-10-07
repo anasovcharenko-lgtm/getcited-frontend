@@ -190,8 +190,9 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
     setCustomRows(next.slice(0, MAX_PROMPTS));
     return true;
   };
-  // Tracked prompts are added on top of whichever mode is chosen, and
-  // de-duplicated so typing one by hand does not run it twice.
+  // Everything this audit will measure, used only to validate the form. What
+  // the request actually sends is split in two: typed prompts replace
+  // generation, tracked prompts are added to it.
   const promptsToRun = Array.from(new Set([
     ...(mode === "manual" ? customLines.slice(0, MAX_PROMPTS) : []),
     ...tracked,
@@ -216,7 +217,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, custom_prompts: mode === "manual" || tracked.length > 0 ? promptsToRun : [] }) });
+      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, /* Typed prompts replace generation; tracked ones are added to it. Sending tracked as custom_prompts is what used to switch generation off. */ custom_prompts: mode === "manual" ? customLines.slice(0, MAX_PROMPTS) : [], extra_prompts: tracked }) });
       const data = await res.json();
 
       /* A failed response is still JSON, and it used to be handed to the
@@ -331,8 +332,8 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           {trackedLoading && <p className="text-xs text-neutral-400">Loading your tracked prompts…</p>}
           {tracked.length > 0 && (
             <div className="rounded-lg border border-neutral-200 p-3">
-              <p className="text-xs font-medium">{`${tracked.length} tracked prompt(s) will run too`}</p>
-              <p className="mt-1 text-xs text-neutral-400">You chose to track these earlier. They run every audit so you can see when you start appearing.</p>
+              <p className="text-xs font-medium">{`${tracked.length} tracked prompt(s) run as well as the rest`}</p>
+              <p className="mt-1 text-xs text-neutral-400">You chose to track these earlier. They are added to whatever else this audit runs, so each one costs an extra check.</p>
             </div>
           )}
           <div className="flex gap-2">
