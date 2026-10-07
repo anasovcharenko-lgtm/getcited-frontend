@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, Lock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "./supabase";
+import { saveAddedPrompts } from "./saveAudit";
 
 /* ────────────────────────────────────────────────────────────────
    Types — match the current backend response shape (api.py).
@@ -73,6 +74,11 @@ export type AuditData = {
   site_issue?: string;
   language?: string;
   run_at?: string;
+  /* Which models actually answered, and when prompts were added to this run.
+     Both are needed to extend it honestly. */
+  models_run?: string[];
+  extended_at?: string;
+  added_prompts?: string[];
   models_used?: Record<string, string>;
   model_status?: Record<string, { ok: boolean; enabled?: boolean; error?: string | null }>;
   visibility_score: number;
@@ -183,6 +189,15 @@ interface Strings {
   svPending: string;
   mentionedPrompts: string;
   viewRecommendations: string;
+  addPromptsLink: string;
+  addPromptsHint: string;
+  addPromptsPlaceholder: string;
+  addPromptsAction: string;
+  addPromptsRunning: string;
+  addPromptsCancel: string;
+  addPromptsFailed: string;
+  addPromptsDone: (added: number, total: number) => string;
+  addPromptsDates: (first: string, second: string) => string;
   recommendationsTitle: string;
   recommendationsSub: string;
   pageCheckTitle: string;
@@ -315,6 +330,15 @@ const STR: Record<Lang, Strings> = {
     svPending: "—",
     mentionedPrompts: "Prompts where you're mentioned",
     viewRecommendations: "View actionable recommendations",
+    addPromptsLink: "Add more prompts to this audit",
+    addPromptsHint: "One per line. Only the new ones are measured — the rest are not run or charged again.",
+    addPromptsPlaceholder: "which loyalty platform handles black friday load\nhow long does a CDP rollout take",
+    addPromptsAction: "Measure and add",
+    addPromptsRunning: "Measuring…",
+    addPromptsCancel: "Cancel",
+    addPromptsFailed: "Could not add those. Try again.",
+    addPromptsDone: (added, total) => `Added ${added}. Every figure above is now over ${total} prompts.`,
+    addPromptsDates: (first, second) => `Measured in two sittings — ${first} and ${second}. The figure averages both.`,
     recommendationsTitle: "Actionable recommendations",
     recommendationsSub: "Prioritised fixes to close the gap with your competitors",
     pageCheckTitle: "What is actually on your page",
@@ -450,6 +474,15 @@ const STR: Record<Lang, Strings> = {
     svPending: "—",
     mentionedPrompts: "Промпты, где вас упоминают",
     viewRecommendations: "Смотреть рекомендации",
+    addPromptsLink: "Добавить промпты к этому аудиту",
+    addPromptsHint: "По одному в строке. Измерятся только новые — за остальные платить снова не придётся.",
+    addPromptsPlaceholder: "какая программа лояльности выдерживает чёрную пятницу\nсколько занимает внедрение CDP",
+    addPromptsAction: "Измерить и добавить",
+    addPromptsRunning: "Измеряем…",
+    addPromptsCancel: "Отмена",
+    addPromptsFailed: "Не удалось добавить. Попробуйте ещё раз.",
+    addPromptsDone: (added, total) => `Добавлено: ${added}. Все цифры выше теперь по ${total} промптам.`,
+    addPromptsDates: (first, second) => `Измерено в два приёма — ${first} и ${second} Цифра усредняет оба.`,
     recommendationsTitle: "Рекомендации к действию",
     recommendationsSub: "Приоритетные шаги, чтобы догнать конкурентов",
     pageCheckTitle: "Что на самом деле на вашей странице",
@@ -1198,7 +1231,7 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
   );
 }
 
-export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandName = "GetCited" }: { data: AuditData; onBack: () => void; lang?: Lang; brandName?: string }) {
+export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandName = "GetCited", auditId = null }: { data: AuditData; onBack: () => void; lang?: Lang; brandName?: string; auditId?: string | number | null }) {
   /* The page URL sets the starting language, but the reader can change it.
      The audit itself can be in a different language from the interface - a
      Russian-market audit is often read by an English-speaking colleague. */
@@ -1207,12 +1240,24 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
 
   /* A partial payload should degrade, not blank the page. Missing arrays are
      normalised here so every use site can assume they exist. */
-  const data = useMemo(() => ({
-    ...raw,
-    results: Array.isArray(raw?.results) ? raw.results : [],
-    citations: Array.isArray(raw?.citations) ? raw.citations : [],
-    competitor_ranking: Array.isArray(raw?.competitor_ranking) ? raw.competitor_ranking : [],
-  }), [raw]);
+  /* Prompts added after the run. Holding the extended audit here rather than
+     lifting it up means every figure on this screen recomputes from it without
+     a single display having to know that extending exists. */
+  const [extendedData, setExtendedData] = useState<AuditData | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addText, setAddText] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState("");
+
+  const data = useMemo(() => {
+    const base = extendedData ?? raw;
+    return ({
+    ...base,
+    results: Array.isArray(base?.results) ? base.results : [],
+    citations: Array.isArray(base?.citations) ? base.citations : [],
+    competitor_ranking: Array.isArray(base?.competitor_ranking) ? base.competitor_ranking : [],
+  });
+  }, [raw, extendedData]);
   const [view, setView] = useState<View>("overview");
   const [tab, setTab] = useState<ModelKey>("all");
   const [showAllCitations, setShowAllCitations] = useState(false);
@@ -1354,6 +1399,56 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
   }, [data.model_status]);
 
   /* ---- recommendations, categorised ---- */
+  const addPrompts = async () => {
+    const lines = Array.from(new Set(
+      addText.split("\n").map((l) => l.trim()).filter(Boolean)));
+    if (lines.length === 0) return;
+    setAdding(true);
+    setAddError("");
+    try {
+      const res = await fetch(`${API_URL}/audit/extend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brand: data.brand,
+          // Rebuilt from the ranking, which already carries each rival's domain.
+          competitor_list: data.competitor_ranking
+            .filter((c) => !c.is_your_brand)
+            .map((c) => ({ name: c.name, website: c.domain ? `https://${c.domain}` : "" })),
+          country: data.country || "US",
+          language: data.language || "",
+          models: data.models_run || [],
+          extra_prompts: lines,
+          previous_results: data.results,
+          previous_citations: data.citations,
+        }),
+      });
+      const next = await res.json();
+      if (!res.ok || next?.error || !Array.isArray(next?.results)) {
+        setAddError(next?.detail || next?.error || t.addPromptsFailed);
+        return;
+      }
+      // Recommendations are not regenerated by an extend, so keep the ones we have.
+      const merged: AuditData = { ...next, recommendations: data.recommendations };
+      setExtendedData(merged);
+      setAddText("");
+      setAddOpen(false);
+
+      if (auditId) {
+        const added = (next.results as AuditResult[]).filter(
+          (r) => (next.added_prompts || []).includes(r.prompt));
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await saveAddedPrompts({ auditId, userId: user.id, added, data: merged });
+        }
+      }
+    } catch {
+      setAddError(t.addPromptsFailed);
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const recCategories = useMemo(() => {
     const items = data.recommendations.split("\n\n").filter(Boolean);
     const buckets: Record<string, { text: string; priority: string }[]> = { mentions: [], technical: [], content: [], authority: [], keywords: [] };
@@ -1934,6 +2029,54 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
           </div>
           <ArrowLeft className="h-5 w-5 rotate-180" />
         </button>
+
+        {/* Adding prompts to this run. Collapsed by default so the screen is
+            unchanged until it is wanted. */}
+        {!addOpen ? (
+          <div className="mt-6">
+            <button onClick={() => setAddOpen(true)} className="text-xs text-neutral-400 hover:text-neutral-900">
+              + {t.addPromptsLink}
+            </button>
+            {extendedData && (
+              <p className="mt-2 text-xs text-neutral-400">
+                {t.addPromptsDone((extendedData.added_prompts || []).length, data.total_prompts)}{" "}
+                {extendedData.extended_at && t.addPromptsDates(
+                  runDate,
+                  new Date(extendedData.extended_at).toLocaleDateString(
+                    lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short", year: "numeric" }))}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-neutral-150 p-5">
+            <p className="text-sm font-medium">{t.addPromptsLink}</p>
+            <p className="mt-1 text-xs text-neutral-400">{t.addPromptsHint}</p>
+            <textarea
+              value={addText}
+              onChange={(e) => setAddText(e.target.value)}
+              placeholder={t.addPromptsPlaceholder}
+              rows={3}
+              className="mt-3 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+            />
+            {addError && <p className="mt-2 text-xs text-red-600">{addError}</p>}
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={addPrompts}
+                disabled={adding || addText.trim().length === 0}
+                className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+              >
+                {adding ? t.addPromptsRunning : t.addPromptsAction}
+              </button>
+              <button
+                onClick={() => { setAddOpen(false); setAddError(""); }}
+                disabled={adding}
+                className="rounded-lg border border-neutral-200 px-4 py-2 text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-50"
+              >
+                {t.addPromptsCancel}
+              </button>
+            </div>
+          </div>
+        )}
 
       </main>
     </div>

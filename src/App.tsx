@@ -109,7 +109,7 @@ function LoadingScreen({ brand }: { brand: string }) {
   );
 }
 
-function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditComplete: (data: AuditData) => void }) {
+function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditComplete: (data: AuditData, auditId: string | number | null) => void }) {
   const [brand, setBrand] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
@@ -238,12 +238,13 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
         return;
       }
 
+      let savedId: string | number | null = null;
       if (user) {
         /* The run itself plus one row per prompt per model. A failure here must
            not stop the audit being shown — the history is for later, the result
            is for now. */
         try {
-          await saveAuditRun({
+          savedId = await saveAuditRun({
             userId: user.id,
             brand: brand.trim(),
             country,
@@ -255,7 +256,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           console.error("audit history not saved", e);
         }
       }
-      onAuditComplete(data);
+      onAuditComplete(data, savedId);
     } catch { setError("Something went wrong. Please try again."); }
     finally { setLoading(false); }
   };
@@ -398,8 +399,9 @@ export default function App() {
   }, []);
 
   const [auditData, setAuditData] = useState<AuditData | null>(null);
+  const [auditId, setAuditId] = useState<string | number | null>(null);
 
-  if (auditData) return <Dashboard data={auditData} onBack={() => setAuditData(null)} lang="en" brandName={BRAND} />;
+  if (auditData) return <Dashboard data={auditData} auditId={auditId} onBack={() => setAuditData(null)} lang="en" brandName={BRAND} />;
 
   const handleStartAudit = () => {
     if (!user) {
@@ -412,7 +414,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white text-neutral-900">
       <style>{`@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
-      {showModal && <Modal onClose={() => setShowModal(false)} onAuditComplete={(data) => { setShowModal(false); setAuditData(data); }} />}
+      {showModal && <Modal onClose={() => setShowModal(false)} onAuditComplete={(data, id) => { setShowModal(false); setAuditData(data); setAuditId(id); }} />}
 
       {/* Nav */}
       <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
