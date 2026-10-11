@@ -10,6 +10,7 @@ import { COMPANY, companyLine } from "./legal/company";
 
 import { isAdmin } from "./admins";
 import { saveAuditRun } from "./saveAudit";
+import { Projects } from "./Projects";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -400,8 +401,10 @@ export default function App() {
 
   const [auditData, setAuditData] = useState<AuditData | null>(null);
   const [auditId, setAuditId] = useState<string | number | null>(null);
+  const [showProjects, setShowProjects] = useState(false);
 
   if (auditData) return <Dashboard data={auditData} auditId={auditId} onBack={() => setAuditData(null)} lang="en" brandName={BRAND} />;
+  if (showProjects) return <Projects lang="en" onBack={() => setShowProjects(false)} onOpen={(d, id) => { setAuditData(d); setAuditId(id); setShowProjects(false); }} />;
 
   const handleStartAudit = () => {
     if (!user) {
@@ -434,6 +437,9 @@ export default function App() {
               <span>|</span>
               <a href="/ru" className="hover:text-neutral-900">RU</a>
             </div>
+            {user && (
+              <button onClick={() => setShowProjects(true)} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">My projects</button>
+            )}
             <button onClick={user ? signOut : signInWithGoogle} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">{user ? user.email?.split("@")[0] : "Sign in"}</button>
             <button onClick={handleStartAudit} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Start free</button>
           </div>

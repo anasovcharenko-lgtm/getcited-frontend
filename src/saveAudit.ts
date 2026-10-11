@@ -73,6 +73,11 @@ export async function saveAuditRun(opts: {
       country,
       language,
       brand_size: brandSize,
+      // The whole result as it came back. audit_prompts records whether the
+      // brand was named, but not the answers, the citations or the competitor
+      // figures — so without this an old audit could only ever be reopened
+      // half empty, which is worse than not reopening it.
+      payload: data,
     })
     .select("id")
     .single();
@@ -143,6 +148,7 @@ export async function saveAddedPrompts(opts: {
   const { error: updErr } = await supabase
     .from("audits")
     .update({
+      payload: data,
       visibility_score: data.visibility_score,
       gemini_score: data.gemini_score,
       chatgpt_score: data.chatgpt_score,
