@@ -8,6 +8,7 @@ import { COMPANY, companyLine } from "./legal/company";
 
 import { isAdmin } from "./admins";
 import { saveAuditRun } from "./saveAudit";
+import { Projects } from "./Projects";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -343,6 +344,7 @@ export default function RuPage() {
   const [showModal, setShowModal] = useState(false);
   const [auditData, setAuditData] = useState<AuditData | null>(null);
   const [auditId, setAuditId] = useState<string | number | null>(null);
+  const [showProjects, setShowProjects] = useState(false);
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -356,6 +358,7 @@ export default function RuPage() {
   };
 
   if (auditData) return <Dashboard data={auditData} auditId={auditId} onBack={() => setAuditData(null)} lang="ru" brandName={BRAND} />;
+  if (showProjects) return <Projects lang="ru" onBack={() => setShowProjects(false)} onOpen={(d, id) => { setAuditData(d); setAuditId(id); setShowProjects(false); }} />;
 
   return (
     <div className="min-h-screen bg-white text-neutral-900">
@@ -378,6 +381,9 @@ export default function RuPage() {
               <span>|</span>
               <a href="/ru" className="font-medium text-neutral-900">RU</a>
             </div>
+            {user && (
+              <button onClick={() => setShowProjects(true)} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">Мои проекты</button>
+            )}
             <button onClick={user ? signOut : signInWithGoogle} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">{user ? user.email?.split("@")[0] : "Войти"}</button>
             <button onClick={handleStartAudit} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Начать бесплатно</button>
           </div>
