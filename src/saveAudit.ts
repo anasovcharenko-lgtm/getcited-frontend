@@ -16,7 +16,7 @@ type ResultRow = {
   [model: string]: unknown;
 };
 
-type AuditPayload = {
+export type AuditPayload = {
   visibility_score?: number;
   gemini_score?: number;
   chatgpt_score?: number;
@@ -33,7 +33,7 @@ type AuditPayload = {
    false` for every prompt, and storing that would record "measured, not named"
    where the truth is "never measured" — which would quietly poison any
    before-and-after built on top of it. */
-function activeModels(data: AuditPayload): string[] {
+export function activeModels(data: AuditPayload): string[] {
   const status = data.model_status;
   const candidates = ["chatgpt", "gemini", "perplexity", "claude", "ai_overview"];
   const present = candidates.filter((m) =>
