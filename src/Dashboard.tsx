@@ -141,7 +141,7 @@ export type PageCheckResult = {
 
 type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "claude" | "ai_overview";
 type Lang = "en" | "ru";
-type View = "overview" | "recommendations" | "uncovered" | "covered" | "competitors";
+type View = "overview" | "recommendations" | "uncovered" | "covered" | "competitors" | "open";
 
 /* ────────────────────────────────────────────────────────────────
    Copy
@@ -169,6 +169,10 @@ interface Strings {
   bestCoveredTitle: string;
   bestCoveredEmpty: string;
   seeCompetitorsDoBetter: string;
+  openTitle: string;
+  openSub: (n: number) => string;
+  openEmpty: string;
+  seeOpenPrompts: string;
   seeResultsWithPrompts: string;
   distributionTitle: string;
   modelPerformance: string;
@@ -310,6 +314,10 @@ const STR: Record<Lang, Strings> = {
     bestCoveredTitle: "Your best covered topics",
     bestCoveredEmpty: "No strongly covered topics yet.",
     seeCompetitorsDoBetter: "See where competitors do better →",
+    openTitle: "Prompts nobody has won",
+    openSub: (n) => `${n} prompt${n === 1 ? "" : "s"} where neither you nor the competitors you listed were named.`,
+    openEmpty: "Every prompt named somebody. No open ground in this set.",
+    seeOpenPrompts: "See prompts nobody has won →",
     seeResultsWithPrompts: "See results with prompts",
     distributionTitle: "Distribution by LLM",
     modelPerformance: "Which model performs better",
@@ -454,6 +462,10 @@ const STR: Record<Lang, Strings> = {
     bestCoveredTitle: "Лучше всего покрытые темы",
     bestCoveredEmpty: "Пока нет уверенно покрытых тем.",
     seeCompetitorsDoBetter: "Смотреть, где конкуренты лучше →",
+    openTitle: "Промпты, которые никто не занял",
+    openSub: (n) => `${n} промптов, где не назвали ни вас, ни указанных вами конкурентов.`,
+    openEmpty: "В каждом промпте кого-то назвали. Свободной земли в этом наборе нет.",
+    seeOpenPrompts: "Смотреть промпты, которые никто не занял →",
     seeResultsWithPrompts: "Смотреть промпты",
     distributionTitle: "Распределение по моделям",
     modelPerformance: "Какая модель работает лучше",
@@ -1403,6 +1415,24 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
       .filter((r) => !r.youMentioned && r.competitors.length > 0);
   }, [tab, data.results]);
 
+  /* Neither you nor any competitor you listed. These used to appear nowhere:
+     "covered" needs you named, "uncovered" needs a rival named, and a prompt
+     that named nobody satisfies neither — while being the cheapest to win,
+     since there is no incumbent to displace. */
+  const openPrompts = useMemo(() => {
+    return data.results
+      .map((r) => {
+        const ms = modelsForTab(r);
+        return {
+          prompt: r.prompt,
+          youMentioned: ms.some((m) => m.mentioned),
+          competitors: Array.from(new Set(ms.flatMap((m) => m.competitors_found))),
+          result: r,
+        };
+      })
+      .filter((r) => !r.youMentioned && r.competitors.length === 0);
+  }, [tab, data.results]);
+
   const bestCoveredPrompts = useMemo(() => {
     return data.results
       .map((r) => {
@@ -1762,8 +1792,10 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
     return <CompetitorPrompts data={data} t={t} lang={lang} setLang={setLang} onBack={() => setView("overview")} addBox={addBox} />;
   }
 
-  if (view === "uncovered" || view === "covered") {
+  if (view === "uncovered" || view === "covered" || view === "open") {
     const isUncovered = view === "uncovered";
+    const isOpen = view === "open";
+    const listRows = isOpen ? openPrompts : isUncovered ? uncoveredPrompts : bestCoveredPrompts;
     return (
       <div className="min-h-screen bg-white text-neutral-900">
         <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
@@ -1775,16 +1807,18 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
           </div>
         </header>
         <main className="mx-auto max-w-4xl px-6 py-10">
-          <h1 className="text-xl font-semibold">{isUncovered ? t.uncoveredTitle : t.bestCoveredTitle}</h1>
-          <p className="mt-1 text-sm text-neutral-500">{isUncovered ? t.uncoveredSub(uncoveredPrompts.length) : ""}</p>
+          <h1 className="text-xl font-semibold">{isOpen ? t.openTitle : isUncovered ? t.uncoveredTitle : t.bestCoveredTitle}</h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            {isOpen ? t.openSub(openPrompts.length) : isUncovered ? t.uncoveredSub(uncoveredPrompts.length) : ""}
+          </p>
 
-          {(isUncovered ? uncoveredPrompts.length : bestCoveredPrompts.length) === 0 ? (
+          {listRows.length === 0 ? (
             <p className="mt-6 rounded-xl border border-dashed border-neutral-200 p-6 text-center text-sm text-neutral-400">
-              {isUncovered ? t.uncoveredEmpty : t.bestCoveredEmpty}
+              {isOpen ? t.openEmpty : isUncovered ? t.uncoveredEmpty : t.bestCoveredEmpty}
             </p>
           ) : (
             <div className="mt-6 divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-150">
-              {(isUncovered ? uncoveredPrompts : bestCoveredPrompts).map((p, i) => (
+              {listRows.map((p, i) => (
                 <PromptRow key={i} result={p.result} t={t} tab={tab} modelsUsed={data.models_used} runDate={runDate} />
               ))}
             </div>
@@ -1888,9 +1922,16 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
         <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.comparedTo}</p>
-            <button onClick={() => setView("competitors")} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900">
-              {t.seeUncovered} <ChevronRight className="h-3 w-3" />
-            </button>
+            <div className="flex flex-col items-end gap-1">
+              <button onClick={() => setView("competitors")} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900">
+                {t.seeUncovered} <ChevronRight className="h-3 w-3" />
+              </button>
+              {openPrompts.length > 0 && (
+                <button onClick={() => setView("open")} className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-900">
+                  {t.openTitle} · {openPrompts.length} <ChevronRight className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             {data.competitor_ranking.slice(0, 5).map((stat) => {
