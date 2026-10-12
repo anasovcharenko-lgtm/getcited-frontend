@@ -38,6 +38,8 @@ export const MODELS = [
   { key: "chatgpt", label: "ChatGPT" },
   { key: "gemini", label: "Gemini" },
   { key: "perplexity", label: "Perplexity" },
+  { key: "deepseek", label: "DeepSeek" },
+  { key: "ai_overview", label: "AI Overview" },
 ] as const;
 
 export type ModelName = (typeof MODELS)[number]["key"];
@@ -47,8 +49,10 @@ export type AuditResult = {
   prompt_type?: "problem" | "comparison" | "brand";
   gemini: ModelMentionInfo;
   chatgpt: ModelMentionInfo;
-  // Optional because every run saved before Perplexity existed has no such key.
+  // Optional: every run saved before a model existed has no key for it.
   perplexity?: ModelMentionInfo;
+  deepseek?: ModelMentionInfo;
+  ai_overview?: ModelMentionInfo;
 };
 
 const NO_ANSWER: ModelMentionInfo = {
@@ -220,7 +224,7 @@ export type PageCheckResult = {
   detail?: string;
 };
 
-type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "claude" | "ai_overview";
+type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "deepseek" | "ai_overview" | "claude";
 type Lang = "en" | "ru";
 type View = "overview" | "recommendations" | "uncovered" | "covered" | "competitors" | "open";
 
@@ -686,7 +690,6 @@ const MODEL_TABS: { key: ModelKey; label: string }[] = [
   { key: "all", label: "All models" },
   ...MODELS.map((m) => ({ key: m.key as ModelKey, label: m.label })),
   { key: "claude", label: "Claude" },
-  { key: "ai_overview", label: "AI Overview" },
 ];
 
 function categorize(text: string): "mentions" | "technical" | "content" | "authority" | "keywords" {
