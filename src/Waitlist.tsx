@@ -20,7 +20,7 @@ const T = {
   en: {
     cta: "Add me to the waiting list",
     placeholder: "you@company.com",
-    join: "Join",
+    join: "Add me to waitlist",
     done: "You're on the list.",
     doneSub: "We'll write when your invite is ready. No newsletter.",
     already: "You're already on the list.",
@@ -33,7 +33,7 @@ const T = {
   ru: {
     cta: "Записаться в лист ожидания",
     placeholder: "you@company.com",
-    join: "Записаться",
+    join: "Сообщить",
     done: "Вы в списке.",
     doneSub: "Напишем, когда откроем доступ. Рассылки не будет.",
     already: "Вы уже в списке.",
@@ -109,7 +109,7 @@ export function WaitlistForm({ lang, source, className = "", id }:
         <button
           type="submit"
           disabled={state === "saving"}
-          className="flex h-12 items-center justify-center gap-2 rounded-lg bg-neutral-900 px-6 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="flex h-12 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-neutral-900 px-6 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
         >
           {state === "saving"
             ? <Loader2 className="h-4 w-4 animate-spin" />
