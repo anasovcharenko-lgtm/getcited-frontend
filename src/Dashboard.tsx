@@ -29,12 +29,66 @@ export type ModelMentionInfo = {
   discovered_brands?: string[];
 };
 
+/* The models an audit can carry, in display order. The backend has the same
+   list; both sides read it rather than naming models inline, because a model
+   named in one place and forgotten in another is a number that silently
+   excludes it. */
+export const MODELS = [
+  { key: "chatgpt", label: "ChatGPT" },
+  { key: "gemini", label: "Gemini" },
+  { key: "perplexity", label: "Perplexity" },
+] as const;
+
+export type ModelName = (typeof MODELS)[number]["key"];
+
 export type AuditResult = {
   prompt: string;
   prompt_type?: "problem" | "comparison" | "brand";
   gemini: ModelMentionInfo;
   chatgpt: ModelMentionInfo;
+  // Optional because every run saved before Perplexity existed has no such key.
+  perplexity?: ModelMentionInfo;
 };
+
+const NO_ANSWER: ModelMentionInfo = {
+  mentioned: false, mentioned_with_link: false, mentioned_without_link: false,
+  competitors_found: [], competitors_with_link: [], competitors_without_link: [],
+};
+
+/* A model that is missing from a stored run did not answer; it must read as
+   "not measured", never as "measured and absent", which would count against the
+   brand in a before-and-after. */
+export const infoFor = (r: AuditResult, key: ModelName): ModelMentionInfo =>
+  (r[key] as ModelMentionInfo | undefined) ?? NO_ANSWER;
+
+/* Which models this particular run used. `models_run` is what the backend
+   divided its scores by; the fallback reads the results themselves for runs
+   saved before that field existed. */
+/* How many answers from this model named the brand.
+
+   Counted, not recovered from the rounded percentage, because the point of
+   showing a fraction under the headline is that it can be checked against the
+   lists. model_scores is the backend's own count; the two named fields are the
+   fallback for runs stored before it, and the results themselves for a model
+   that predates both. */
+export function modelNamedCount(
+  data: { model_scores?: Record<string, number>; gemini_score?: number;
+          chatgpt_score?: number; results?: AuditResult[] },
+  key: ModelName): number {
+  const fromScores = data.model_scores?.[key];
+  if (typeof fromScores === "number") return fromScores;
+  if (key === "gemini" && typeof data.gemini_score === "number") return data.gemini_score;
+  if (key === "chatgpt" && typeof data.chatgpt_score === "number") return data.chatgpt_score;
+  return (data.results || []).filter((r) => infoFor(r, key).mentioned).length;
+}
+
+export function modelsIn(data: { models_run?: string[]; results?: AuditResult[] }): ModelName[] {
+  const declared = (data.models_run || []).filter(
+    (m): m is ModelName => MODELS.some((x) => x.key === m));
+  if (declared.length) return declared;
+  return MODELS.map((m) => m.key).filter((k) =>
+    (data.results || []).some((r) => r[k] && typeof r[k] === "object"));
+}
 
 export type CompetitorStat = {
   name: string;
@@ -89,6 +143,9 @@ export type AuditData = {
   visibility_score: number;
   gemini_score: number;
   chatgpt_score: number;
+  // Named the brand, per model. The two fields above are the same thing for the
+  // first two models and stay because stored runs carry them.
+  model_scores?: Record<string, number>;
   total_prompts: number;
   /* Named against the convention, and kept that way because stored runs and the
      Supabase columns carry these keys. `mentions_score` is the count of answers
@@ -608,13 +665,14 @@ const STR: Record<Lang, Strings> = {
   },
 } as const;
 
-const MODEL_TABS: { key: ModelKey; label: string; available: boolean }[] = [
-  { key: "all", label: "All models", available: true },
-  { key: "chatgpt", label: "ChatGPT", available: true },
-  { key: "gemini", label: "Gemini", available: true },
-  { key: "perplexity", label: "Perplexity", available: false },
-  { key: "claude", label: "Claude", available: false },
-  { key: "ai_overview", label: "AI Overview", available: false },
+/* Every tab the dashboard can show. Whether one is selectable comes from the
+   run, not from this list — see ModelSwitcher. The last two have no backend
+   behind them yet and so are never in `ran`, which is what greys them out. */
+const MODEL_TABS: { key: ModelKey; label: string }[] = [
+  { key: "all", label: "All models" },
+  ...MODELS.map((m) => ({ key: m.key as ModelKey, label: m.label })),
+  { key: "claude", label: "Claude" },
+  { key: "ai_overview", label: "AI Overview" },
 ];
 
 function categorize(text: string): "mentions" | "technical" | "content" | "authority" | "keywords" {
@@ -630,12 +688,15 @@ function categorize(text: string): "mentions" | "technical" | "content" | "autho
    Small building blocks
    ──────────────────────────────────────────────────────────────── */
 
-function ModelSwitcher({ tab, setTab, t }: { tab: ModelKey; setTab: (m: ModelKey) => void; t: Strings }) {
+function ModelSwitcher({ tab, setTab, t, ran }: { tab: ModelKey; setTab: (m: ModelKey) => void; t: Strings; ran: ModelName[] }) {
   return (
     <div className="flex flex-wrap gap-1 rounded-xl border border-neutral-150 bg-neutral-50/60 p-1">
       {MODEL_TABS.map((m) => {
         const active = tab === m.key;
-        if (!m.available) {
+        // Availability follows the run, not a constant. A model the backend has
+        // started running would otherwise still show as locked.
+        const available = m.key === "all" || ran.includes(m.key as ModelName);
+        if (!available) {
           return (
             <button key={m.key} type="button" title={t.proTooltip} disabled className="flex cursor-not-allowed items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-300">
               {m.label}
@@ -944,10 +1005,11 @@ function excerptToNodes(text: string, limit = 150): React.ReactNode[] {
    compares against - it is the reason to come back rather than just re-read a
    report. */
 function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: AuditData; t: Strings; lang: Lang; setLang: (l: Lang) => void; onBack: () => void; addBox?: React.ReactNode }) {
+  const ran = useMemo(() => modelsIn(data), [data]);
   const rows = useMemo(() => {
     return data.results
       .map((r) => {
-        const models = [r.chatgpt, r.gemini];
+        const models = ran.map((k) => infoFor(r, k));
         const youHere = models.some((m) => m.mentioned);
         const rivals = Array.from(new Set(models.flatMap((m) => m.competitors_found || [])));
         // Names the models brought up that nobody asked us to track. Often the
@@ -999,7 +1061,7 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
         : "";
       const hit = data.results.find((r) => r.prompt.toLowerCase() === p.toLowerCase());
       if (!hit) return { prompt: p, state: "unknown" as const, rivals: [] as string[], added };
-      const models = [hit.chatgpt, hit.gemini];
+      const models = ran.map((k) => infoFor(hit, k));
       return {
         prompt: p,
         state: models.some((m) => m.mentioned) ? ("present" as const) : ("absent" as const),
@@ -1292,12 +1354,12 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
 
 /* Expandable row showing what each model actually answered for one prompt.
    This is the "why don't I appear / what did competitors get" view. */
-function PromptRow({ result, t, tab, modelsUsed, runDate }: { result: AuditResult; t: Strings; tab: ModelKey; modelsUsed?: Record<string, string>; runDate: string }) {
+function PromptRow({ result, t, tab, ran, modelsUsed, runDate }: { result: AuditResult; t: Strings; tab: ModelKey; ran: ModelName[]; modelsUsed?: Record<string, string>; runDate: string }) {
   const [open, setOpen] = useState(false);
-  const models: { key: "chatgpt" | "gemini"; label: string; info: ModelMentionInfo }[] = [
-    { key: "chatgpt", label: "ChatGPT", info: result.chatgpt },
-    { key: "gemini", label: "Gemini", info: result.gemini },
-  ].filter((m) => tab === "all" || tab === m.key) as never;
+  const models = MODELS
+    .filter((m) => ran.includes(m.key))
+    .filter((m) => tab === "all" || tab === m.key)
+    .map((m) => ({ key: m.key, label: m.label, info: infoFor(result, m.key) }));
 
   const youMentioned = models.some((m) => m.info.mentioned);
   const competitors = Array.from(new Set(models.flatMap((m) => m.info.competitors_found)));
@@ -1452,7 +1514,14 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
   const citationsRef = useRef<HTMLDivElement>(null);
   const history = useVisibilityHistory(data.brand);
 
-  const modelsForTab = (r: AuditResult) => (tab === "gemini" ? [r.gemini] : tab === "chatgpt" ? [r.chatgpt] : [r.gemini, r.chatgpt]);
+  const ran = useMemo(() => modelsIn(data), [data]);
+  useEffect(() => {
+    // Opening a saved run while a model tab is selected that this run did not
+    // use would show its zeros as a real measurement.
+    if (tab !== "all" && !ran.includes(tab as ModelName)) setTab("all");
+  }, [ran, tab]);
+  const modelsForTab = (r: AuditResult) =>
+    (tab === "all" ? ran : ran.filter((k) => k === tab)).map((k) => infoFor(r, k));
 
   /* ---- metrics for the selected model tab ---- */
   const metrics = useMemo(() => {
@@ -1470,22 +1539,25 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
        models count" here would be a second definition of the denominator, and
        the two would disagree the first time a model ran but failed on every
        prompt. activeModels is the fallback for runs saved before models_run. */
-    const modelCount = Math.max(
-      (data.models_run?.length ?? activeModels(data).length) || 1, 1);
+    const modelCount = Math.max(ran.length || activeModels(data).length || 1, 1);
     const answers = tab === "all" ? data.total_prompts * modelCount : data.total_prompts;
 
-    if (tab === "gemini") {
-      citationCount = data.results.filter((r) => r.gemini.mentioned_with_link).length;
-      bareMentionCount = data.results.filter((r) => r.gemini.mentioned_without_link).length;
-      scorePct = data.total_prompts ? Math.round((data.gemini_score / data.total_prompts) * 100) : 0;
-    } else if (tab === "chatgpt") {
-      citationCount = data.results.filter((r) => r.chatgpt.mentioned_with_link).length;
-      bareMentionCount = data.results.filter((r) => r.chatgpt.mentioned_without_link).length;
-      scorePct = data.total_prompts ? Math.round((data.chatgpt_score / data.total_prompts) * 100) : 0;
-    } else {
+    /* Per-model counts come from the results, which carry every model. The
+       combined tab uses the backend's own totals so the headline cannot drift
+       from what was stored. Both branches used to name gemini and chatgpt, so
+       selecting a third model showed the combined figures under its tab. */
+    let named: number;
+    if (tab === "all") {
       citationCount = data.mentions_score;
       bareMentionCount = data.citations_score;
       scorePct = data.visibility_score;
+      named = ran.reduce((s, k) => s + modelNamedCount(data, k), 0);
+    } else {
+      const key = tab as ModelName;
+      citationCount = data.results.filter((r) => infoFor(r, key).mentioned_with_link).length;
+      bareMentionCount = data.results.filter((r) => infoFor(r, key).mentioned_without_link).length;
+      named = modelNamedCount(data, key);
+      scorePct = data.total_prompts ? Math.round((named / data.total_prompts) * 100) : 0;
     }
 
     const others = data.competitor_ranking.filter((c) => !c.is_your_brand);
@@ -1494,12 +1566,6 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
     const topRivalsByBareMentions = [...others].sort((a, b) => b.mentions_without_link - a.mentions_without_link).slice(0, 2);
 
     const pct = (n: number) => (answers > 0 ? Math.round((n / answers) * 100) : 0);
-    /* Counted, not recovered from the rounded percentage: scorePct * answers
-       disagrees with the lists below by one often enough to be noticed, and the
-       whole point of showing the denominator is that the figure can be checked. */
-    const named = tab === "gemini" ? data.gemini_score
-                : tab === "chatgpt" ? data.chatgpt_score
-                : data.gemini_score + data.chatgpt_score;
 
     return { citationCount, bareMentionCount, scorePct, competitorAvg,
              topRivalsByCitations, topRivalsByBareMentions,
@@ -1922,7 +1988,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
           ) : (
             <div className="mt-6 divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-150">
               {listRows.map((p, i) => (
-                <PromptRow key={i} result={p.result} t={t} tab={tab} modelsUsed={data.models_used} runDate={runDate} />
+                <PromptRow key={i} result={p.result} t={t} tab={tab} ran={ran} modelsUsed={data.models_used} runDate={runDate} />
               ))}
             </div>
           )}
@@ -1966,7 +2032,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
               {data.country ? ` · ${data.country}` : ""}
             </p>
           </div>
-          <ModelSwitcher tab={tab} setTab={setTab} t={t} />
+          <ModelSwitcher tab={tab} setTab={setTab} t={t} ran={ran} />
         </div>
 
         {failedModels.length > 0 && (
