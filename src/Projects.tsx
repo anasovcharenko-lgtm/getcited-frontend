@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { supabase } from "./supabase";
 import { saveAuditRun } from "./saveAudit";
+import { apiFetch } from "./api";
 import type { AuditData } from "./Dashboard";
 
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -141,9 +142,8 @@ export function Projects({ lang = "en", onBack, onOpen }: {
         .filter((c) => !c.is_your_brand)
         .map((c) => ({ name: c.name, website: c.domain ? `https://${c.domain}` : "" }));
 
-      const res = await fetch(`${API_URL}/audit`, {
+      const res = await apiFetch(`${API_URL}/audit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brand: project.brand,
           competitor_list: rivals,

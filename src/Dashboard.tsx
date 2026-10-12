@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "./supabase";
 import { saveAddedPrompts, activeModels } from "./saveAudit";
+import { apiFetch } from "./api";
 
 /* ────────────────────────────────────────────────────────────────
    Types — match the current backend response shape (api.py).
@@ -1266,9 +1267,8 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
     setLoading(true);
     setFailed(false);
     try {
-      const res = await fetch(`${API_URL}/source-gap`, {
+      const res = await apiFetch(`${API_URL}/source-gap`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           urls: domains.flatMap((d) => d.urls),
           brand: data.brand,
@@ -1483,9 +1483,8 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
     setPageChecking(true);
     setPageCheckError("");
     try {
-      const res = await fetch(`${API_URL}/page-check`, {
+      const res = await apiFetch(`${API_URL}/page-check`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           website: url,
           brand: data.brand,
@@ -1651,9 +1650,8 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
     setAdding(true);
     setAddError("");
     try {
-      const res = await fetch(`${API_URL}/audit/extend`, {
+      const res = await apiFetch(`${API_URL}/audit/extend`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brand: data.brand,
           // Rebuilt from the ranking, which already carries each rival's domain.

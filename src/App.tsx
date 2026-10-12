@@ -11,6 +11,7 @@ import { COMPANY, companyLine } from "./legal/company";
 import { isAdmin } from "./admins";
 import { saveAuditRun } from "./saveAudit";
 import { Projects } from "./Projects";
+import { apiFetch } from "./api";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -144,7 +145,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
     const timer = setTimeout(async () => {
       setChecking(true);
       try {
-        const res = await fetch(`${API_URL}/check-brand`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim() }) });
+        const res = await apiFetch(`${API_URL}/check-brand`, { method: "POST", body: JSON.stringify({ brand: brand.trim() }) });
         const data = await res.json();
         setShowDescription(!data.known);
       } catch { setShowDescription(true); }
@@ -218,7 +219,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await fetch(`${API_URL}/audit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, /* Typed prompts replace generation; tracked ones are added to it. Sending tracked as custom_prompts is what used to switch generation off. */ custom_prompts: mode === "manual" ? customLines.slice(0, MAX_PROMPTS) : [], extra_prompts: tracked }) });
+      const res = await apiFetch(`${API_URL}/audit`, { method: "POST", body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, /* Typed prompts replace generation; tracked ones are added to it. Sending tracked as custom_prompts is what used to switch generation off. */ custom_prompts: mode === "manual" ? customLines.slice(0, MAX_PROMPTS) : [], extra_prompts: tracked }) });
       const data = await res.json();
 
       /* A failed response is still JSON, and it used to be handed to the
