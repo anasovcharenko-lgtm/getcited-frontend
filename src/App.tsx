@@ -12,6 +12,7 @@ import { isAdmin } from "./admins";
 import { saveAuditRun } from "./saveAudit";
 import { Projects } from "./Projects";
 import { apiFetch } from "./api";
+import { WaitlistForm } from "./Waitlist";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -442,7 +443,11 @@ export default function App() {
               <button onClick={() => setShowProjects(true)} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">My projects</button>
             )}
             <button onClick={user ? signOut : signInWithGoogle} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">{user ? user.email?.split("@")[0] : "Sign in"}</button>
-            <button onClick={handleStartAudit} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Start free</button>
+            {user ? (
+              <button onClick={handleStartAudit} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Start free</button>
+            ) : (
+              <a href="#waitlist" className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Join waiting list</a>
+            )}
           </div>
         </div>
       </header>
@@ -463,12 +468,21 @@ export default function App() {
           </p>
         </Reveal>
         <Reveal>
-          <div className="mt-8 flex items-center gap-4">
-            <button onClick={handleStartAudit} className="flex items-center gap-2 rounded-lg bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-800">
-              Start free audit <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-neutral-400">Free to start · no credit card</p>
+          {/* Signed in keeps the tool; everyone else joins the list. An
+              anonymous visitor running an audit costs a real OpenAI call for a
+              brand we never hear about again, and the service is not open yet. */}
+          {user ? (
+            <>
+              <div className="mt-8 flex items-center gap-4">
+                <button onClick={handleStartAudit} className="flex items-center gap-2 rounded-lg bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-800">
+                  Start free audit <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="mt-3 text-xs text-neutral-400">Free to start · no credit card</p>
+            </>
+          ) : (
+            <WaitlistForm lang="en" source="home_hero_en" className="mt-8 scroll-mt-24" id="waitlist" />
+          )}
         </Reveal>
       </section>
 
@@ -578,7 +592,10 @@ export default function App() {
               <ul className="mt-6 flex-1 space-y-2">
                 {plan.features.map((f) => <li key={f} className="flex items-center gap-2 text-sm"><Check className={`h-4 w-4 shrink-0 ${"highlight" in plan && plan.highlight ? "text-white" : "text-neutral-900"}`} />{f}</li>)}
               </ul>
-              <button onClick={() => setShowModal(true)} className={`mt-6 rounded-lg py-2.5 text-sm font-medium ${"highlight" in plan && plan.highlight ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{plan.cta}</button>
+              {/* Was setShowModal(true), which opened the audit for a signed-out
+                  visitor and skipped the sign-in that every other entry point
+                  goes through. handleStartAudit is that one path. */}
+              <button onClick={user ? handleStartAudit : () => { window.location.hash = "waitlist"; }} className={`mt-6 rounded-lg py-2.5 text-sm font-medium ${"highlight" in plan && plan.highlight ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{user ? plan.cta : "Join waiting list"}</button>
             </div>
           ))}
         </div>
