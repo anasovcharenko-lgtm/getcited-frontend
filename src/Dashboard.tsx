@@ -83,7 +83,16 @@ export function modelNamedCount(
   return (data.results || []).filter((r) => infoFor(r, key).mentioned).length;
 }
 
-export function modelsIn(data: { models_run?: string[]; results?: AuditResult[] }): ModelName[] {
+export function modelsIn(
+  data: { models_answered?: string[]; models_run?: string[]; results?: AuditResult[] },
+): ModelName[] {
+  /* models_answered first: a model that was asked and said nothing has no tab
+     worth opening and no row to fill, and counting it would read as "measured,
+     not named". models_run is the fallback for runs saved before the backend
+     told the two apart; the banner still reports the failure either way. */
+  const spoke = (data.models_answered || []).filter(
+    (m): m is ModelName => MODELS.some((x) => x.key === m));
+  if (spoke.length) return spoke;
   const declared = (data.models_run || []).filter(
     (m): m is ModelName => MODELS.some((x) => x.key === m));
   if (declared.length) return declared;
@@ -147,6 +156,10 @@ export type AuditData = {
   // Named the brand, per model. The two fields above are the same thing for the
   // first two models and stay because stored runs carry them.
   model_scores?: Record<string, number>;
+  /* The denominator the backend divided by, and which models actually spoke.
+     A model can be in models_run and absent here: selected, called, silent. */
+  answers?: number;
+  models_answered?: string[];
   total_prompts: number;
   /* Named against the convention, and kept that way because stored runs and the
      Supabase columns carry these keys. `mentions_score` is the count of answers
@@ -371,7 +384,7 @@ const STR: Record<Lang, Strings> = {
     lastRun: "Last run: today",
     aiVisibilityScore: "AI visibility score",
     vsCompetitorsAvg: (n) => `vs competitors avg ${n}%`,
-    mentionRateSub: (named, answers) => `named in ${named} of ${answers} answers`,
+    mentionRateSub: (named, answers) => `named in ${named} of ${answers} answers that came back`,
     citationsCard: "Citations",
     citationsCardSub: (pct) => `named with a link to your site · ${pct}% of answers`,
     mentionsNoLinkCard: "Mentions, no link",
@@ -520,7 +533,7 @@ const STR: Record<Lang, Strings> = {
     lastRun: "Последний запуск: сегодня",
     aiVisibilityScore: "AI visibility score",
     vsCompetitorsAvg: (n) => `в среднем у конкурентов ${n}%`,
-    mentionRateSub: (named, answers) => `вас называют в ${named} из ${answers} ответов`,
+    mentionRateSub: (named, answers) => `вас называют в ${named} из ${answers} полученных ответов`,
     citationsCard: "Цитирования",
     citationsCardSub: (pct) => `назвали и дали ссылку на ваш сайт · ${pct}% ответов`,
     mentionsNoLinkCard: "Упоминания без ссылки",
@@ -1538,8 +1551,17 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
        models count" here would be a second definition of the denominator, and
        the two would disagree the first time a model ran but failed on every
        prompt. activeModels is the fallback for runs saved before models_run. */
+    /* The backend sends the denominator it divided by. Recomputing it as
+       prompts × models silently disagrees whenever a model was asked and did
+       not answer — exactly the run where the numbers most need explaining. */
     const modelCount = Math.max(ran.length || activeModels(data).length || 1, 1);
-    const answers = tab === "all" ? data.total_prompts * modelCount : data.total_prompts;
+    const allAnswers = typeof data.answers === "number" && data.answers > 0
+      ? data.answers
+      : data.total_prompts * modelCount;
+    const answers = tab === "all"
+      ? allAnswers
+      : data.results.filter((r) => (infoFor(r, tab as ModelName).answer || "").trim()).length
+        || data.total_prompts;
 
     /* Per-model counts come from the results, which carry every model. The
        combined tab uses the backend's own totals so the headline cannot drift
@@ -1648,7 +1670,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
        when they were exactly as complete as asked for. */
     return Object.entries(status)
       .filter(([, v]) => !v.ok && v.enabled !== false && v.selected !== false)
-      .map(([k]) => labels[k] ?? k);
+      .map(([k, v]) => ({ label: labels[k] ?? k, reason: (v.error || "").trim() }));
   }, [data.model_status]);
 
   /* ---- recommendations, categorised ---- */
@@ -2044,7 +2066,16 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
 
         {failedModels.length > 0 && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm text-amber-800">{t.modelFailed(failedModels.join(", "))}</p>
+            <p className="text-sm text-amber-800">{t.modelFailed(failedModels.map((f) => f.label).join(", "))}</p>
+            {/* The reason was in the payload all along and never shown, so the
+                only way to find out why a model went quiet was to call the API
+                by hand — which now needs a token. It is the provider's own
+                words, so it is kept as a quotation rather than paraphrased. */}
+            {failedModels.filter((f) => f.reason).map((f) => (
+              <p key={f.label} className="mt-1 break-words font-mono text-[11px] leading-snug text-amber-700/90">
+                {f.label}: {f.reason.slice(0, 300)}
+              </p>
+            ))}
           </div>
         )}
 
@@ -2120,8 +2151,15 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
             {data.competitor_ranking.slice(0, 5).map((stat) => {
               // Counts, not percentages: "0 of 18" gives the gap a size you can
               // aim at, where "0%" is just a score you are losing.
-              const total = data.total_prompts || 1;
-              const covered = Math.round((stat.mention_rate / 100) * total);
+              /* The count itself, against the same denominator as the cards.
+                 This used to rebuild the count from the rounded percentage and
+                 multiply it by PROMPTS, while the rate is over ANSWERS — so a
+                 rival named in one of three answers came out as round(0.33 × 1)
+                 = "0 of 1" on the bar while the card above said the competitor
+                 average was 33%. Two numbers from the same data, contradicting
+                 each other on the same screen. */
+              const total = metrics.answers || data.total_prompts || 1;
+              const covered = stat.total_mentions;
               const max = Math.max(...data.competitor_ranking.map((s) => s.mention_rate), 1);
               const empty = covered === 0;
               return (
@@ -2202,19 +2240,38 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
           <p className="mb-3 text-sm font-medium">{t.distributionTitle}</p>
           <div className="space-y-3">
             {[
-              { label: "ChatGPT", pct: data.total_prompts ? Math.round((data.chatgpt_score / data.total_prompts) * 100) : 0, locked: false, hidden: false },
-              { label: "Gemini", pct: data.total_prompts ? Math.round((data.gemini_score / data.total_prompts) * 100) : 0, locked: false, hidden: data.model_status?.gemini?.enabled === false },
-              { label: "Perplexity", pct: 0, locked: true, hidden: false },
-              { label: "Claude", pct: 0, locked: true, hidden: false },
+              /* A fourth hand-written model list lived here, with Perplexity
+                 nailed to "Pro" while the backend was already running it. Each
+                 row is now a share of the answers THAT MODEL returned, not of
+                 the prompts it was asked: a model that answered four of eight
+                 and named the brand in two is at 50%, not 25%. Claude stays
+                 locked because nothing behind it exists yet. */
+              ...MODELS.map((m) => {
+                const answered = data.results.filter(
+                  (r) => (infoFor(r, m.key).answer || "").trim()).length;
+                const named = modelNamedCount(data, m.key);
+                return {
+                  label: m.label,
+                  pct: answered ? Math.round((named / answered) * 100) : 0,
+                  locked: false,
+                  silent: answered === 0,
+                  hidden: !ran.includes(m.key) && data.model_status?.[m.key]?.enabled === false,
+                };
+              }),
+              { label: "Claude", pct: 0, locked: true, silent: false, hidden: false },
             ].filter((m) => !m.hidden).map((m) => (
               <div key={m.label} className="flex items-center gap-3">
                 <span className="flex w-24 shrink-0 items-center gap-1 text-xs font-medium text-neutral-700">
                   {m.label}{m.locked && <Lock className="h-3 w-3 text-neutral-300" />}
                 </span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-neutral-100">
-                  {!m.locked && <div className="h-full rounded-full bg-neutral-900" style={{ width: `${m.pct}%` }} />}
+                <div className={`h-2 flex-1 overflow-hidden rounded-full ${m.silent ? "border border-dashed border-neutral-200" : "bg-neutral-100"}`}>
+                  {!m.locked && !m.silent && <div className="h-full rounded-full bg-neutral-900" style={{ width: `${m.pct}%` }} />}
                 </div>
-                <span className="w-10 shrink-0 text-right text-xs font-semibold text-neutral-500">{m.locked ? t.proOnly : `${m.pct}%`}</span>
+                {/* A model that returned nothing has no percentage. Printing 0%
+                    would read as "asked you about, never named you". */}
+                <span className="w-10 shrink-0 text-right text-xs font-semibold text-neutral-500">
+                  {m.locked ? t.proOnly : m.silent ? "—" : `${m.pct}%`}
+                </span>
               </div>
             ))}
           </div>
