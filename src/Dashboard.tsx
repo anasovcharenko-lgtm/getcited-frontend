@@ -20,6 +20,11 @@ export type ModelMentionInfo = {
   competitors_with_link: string[];
   competitors_without_link: string[];
   answer?: string;
+  /* The pages the model actually read to write this answer. The one question a
+     reader has in front of an answer that named someone else is "where did that
+     come from" — the domain chips could not answer it, because a domain is not a
+     page. Optional: audits saved before this existed carry cited_domains only. */
+  sources?: string[];
   cited_domains?: string[];
   discovered_brands?: string[];
 };
@@ -433,7 +438,7 @@ const STR: Record<Lang, Strings> = {
     closeAnswer: "Hide",
     seeAiResponse: "See what AI answered",
     hideAiResponse: "Hide answer",
-    citedDomains: "Cited",
+    citedDomains: "Sources the model read",
     noAnswerCaptured: "This model didn't return an answer for this prompt.",
     youAppear: "You appear",
     youDontAppear: "You don't appear",
@@ -581,7 +586,7 @@ const STR: Record<Lang, Strings> = {
     closeAnswer: "Свернуть",
     seeAiResponse: "Смотреть ответ AI",
     hideAiResponse: "Свернуть ответ",
-    citedDomains: "Ссылки",
+    citedDomains: "Источники, на которые опирался ответ",
     noAnswerCaptured: "Эта модель не вернула ответ на этот промпт.",
     youAppear: "Вы есть в ответе",
     youDontAppear: "Вас нет в ответе",
@@ -683,9 +688,19 @@ function localizeFinding(f: PageFinding, lang: Lang): { title: string; found: st
     case "self_declaration": {
       const n = Number(x.body_occurrences) || 0;
       const missing = (x.missing as unknown as string[] | undefined) || [];
+      const names = missing.map((m) => FIELD_RU[m] || m);
+      // Собранная через «но» фраза держится только на противопоставлении: при
+      // нуле в теле «встречается 0 раз, но отсутствует в title» противопоставляет
+      // отсутствие отсутствию. Ноль — отдельная формулировка.
+      const found =
+        n > 0
+          ? `«${x.term}» встречается в тексте ${n} ${plural(n, "раз", "раза", "раз")}, но отсутствует в ${names.join(", ")}.`
+          : missing.length === 3
+            ? `«${x.term}» не встречается на странице нигде — ни в title, ни в H1, ни в meta description, ни в тексте.`
+            : `«${x.term}» отсутствует в ${names.join(" и ")} и не встречается в тексте.`;
       return {
         title: "Страница не объявляет категорию, в которой конкурирует",
-        found: `«${x.term}» встречается в тексте ${n} ${plural(n, "раз", "раза", "раз")}, но отсутствует в ${missing.map((m) => FIELD_RU[m] || m).join(", ")}.`,
+        found,
         why: "Отвечая на категорийный вопрос, модель опирается на то, чем страница себя объявляет, а не на то, сколько раз фраза встретилась ниже по тексту. Частота в теле страницы и в кейсах не заменяет title, H1 и описание — страница с втрое меньшим числом упоминаний выигрывает, если ведёт этими тремя.",
       };
     }
@@ -780,6 +795,59 @@ function statLabel(name: string, isYou: boolean, youLabel: string) {
   return isYou ? `${name} (${youLabel})` : name;
 }
 
+/* The sources the model read, under the answer it wrote.
+
+   The backend appends these to the answer text as a "Sources:" block and used to
+   strip them again on the way out, leaving only the CITED chips — which say
+   whether your own domain turned up, not which pages the model was reading. For
+   working out why a competitor was named and you were not, the pages are the
+   whole answer, so they are shown as links. `sources` carries the URLs;
+   `cited_domains` is the fallback for audits saved before it existed, and those
+   stay as plain chips because a domain has no page to open. */
+function SourceList({ info, label }: { info: ModelMentionInfo; label: string }) {
+  const urls = info.sources || [];
+  if (urls.length > 0) {
+    return (
+      <div className="mt-2">
+        <span className="text-[10px] uppercase tracking-wide text-neutral-400">{label}</span>
+        <ol className="mt-1 space-y-0.5">
+          {urls.map((u, i) => {
+            // Host and path separately: several sources often share a domain, and
+            // "capterra.com" four times over says nothing about which page was read.
+            let host = u, path = "";
+            try {
+              const p = new URL(u);
+              host = p.hostname.replace(/^www\./, "");
+              path = decodeURIComponent(p.pathname).replace(/\/$/, "");
+            } catch { /* unparseable: show it raw rather than hide it */ }
+            return (
+              <li key={`${u}-${i}`} className="flex gap-1.5 text-[10px] leading-snug">
+                <span className="w-3 shrink-0 text-right text-neutral-400">{i + 1}</span>
+                <a href={u} target="_blank" rel="noopener noreferrer"
+                   className="min-w-0 truncate underline decoration-neutral-300 hover:decoration-neutral-500"
+                   title={u}>
+                  <span className="text-neutral-700">{host}</span>
+                  {path && <span className="text-neutral-400">{path}</span>}
+                </a>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    );
+  }
+  const domains = info.cited_domains || [];
+  if (domains.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className="text-[10px] uppercase tracking-wide text-neutral-400">{label}</span>
+      {domains.map((d) => (
+        <span key={d} className="rounded-full border border-neutral-200 px-2 py-0.5 text-[10px] text-neutral-600">{d}</span>
+      ))}
+    </div>
+  );
+}
+
 /* AI answers come back as markdown — headings, bold, and comparison tables.
    Rendering them raw showed literal ** and pipe characters, so we render
    properly but keep the type small to fit inside an expanded row. */
@@ -872,8 +940,12 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
         // Names the models brought up that nobody asked us to track. Often the
         // more useful finding, so they are shown but kept visually apart.
         const found = Array.from(new Set(models.flatMap((m) => m.discovered_brands || [])));
-        const answer = r.chatgpt.answer || r.gemini.answer || "";
-        return { prompt: r.prompt, rivals, found, answer, youHere };
+        // The sources have to come from whichever model's answer is on screen,
+        // not from a merge of both — otherwise the list cites pages that the
+        // answer above it was not written from.
+        const shown = r.chatgpt.answer ? r.chatgpt : r.gemini.answer ? r.gemini : null;
+        const answer = shown?.answer || "";
+        return { prompt: r.prompt, rivals, found, answer, info: shown, youHere };
       })
       .filter((r) => !r.youHere && r.rivals.length > 0);
   }, [data.results]);
@@ -1030,6 +1102,7 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
                   {open && r.answer && (
                     <div className="border-t border-neutral-100 bg-neutral-50/60 px-4 py-4">
                       <AnswerMarkdown text={r.answer} />
+                      {r.info && <SourceList info={r.info} label={t.citedDomains} />}
                     </div>
                   )}
                 </div>
@@ -1249,14 +1322,7 @@ function PromptRow({ result, t, tab, modelsUsed, runDate }: { result: AuditResul
               ) : (
                 <p className="text-xs italic text-neutral-400">{t.noAnswerCaptured}</p>
               )}
-              {m.info.cited_domains && m.info.cited_domains.length > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] uppercase tracking-wide text-neutral-400">{t.citedDomains}</span>
-                  {m.info.cited_domains.map((d) => (
-                    <span key={d} className="rounded-full border border-neutral-200 px-2 py-0.5 text-[10px] text-neutral-600">{d}</span>
-                  ))}
-                </div>
-              )}
+              <SourceList info={m.info} label={t.citedDomains} />
             </div>
           ))}
         </div>
