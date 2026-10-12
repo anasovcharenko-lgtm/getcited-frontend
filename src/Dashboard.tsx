@@ -3,7 +3,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, Lock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "./supabase";
-import { saveAddedPrompts } from "./saveAudit";
+import { saveAddedPrompts, activeModels } from "./saveAudit";
 
 /* ────────────────────────────────────────────────────────────────
    Types — match the current backend response shape (api.py).
@@ -90,6 +90,11 @@ export type AuditData = {
   gemini_score: number;
   chatgpt_score: number;
   total_prompts: number;
+  /* Named against the convention, and kept that way because stored runs and the
+     Supabase columns carry these keys. `mentions_score` is the count of answers
+     that name the brand AND link to it — a citation. `citations_score` is the
+     count that name it with no link — a mention. The screen maps them to the
+     right words; nothing else should read them without this note. */
   mentions_score: number;
   citations_score: number;
   results: AuditResult[];
@@ -157,10 +162,16 @@ interface Strings {
   lastRun: string;
   aiVisibilityScore: string;
   vsCompetitorsAvg: (n: number) => string;
-  totalMentions: string;
-  mentionsSub: string;
-  totalCitations: string;
-  citationsSub: string;
+  /* The two words are not interchangeable and the industry fixed their meaning
+     before we did: a MENTION is the brand named in the prose, a CITATION is the
+     answer crediting your page, normally with a link. The cards used to carry
+     them the other way round, which made every number we quoted a client read
+     as the opposite of what the same number means in Profound or Peec. */
+  mentionRateSub: (named: number, answers: number) => string;
+  citationsCard: string;
+  citationsCardSub: (pct: number) => string;
+  mentionsNoLinkCard: string;
+  mentionsNoLinkSub: (pct: number) => string;
   proOnly: string;
   proTooltip: string;
   comparedTo: string;
@@ -302,10 +313,11 @@ const STR: Record<Lang, Strings> = {
     lastRun: "Last run: today",
     aiVisibilityScore: "AI visibility score",
     vsCompetitorsAvg: (n) => `vs competitors avg ${n}%`,
-    totalMentions: "Total mentions",
-    mentionsSub: "with link to your site",
-    totalCitations: "Total citations",
-    citationsSub: "named, no link · click to see",
+    mentionRateSub: (named, answers) => `named in ${named} of ${answers} answers`,
+    citationsCard: "Citations",
+    citationsCardSub: (pct) => `named with a link to your site · ${pct}% of answers`,
+    mentionsNoLinkCard: "Mentions, no link",
+    mentionsNoLinkSub: (pct) => `named, but nothing links back · ${pct}% of answers`,
     proOnly: "Pro",
     proTooltip: "Available on paid plans",
     comparedTo: "Where you stand vs competitors",
@@ -313,9 +325,9 @@ const STR: Record<Lang, Strings> = {
     you: "you",
     howToFix: "How to fix this →",
     landscapeTitle: "Competitive landscape",
-    landscapeSub: "Mentions vs citations · bubble size = total appearances",
-    landscapeXAxis: "Mentions (with link)",
-    landscapeYAxis: "Citations (no link)",
+    landscapeSub: "Citations vs bare mentions · bubble size = total appearances",
+    landscapeXAxis: "Citations (with link)",
+    landscapeYAxis: "Mentions (no link)",
     bestCoveredTitle: "Your best covered topics",
     bestCoveredEmpty: "No strongly covered topics yet.",
     seeCompetitorsDoBetter: "See where competitors do better →",
@@ -333,7 +345,7 @@ const STR: Record<Lang, Strings> = {
     whatAiSays: "What AI says about your brand",
     whatAiSaysEmpty: "No direct quote captured yet — run another audit to try again.",
     seeHowAccurate: "See how accurate this is →",
-    citationsTable: "Citations — AI responses that name you without a link",
+    citationsTable: "Sources — the pages AI models cite most in your category",
     viewAllCitations: (n) => `View all ${n} →`,
     showLess: "Show less",
     colPrompt: "Prompt",
@@ -450,10 +462,11 @@ const STR: Record<Lang, Strings> = {
     lastRun: "Последний запуск: сегодня",
     aiVisibilityScore: "AI visibility score",
     vsCompetitorsAvg: (n) => `в среднем у конкурентов ${n}%`,
-    totalMentions: "Всего упоминаний",
-    mentionsSub: "со ссылкой на ваш сайт",
-    totalCitations: "Всего цитирований",
-    citationsSub: "названы, без ссылки · нажмите, чтобы увидеть",
+    mentionRateSub: (named, answers) => `вас называют в ${named} из ${answers} ответов`,
+    citationsCard: "Цитирования",
+    citationsCardSub: (pct) => `назвали и дали ссылку на ваш сайт · ${pct}% ответов`,
+    mentionsNoLinkCard: "Упоминания без ссылки",
+    mentionsNoLinkSub: (pct) => `назвали, но ссылки на вас нет · ${pct}% ответов`,
     proOnly: "Pro",
     proTooltip: "Доступно на платных тарифах",
     comparedTo: "Как вы выглядите на фоне конкурентов",
@@ -461,9 +474,9 @@ const STR: Record<Lang, Strings> = {
     you: "вы",
     howToFix: "Как это исправить →",
     landscapeTitle: "Конкурентный ландшафт",
-    landscapeSub: "Упоминания и цитирования · размер пузыря = всего появлений",
-    landscapeXAxis: "Упоминания (со ссылкой)",
-    landscapeYAxis: "Цитирования (без ссылки)",
+    landscapeSub: "Цитирования и упоминания без ссылки · размер пузыря = всего появлений",
+    landscapeXAxis: "Цитирования (со ссылкой)",
+    landscapeYAxis: "Упоминания (без ссылки)",
     bestCoveredTitle: "Лучше всего покрытые темы",
     bestCoveredEmpty: "Пока нет уверенно покрытых тем.",
     seeCompetitorsDoBetter: "Смотреть, где конкуренты лучше →",
@@ -481,7 +494,7 @@ const STR: Record<Lang, Strings> = {
     whatAiSays: "Что AI говорит о вашем бренде",
     whatAiSaysEmpty: "Пока не удалось выделить цитату — попробуйте запустить аудит ещё раз.",
     seeHowAccurate: "Проверить точность →",
-    citationsTable: "Цитирования — ответы AI, где вас называют без ссылки",
+    citationsTable: "Источники — страницы, на которые AI ссылается чаще всего в вашей категории",
     viewAllCitations: (n) => `Показать все ${n} →`,
     showLess: "Свернуть",
     colPrompt: "Промпт",
@@ -1443,30 +1456,54 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
 
   /* ---- metrics for the selected model tab ---- */
   const metrics = useMemo(() => {
-    let mentionsWithLink = 0;
-    let citationsNoLink = 0;
+    let citationCount = 0;
+    let bareMentionCount = 0;
     let scorePct = data.visibility_score;
 
+    /* The denominator is answers, not prompts: on the combined tab every prompt
+       was put to each model that ran, so eight prompts across two models are
+       sixteen answers. Quoting a count against "8 prompts" would halve the rate
+       the moment a second model is switched on.
+
+       `models_run` is the same list the backend divided by, so the fraction on
+       screen cannot contradict the percentage next to it. Recomputing "which
+       models count" here would be a second definition of the denominator, and
+       the two would disagree the first time a model ran but failed on every
+       prompt. activeModels is the fallback for runs saved before models_run. */
+    const modelCount = Math.max(
+      (data.models_run?.length ?? activeModels(data).length) || 1, 1);
+    const answers = tab === "all" ? data.total_prompts * modelCount : data.total_prompts;
+
     if (tab === "gemini") {
-      mentionsWithLink = data.results.filter((r) => r.gemini.mentioned_with_link).length;
-      citationsNoLink = data.results.filter((r) => r.gemini.mentioned_without_link).length;
+      citationCount = data.results.filter((r) => r.gemini.mentioned_with_link).length;
+      bareMentionCount = data.results.filter((r) => r.gemini.mentioned_without_link).length;
       scorePct = data.total_prompts ? Math.round((data.gemini_score / data.total_prompts) * 100) : 0;
     } else if (tab === "chatgpt") {
-      mentionsWithLink = data.results.filter((r) => r.chatgpt.mentioned_with_link).length;
-      citationsNoLink = data.results.filter((r) => r.chatgpt.mentioned_without_link).length;
+      citationCount = data.results.filter((r) => r.chatgpt.mentioned_with_link).length;
+      bareMentionCount = data.results.filter((r) => r.chatgpt.mentioned_without_link).length;
       scorePct = data.total_prompts ? Math.round((data.chatgpt_score / data.total_prompts) * 100) : 0;
     } else {
-      mentionsWithLink = data.mentions_score;
-      citationsNoLink = data.citations_score;
+      citationCount = data.mentions_score;
+      bareMentionCount = data.citations_score;
       scorePct = data.visibility_score;
     }
 
     const others = data.competitor_ranking.filter((c) => !c.is_your_brand);
     const competitorAvg = others.length ? Math.round(others.reduce((s, c) => s + c.mention_rate, 0) / others.length) : 0;
-    const topCompetitorsByMentions = [...others].sort((a, b) => b.mentions_with_link - a.mentions_with_link).slice(0, 2);
-    const topCompetitorsByCitations = [...others].sort((a, b) => b.mentions_without_link - a.mentions_without_link).slice(0, 2);
+    const topRivalsByCitations = [...others].sort((a, b) => b.mentions_with_link - a.mentions_with_link).slice(0, 2);
+    const topRivalsByBareMentions = [...others].sort((a, b) => b.mentions_without_link - a.mentions_without_link).slice(0, 2);
 
-    return { mentionsWithLink, citationsNoLink, scorePct, competitorAvg, topCompetitorsByMentions, topCompetitorsByCitations };
+    const pct = (n: number) => (answers > 0 ? Math.round((n / answers) * 100) : 0);
+    /* Counted, not recovered from the rounded percentage: scorePct * answers
+       disagrees with the lists below by one often enough to be noticed, and the
+       whole point of showing the denominator is that the figure can be checked. */
+    const named = tab === "gemini" ? data.gemini_score
+                : tab === "chatgpt" ? data.chatgpt_score
+                : data.gemini_score + data.chatgpt_score;
+
+    return { citationCount, bareMentionCount, scorePct, competitorAvg,
+             topRivalsByCitations, topRivalsByBareMentions,
+             answers, named, withLinkPct: pct(citationCount), noLinkPct: pct(bareMentionCount) };
   }, [tab, data]);
 
   /* ---- uncovered / best-covered prompts ---- */
@@ -1950,16 +1987,19 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
           <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.aiVisibilityScore}</p>
             <div className="mt-2 text-5xl font-bold tracking-tight">{metrics.scorePct}%</div>
-            <p className="mt-1 text-xs text-neutral-400">{t.vsCompetitorsAvg(metrics.competitorAvg)}</p>
+            {/* What the percentage is a percentage of. Without it the headline
+                number cannot be checked against the lists further down. */}
+            <p className="mt-1 text-xs text-neutral-400">{t.mentionRateSub(metrics.named, metrics.answers)}</p>
+            <p className="text-xs text-neutral-400">{t.vsCompetitorsAvg(metrics.competitorAvg)}</p>
           </div>
 
           <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.totalMentions}</p>
-            <div className="mt-2 text-5xl font-bold tracking-tight">{metrics.mentionsWithLink}</div>
-            <p className="mt-1 text-xs text-neutral-400">{t.mentionsSub}</p>
-            {metrics.topCompetitorsByMentions.length > 0 && (
+            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.citationsCard}</p>
+            <div className="mt-2 text-5xl font-bold tracking-tight">{metrics.citationCount}</div>
+            <p className="mt-1 text-xs text-neutral-400">{t.citationsCardSub(metrics.withLinkPct)}</p>
+            {metrics.topRivalsByCitations.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {metrics.topCompetitorsByMentions.map((c) => (
+                {metrics.topRivalsByCitations.map((c) => (
                   <span key={c.name} className="rounded-full border border-neutral-200 px-2.5 py-1 text-[11px] text-neutral-500">
                     {c.name} <b className="font-medium text-neutral-900">{c.mentions_with_link}</b>
                   </span>
@@ -1968,20 +2008,24 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
             )}
           </div>
 
-          <button type="button" onClick={() => { setShowAllCitations(true); citationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6 text-left transition-colors hover:bg-neutral-100/60">
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.totalCitations}</p>
-            <div className="mt-2 text-5xl font-bold tracking-tight">{metrics.citationsNoLink}</div>
-            <p className="mt-1 text-xs text-neutral-400">{t.citationsSub}</p>
-            {metrics.topCompetitorsByCitations.length > 0 && (
+          {/* Was a button that scrolled to the table below. That table lists the
+              domains the models read, not the answers that named you without a
+              link, so the click promised one thing and delivered another. The
+              table keeps its own "view all". */}
+          <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
+            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.mentionsNoLinkCard}</p>
+            <div className="mt-2 text-5xl font-bold tracking-tight">{metrics.bareMentionCount}</div>
+            <p className="mt-1 text-xs text-neutral-400">{t.mentionsNoLinkSub(metrics.noLinkPct)}</p>
+            {metrics.topRivalsByBareMentions.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {metrics.topCompetitorsByCitations.map((c) => (
+                {metrics.topRivalsByBareMentions.map((c) => (
                   <span key={c.name} className="rounded-full border border-neutral-200 px-2.5 py-1 text-[11px] text-neutral-500">
                     {c.name} <b className="font-medium text-neutral-900">{c.mentions_without_link}</b>
                   </span>
                 ))}
               </div>
             )}
-          </button>
+          </div>
         </div>
 
         {/* Where you stand vs competitors */}
