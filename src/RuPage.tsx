@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, X } from "lucide-react";
 import { supabase } from './supabase'
 import { signInWithGoogle, signOut } from './auth'
-import { Dashboard, type AuditData } from "./Dashboard";
+import { Dashboard, MODELS, type AuditData } from "./Dashboard";
 
 import { COMPANY, companyLine } from "./legal/company";
 
@@ -83,7 +83,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   /* Which models this audit runs. Unticking one keeps it out of this audit and
      out of its cost; the backend narrows further if a model is switched off
      globally, because enabling one is a billing decision, not a per-audit one. */
-  const [models, setModels] = useState<string[]>(["chatgpt", "gemini"]);
+  const [models, setModels] = useState<string[]>(MODELS.map((m) => m.key));
   const toggleModel = (m: string) =>
     setModels((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
   const [comps, setComps] = useState([{ name: "", website: "" }]);
@@ -235,14 +235,12 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           <div>
             <span className="mb-1 block text-xs text-neutral-500">Какие модели проверять</span>
             <div className="flex flex-wrap gap-2">
-              <label key="chatgpt" className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
-                <input type="checkbox" checked={models.includes("chatgpt")} onChange={() => toggleModel("chatgpt")} className="h-4 w-4 accent-neutral-900" />
-                ChatGPT
-              </label>
-              <label key="gemini" className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
-                <input type="checkbox" checked={models.includes("gemini")} onChange={() => toggleModel("gemini")} className="h-4 w-4 accent-neutral-900" />
-                Gemini
-              </label>
+              {MODELS.map((m) => (
+                <label key={m.key} className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
+                  <input type="checkbox" checked={models.includes(m.key)} onChange={() => toggleModel(m.key)} className="h-4 w-4 accent-neutral-900" />
+                  {m.label}
+                </label>
+              ))}
             </div>
             <span className="mt-1 block text-xs text-neutral-400">Снимите галочку, чтобы не гонять модель в этом аудите и не платить за неё. Отключённая на сервере модель отсюда не включится.</span>
           </div>

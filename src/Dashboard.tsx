@@ -140,7 +140,7 @@ export type AuditData = {
   extended_at?: string;
   added_prompts?: string[];
   models_used?: Record<string, string>;
-  model_status?: Record<string, { ok: boolean; enabled?: boolean; error?: string | null }>;
+  model_status?: Record<string, { ok: boolean; enabled?: boolean; selected?: boolean; error?: string | null }>;
   visibility_score: number;
   gemini_score: number;
   chatgpt_score: number;
@@ -1637,9 +1637,18 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
   const failedModels = useMemo(() => {
     const status = data.model_status;
     if (!status) return [];
-    const labels: Record<string, string> = { gemini: "Gemini", chatgpt: "ChatGPT" };
-    // A model we deliberately turned off isn't a failure — don't alarm the user about it.
-    return Object.entries(status).filter(([, v]) => !v.ok && v.enabled !== false).map(([k]) => labels[k] ?? k);
+    const labels = Object.fromEntries(MODELS.map((m) => [m.key, m.label]));
+    /* Three different things look alike in model_status, and only one is a
+       failure worth a warning:
+         enabled: false  — switched off on the server, deliberate
+         selected: false — not ticked for this audit, also deliberate
+         ok: false       — asked, and did not answer
+       The second was missing, so a model simply left out of the run was
+       announced as having not responded, with the numbers called incomplete
+       when they were exactly as complete as asked for. */
+    return Object.entries(status)
+      .filter(([, v]) => !v.ok && v.enabled !== false && v.selected !== false)
+      .map(([k]) => labels[k] ?? k);
   }, [data.model_status]);
 
   /* ---- recommendations, categorised ---- */
