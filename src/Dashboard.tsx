@@ -47,6 +47,10 @@ export type ModelName = (typeof MODELS)[number]["key"];
 export type AuditResult = {
   prompt: string;
   prompt_type?: "problem" | "comparison" | "brand";
+  /* Google search volume for the prompt used verbatim as a search phrase.
+     Absent when the phrase is too long for the API or Google has no data. */
+  search_volume?: number;
+  keyword_source?: "exact";
   gemini: ModelMentionInfo;
   chatgpt: ModelMentionInfo;
   // Optional: every run saved before a model existed has no key for it.
@@ -351,6 +355,8 @@ interface Strings {
   competitorsSub: (n: number) => string;
   colPrompt2: string;
   colVolume: string;
+  volumeTitle: string;
+  volumeMissing: string;
   colAnswer: string;
   colMentions: string;
   noVolume: string;
@@ -499,7 +505,9 @@ const STR: Record<Lang, Strings> = {
     competitorsTitle: "Prompts your competitors answer",
     competitorsSub: (n) => `${n} prompt${n === 1 ? "" : "s"} where they appear and you don't.`,
     colPrompt2: "Prompt",
-    colVolume: "Volume",
+    colVolume: "Google volume",
+    volumeTitle: "Monthly Google searches for this exact phrase. Not how often an AI is asked it — nobody publishes that.",
+    volumeMissing: "Either the phrase is too long for the keyword API, or Google has no data for it. Not zero.",
     colAnswer: "Answer",
     colMentions: "Mentions",
     noVolume: "—",
@@ -648,7 +656,9 @@ const STR: Record<Lang, Strings> = {
     competitorsTitle: "Промпты, на которые отвечают конкуренты",
     competitorsSub: (n) => `${n} промптов, где есть они и нет вас.`,
     colPrompt2: "Промпт",
-    colVolume: "Частотность",
+    colVolume: "Частотность Google",
+    volumeTitle: "Сколько раз в месяц эту фразу ищут в Google. Не то же, сколько раз её спрашивают у AI — таких данных не публикует никто.",
+    volumeMissing: "Либо фраза слишком длинная для API частотности, либо у Google нет по ней данных. Это не ноль.",
     colAnswer: "Ответ",
     colMentions: "Упоминают",
     noVolume: "—",
@@ -1037,7 +1047,8 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
         // answer above it was not written from.
         const shown = r.chatgpt.answer ? r.chatgpt : r.gemini.answer ? r.gemini : null;
         const answer = shown?.answer || "";
-        return { prompt: r.prompt, rivals, found, answer, info: shown, youHere };
+        return { prompt: r.prompt, rivals, found, answer, info: shown, youHere,
+                 searchVolume: r.search_volume };
       })
       .filter((r) => !r.youHere && r.rivals.length > 0);
   }, [data.results]);
@@ -1165,8 +1176,18 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
                       className="mt-0.5"
                     />
                     <span className="pr-2 text-xs">{r.prompt}</span>
-                    {/* No search-volume source yet. An honest dash beats a number we made up. */}
-                    <span className="text-xs text-neutral-300">{t.noVolume}</span>
+                    {/* Google search volume for this exact phrase, when there is
+                        any. Absent means one of two things — the phrase is too
+                        long for the API to accept, or Google has no data — and
+                        neither is zero, so the dash stays rather than a number
+                        that would claim nobody searches it. */}
+                    {typeof r.searchVolume === "number" ? (
+                      <span className="text-xs text-neutral-700" title={t.volumeTitle}>
+                        {r.searchVolume.toLocaleString(lang === "ru" ? "ru-RU" : "en-US")}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-neutral-300" title={t.volumeMissing}>{t.noVolume}</span>
+                    )}
                     <div className="pr-2">
                       <p className="text-[11px] leading-relaxed text-neutral-500">
                         {r.answer ? excerptToNodes(r.answer) : "—"}
