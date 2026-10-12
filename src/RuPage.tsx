@@ -10,6 +10,7 @@ import { isAdmin } from "./admins";
 import { saveAuditRun } from "./saveAudit";
 import { Projects } from "./Projects";
 import { apiFetch } from "./api";
+import { WaitlistForm } from "./Waitlist";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -386,7 +387,11 @@ export default function RuPage() {
               <button onClick={() => setShowProjects(true)} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">Мои проекты</button>
             )}
             <button onClick={user ? signOut : signInWithGoogle} className="hidden text-sm text-neutral-500 hover:text-neutral-900 sm:block">{user ? user.email?.split("@")[0] : "Войти"}</button>
-            <button onClick={handleStartAudit} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Начать бесплатно</button>
+            {user ? (
+              <button onClick={handleStartAudit} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Начать бесплатно</button>
+            ) : (
+              <a href="#waitlist" className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">В лист ожидания</a>
+            )}
           </div>
         </div>
       </header>
@@ -403,12 +408,21 @@ export default function RuPage() {
           </p>
         </Reveal>
         <Reveal>
-          <div className="mt-8 flex items-center gap-4">
-            <button onClick={handleStartAudit} className="flex items-center gap-2 rounded-lg bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-800">
-              Начать бесплатный аудит <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-neutral-400">Бесплатно · без карты</p>
+          {/* Вошедшие пользуются сервисом, остальные записываются. Аудит
+              анонимного посетителя — это реальный вызов OpenAI за бренд, о
+              котором мы больше ничего не узнаем, а доступ ещё не открыт. */}
+          {user ? (
+            <>
+              <div className="mt-8 flex items-center gap-4">
+                <button onClick={handleStartAudit} className="flex items-center gap-2 rounded-lg bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-800">
+                  Начать бесплатный аудит <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="mt-3 text-xs text-neutral-400">Бесплатно · без карты</p>
+            </>
+          ) : (
+            <WaitlistForm lang="ru" source="home_hero_ru" className="mt-8 scroll-mt-24" id="waitlist" />
+          )}
         </Reveal>
       </section>
       <section className="border-y border-neutral-100 py-5">
@@ -503,7 +517,7 @@ export default function RuPage() {
               <ul className="mt-6 flex-1 space-y-2">
                 {plan.features.map((f) => <li key={f} className="flex items-center gap-2 text-sm"><Check className={`h-4 w-4 shrink-0 ${"highlight" in plan && plan.highlight ? "text-white" : "text-neutral-900"}`} />{f}</li>)}
               </ul>
-              <button onClick={handleStartAudit} className={`mt-6 rounded-lg py-2.5 text-sm font-medium ${"highlight" in plan && plan.highlight ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{plan.cta}</button>
+              <button onClick={user ? handleStartAudit : () => { window.location.hash = "waitlist"; }} className={`mt-6 rounded-lg py-2.5 text-sm font-medium ${"highlight" in plan && plan.highlight ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{user ? plan.cta : "В лист ожидания"}</button>
             </div>
           ))}
         </div>
