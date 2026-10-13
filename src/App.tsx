@@ -590,7 +590,7 @@ export default function App() {
           {[
             { name: "Free", price: "$0", period: "one run", features: ["1 brand", "10 prompts", "ChatGPT + Perplexity", "One audit, no card"], cta: "Start free" },
             { name: "Solo", price: "$39", period: "/month", features: ["1 brand", "25 prompts", "All 5 models", "Weekly re-runs", "Page check + keyword research", "Sources behind every answer"], cta: "Get started" },
-            { name: "Growth", price: "$99", period: "/month", features: ["1 brand", "75 prompts", "All 5 models", "Weekly re-runs", "Competitor tracking", "History + CSV export"], cta: "Go Growth", highlight: true },
+            { name: "Growth", price: "$99", period: "/month", features: ["1 brand", "50 prompts", "All 5 models", "Weekly re-runs", "Competitor tracking", "History + CSV export"], cta: "Go Growth", highlight: true },
           ].map((plan) => (
             <div key={plan.name} className={`flex flex-col rounded-2xl border p-6 ${"highlight" in plan && plan.highlight ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 bg-white"}`}>
               <p className={`text-xs font-medium ${"highlight" in plan && plan.highlight ? "text-neutral-400" : "text-neutral-500"}`}>{plan.name}</p>

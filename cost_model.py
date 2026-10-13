@@ -101,18 +101,18 @@ print("CANDIDATE PLANS")
 print("=" * 64)
 
 PLANS = [
-    # name,            brands, prompts, models,  runs/wk, price EUR
-    ("Free trial",          1,  10, CHEAP_2,     0.25,   0),
-    ("Solo",                1,  25, ALL,         1,     39),
-    ("Growth",              2,  50, ALL,         1,     99),
-    ("Agency",              8,  50, ALL,         1,    299),
+    # name,        brands, prompts, models,   runs/wk, price USD
+    ("Free",            1,  10, CHEAP_2,      0.25,   0),
+    ("Solo",            1,  25, ALL,          1,     39),
+    ("Growth",          1,  50, ALL,          1,     99),
+    ("Agency",          5,  50, ALL,          1,    299),
 ]
 
 for name, brands, prompts, models, runs, price in PLANS:
     r = monthly_cost(prompts, models, runs, brands, gemini_free_left=5000)
     cost = r["total"]
     margin = (price - cost) / price * 100 if price else 0
-    print(f"\n{name:12} EUR {price:>4}/mo")
+    print(f"\n{name:12} ${price:>4}/mo")
     print(f"  {brands} brand(s), {prompts} prompts, {len(models)} models, "
           f"{runs}/wk -> {r['answers']:,.0f} answers/mo")
     print(f"  cost ${cost:6.2f}   gross margin {margin:5.1f}%"
@@ -124,7 +124,7 @@ print("=" * 64)
 print("OpenAI search-content tokens is an estimate. Growth plan cost if it is:")
 for tokens, label in ((2000, "2k"), (4000, "4k"), (8000, "8k (assumed)"), (16000, "16k")):
     COST["chatgpt"] = OPENAI_SEARCH_CALL + (tokens / 1_000_000 * 4.0) + OPENAI_OUTPUT
-    r = monthly_cost(50, ALL, 1, 2, gemini_free_left=5000)
+    r = monthly_cost(50, ALL, 1, 1, gemini_free_left=5000)
     print(f"  {label:14} chatgpt ${COST['chatgpt']:.4f}/answer -> "
-          f"Growth costs ${r['total']:6.2f}, margin at EUR99 = "
+          f"Growth costs ${r['total']:6.2f}, margin at $99 = "
           f"{(99 - r['total'])/99*100:5.1f}%")
