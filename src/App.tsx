@@ -61,6 +61,41 @@ const MARKETS = [
 /* What actually runs. The list used to carry nine names, five of which had no
    code behind them — which is a strange thing to claim on a page selling you as
    the company that checks whether AI tells the truth about brands. */
+/* Every figure on this page names where it came from, and links to it.
+   The widely quoted "23x" is one company measuring its own site for thirty
+   days; printing that bare, on the homepage of a tool that sells checking
+   rather than assuming, would undercut the product on its own front page.
+   Two numbers that were asked for are absent because they could not be
+   sourced: Adobe's current figure for AI-referred retail traffic is roughly
+   double year on year rather than 9.7x, and no basis was found for a hundred
+   million daily AI searchers. */
+const CLAIMS = [
+  {
+    figure: "23×",
+    claim: "Visitors arriving from AI answers converted 23 times better than organic search.",
+    detail: "They were 0.5% of visits and 12.1% of signups. One company, its own site, thirty days — small, and worth knowing.",
+    host: "ahrefs.com", path: "/blog/ai-search-traffic-conversions-ahrefs",
+    href: "https://ahrefs.com/blog/ai-search-traffic-conversions-ahrefs/",
+    source: "Ahrefs Web Analytics, measuring ahrefs.com",
+  },
+  {
+    figure: "2×",
+    claim: "AI-referred traffic to retail sites doubled in a year.",
+    detail: "Still a small share of the total. The direction is the point, not the size.",
+    host: "business.adobe.com", path: "/blog/ai-traffic-surge-retail-sites",
+    href: "https://business.adobe.com/blog/ai-traffic-surge-retail-sites-not-machine-readable",
+    source: "Adobe Analytics, June 2026",
+  },
+  {
+    figure: "~55%",
+    claim: "Around half of Google searches now return an AI Overview.",
+    detail: "Informational and longer questions most of all — and not the same half from one week to the next.",
+    host: "dataforseo.com", path: "/apis/serp-api",
+    href: "https://dataforseo.com/apis/serp-api",
+    source: "DataForSEO SERP data",
+  },
+];
+
 const AI_LOGOS = ["ChatGPT", "Google AI Overviews", "Gemini", "Perplexity", "DeepSeek"];
 
 
@@ -77,7 +112,9 @@ function Reveal({ children, className = "" }: { children: React.ReactNode; class
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  return <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"} ${className}`}>{children}</div>;
+  // motion-reduce: the whole page is built out of these, so without it a
+  // reader who has asked their system for less motion gets the most.
+  return <div ref={ref} className={`transition-all duration-700 ease-out motion-reduce:transition-none motion-reduce:translate-y-0 motion-reduce:opacity-100 ${shown ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"} ${className}`}>{children}</div>;
 }
 
 function LoadingScreen({ brand }: { brand: string }) {
@@ -500,50 +537,47 @@ export default function App() {
       </section>
 
 
-      {/* Why this matters, with receipts.
+      {/* One claim per screen, each presented the way the product presents a
+          model's answer: the statement, then its source as a numbered citation.
+          The dashboard puts a Sources list under every answer because a claim
+          without its provenance is the thing this product exists to catch — so
+          the homepage makes the same argument by obeying it rather than by
+          asserting it.
 
-          Every figure here names where it came from, on the page, next to the
-          number. A tool whose whole claim is "check what AI says about you
-          instead of assuming" cannot print unsourced statistics in its own
-          marketing. It is also the honest version: the widely-quoted "23x" is
-          one company measuring its own site, and saying so is more convincing
-          to the kind of buyer who would otherwise go and check. */}
-      <section className="border-y border-neutral-100 bg-neutral-50/40">
-        <div className="mx-auto grid max-w-6xl gap-px bg-neutral-150 sm:grid-cols-3">
-          {[
-            {
-              figure: "23×",
-              claim: "AI referrals converted better than organic search",
-              detail: "0.5% of visits produced 12.1% of signups",
-              source: "Ahrefs, measuring ahrefs.com over 30 days",
-              href: "https://ahrefs.com/blog/ai-search-traffic-conversions-ahrefs/",
-            },
-            {
-              figure: "2×",
-              claim: "AI-referred traffic to retail sites, year on year",
-              detail: "Still small in absolute terms, growing fast",
-              source: "Adobe Analytics, June 2026",
-              href: "https://business.adobe.com/blog/ai-traffic-surge-retail-sites-not-machine-readable",
-            },
-            {
-              figure: "~55%",
-              claim: "of Google searches now return an AI Overview",
-              detail: "Informational and longer queries most of all",
-              source: "DataForSEO SERP data",
-              href: "https://dataforseo.com/apis/serp-api",
-            },
-          ].map((s) => (
-            <div key={s.figure} className="bg-white px-6 py-8">
-              <p className="text-4xl font-bold tracking-tight">{s.figure}</p>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-700">{s.claim}</p>
-              <p className="mt-1 text-sm text-neutral-400">{s.detail}</p>
-              <a href={s.href} target="_blank" rel="noopener noreferrer"
-                 className="mt-3 inline-block text-xs text-neutral-400 underline decoration-neutral-200 underline-offset-2 hover:text-neutral-700">
-                {s.source}
+          The three were a cramped row of one-line cards before, which gave the
+          evidence less room than the pricing table. */}
+      <section aria-label="Why AI visibility matters" className="border-y border-neutral-100">
+        {CLAIMS.map((c, i) => (
+          <article
+            key={c.figure}
+            className={`flex min-h-[78vh] items-center px-6 ${i > 0 ? "border-t border-neutral-100" : ""} ${i % 2 ? "bg-neutral-50/50" : ""}`}
+          >
+            <Reveal className="mx-auto w-full max-w-4xl">
+              <p className="text-[15vw] font-bold leading-[0.85] tracking-tighter sm:text-[11rem]">
+                {c.figure}
+              </p>
+              <p className="mt-8 max-w-2xl text-2xl leading-snug text-neutral-900 sm:text-3xl">
+                {c.claim}
+              </p>
+              <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-500">
+                {c.detail}
+              </p>
+              {/* The same shape as the Sources list under an answer in the
+                  product: an index, the host, the path in lighter type. */}
+              <a
+                href={c.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-10 inline-flex items-baseline gap-2 text-sm hover:underline"
+              >
+                <span className="text-neutral-300">1</span>
+                <span className="text-neutral-700">{c.host}</span>
+                <span className="text-neutral-400">{c.path}</span>
               </a>
-            </div>
-          ))}
-        </div>
+              <p className="mt-1 text-xs text-neutral-400">{c.source}</p>
+            </Reveal>
+          </article>
+        ))}
       </section>
 
       {/* Each platform is its own ecosystem. This is the section that earns the
