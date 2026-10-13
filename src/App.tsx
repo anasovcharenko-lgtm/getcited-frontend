@@ -58,7 +58,10 @@ const MARKETS = [
 ];
 
 
-const AI_LOGOS = ["ChatGPT", "Claude", "Gemini", "Perplexity", "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok"];
+/* What actually runs. The list used to carry nine names, five of which had no
+   code behind them — which is a strange thing to claim on a page selling you as
+   the company that checks whether AI tells the truth about brands. */
+const AI_LOGOS = ["ChatGPT", "Google AI Overviews", "Gemini", "Perplexity", "DeepSeek"];
 
 
 
@@ -453,7 +456,7 @@ export default function App() {
       {/* Hero */}
       <section className="relative mx-auto max-w-5xl px-6 pb-20 pt-24 md:pt-32">
         <Reveal>
-          <p className="text-sm text-neutral-400">Now tracking ChatGPT · Claude · Gemini · YandexGPT</p>
+          <p className="text-sm text-neutral-400">Tracking ChatGPT · Google AI Overviews · Gemini · Perplexity · DeepSeek</p>
         </Reveal>
         <Reveal>
           <h1 className="mt-4 max-w-3xl text-balance text-5xl font-bold leading-tight tracking-tight md:text-6xl">
@@ -572,14 +575,22 @@ export default function App() {
       {/* Pricing */}
       <section id="pricing" className="mx-auto max-w-5xl px-6 py-24">
         <Reveal>
-          <h2 className="text-3xl font-bold tracking-tight">Simple pricing.</h2>
-          <p className="mt-2 text-neutral-500">Start free. Upgrade when you are ready.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Priced on what it costs to run.</h2>
+          <p className="mt-2 text-neutral-500">Every prompt is a real call to every model, every week. The plans are built around that, not around a number that looked nice.</p>
         </Reveal>
         <div className="mt-10 grid gap-4 md:grid-cols-3">
+          {/* Costed, not guessed. One prompt put to one model once is an
+              "answer", and an answer costs between $0.002 and $0.048 depending
+              on the model — ChatGPT with web search is about four fifths of it,
+              because OpenAI bills $10 per 1,000 searches plus the tokens the
+              search pulls back. The old plans sold 5 brands x 50 prompts x 5
+              models x 12 runs for $29, which is roughly $66 of API calls: every
+              Pro customer lost money, and faster the better it sold. See
+              cost_model.py in the repo for the arithmetic. */}
           {[
-            { name: "Free Trial", price: "$0", period: "3 days", features: ["1 brand", "10 prompts", "2 AI models", "1 run"], cta: "Start free" },
-            { name: "Starter", price: "$9", period: "/month", features: ["1 brand", "20 prompts", "3 AI models", "4 runs / month"], cta: "Get started" },
-            { name: "Pro", price: "$29", period: "/month", features: ["5 brands", "50 prompts", "5 AI models", "12 runs / month", "CSV export", "Team seats"], cta: "Go Pro", highlight: true },
+            { name: "Free", price: "$0", period: "one run", features: ["1 brand", "10 prompts", "ChatGPT + Perplexity", "One audit, no card"], cta: "Start free" },
+            { name: "Solo", price: "$39", period: "/month", features: ["1 brand", "25 prompts", "All 5 models", "Weekly re-runs", "Page check + keyword research", "Sources behind every answer"], cta: "Get started" },
+            { name: "Growth", price: "$99", period: "/month", features: ["1 brand", "50 prompts", "All 5 models", "Weekly re-runs", "Competitor tracking", "History + CSV export"], cta: "Go Growth", highlight: true },
           ].map((plan) => (
             <div key={plan.name} className={`flex flex-col rounded-2xl border p-6 ${"highlight" in plan && plan.highlight ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 bg-white"}`}>
               <p className={`text-xs font-medium ${"highlight" in plan && plan.highlight ? "text-neutral-400" : "text-neutral-500"}`}>{plan.name}</p>
@@ -597,6 +608,20 @@ export default function App() {
             </div>
           ))}
         </div>
+        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50/60 p-6 sm:flex sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium">Agency — $299/month</p>
+            <p className="mt-1 text-sm text-neutral-500">
+              5 brands, 50 prompts each, all 5 models, weekly. For running GEO work on clients rather than one brand of your own.
+            </p>
+          </div>
+          <a href="#waitlist" className="mt-4 inline-block rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 sm:mt-0">Join waiting list</a>
+        </div>
+        <p className="mt-4 text-xs leading-relaxed text-neutral-400">
+          Extra prompts $1.50 each per month. Daily instead of weekly multiplies every number by seven, so it is quoted per case rather than listed here.
+          Prompts are re-run on a schedule — a figure from one measurement is an anecdote, not a trend.
+        </p>
+
       </section>
 
       {/* Footer */}
