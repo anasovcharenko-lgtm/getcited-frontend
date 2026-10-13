@@ -380,7 +380,8 @@ interface Strings {
   kwDifficultyTitle: string;
   kwCpcTitle: string;
   kwTooLong: string;
-  kwFootnote: string;
+  kwMarket: string;
+  kwFootnote: (market: string) => string;
   volumeTitle: string;
   volumeMissing: string;
   colAnswer: string;
@@ -545,7 +546,8 @@ const STR: Record<Lang, Strings> = {
     kwDifficultyTitle: "0-100, the chance of reaching Google's organic top ten. Not the advertiser competition that comes with search volume — a different number that is often confused with this one.",
     kwCpcTitle: "What advertisers pay per click. A rough read on how commercial the phrase is.",
     kwTooLong: "too long to look up",
-    kwFootnote: "Google data, for the market this audit was run in. A dash means Google has no data for that phrase, or it was over the 10-word limit — neither is zero.",
+    kwMarket: "Market",
+    kwFootnote: (market) => `Google data for ${market}. Volume differs a lot between markets, so the figures above mean nothing without it. A dash means Google has no data for that phrase, or it was over the 10-word limit — neither is zero.`,
     volumeTitle: "Monthly Google searches for this exact phrase. Not how often an AI is asked it — nobody publishes that.",
     volumeMissing: "Either the phrase is too long for the keyword API, or Google has no data for it. Not zero.",
     colAnswer: "Answer",
@@ -710,7 +712,8 @@ const STR: Record<Lang, Strings> = {
     kwDifficultyTitle: "0-100, шанс попасть в органический топ-10 Google. Это не «конкуренция», которая приходит вместе с частотностью: та считает рекламодателей, и её постоянно путают с этой.",
     kwCpcTitle: "Сколько рекламодатели платят за клик. Грубая оценка того, насколько фраза коммерческая.",
     kwTooLong: "слишком длинная",
-    kwFootnote: "Данные Google по рынку, в котором запускался аудит. Прочерк значит, что у Google нет данных по фразе или она длиннее 10 слов, — и то и другое не ноль.",
+    kwMarket: "Рынок",
+    kwFootnote: (market) => `Данные Google по рынку: ${market}. Частотность сильно различается между рынками, так что цифры выше без него ничего не значат. Прочерк значит, что у Google нет данных по фразе или она длиннее 10 слов, — и то и другое не ноль.`,
     volumeTitle: "Сколько раз в месяц эту фразу ищут в Google. Не то же, сколько раз её спрашивают у AI — таких данных не публикует никто.",
     volumeMissing: "Либо фраза слишком длинная для API частотности, либо у Google нет по ней данных. Это не ноль.",
     colAnswer: "Ответ",
@@ -1558,9 +1561,25 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
      going after", which is the question that comes before "does a model name
      us for it". Two DataForSEO endpoints behind it, about ten cents a lookup. */
   const [kwText, setKwText] = useState("");
+  /* Which market the numbers are for. Defaults to the audit's country but is
+     not tied to it: keyword research is planning work, often for a different
+     client in a different market than whatever audit happens to be open. */
+  const [kwMarket, setKwMarket] = useState((data.country || "US").toUpperCase());
+  const [markets, setMarkets] = useState<{ code: string; name: string }[]>([]);
   const [kwRows, setKwRows] = useState<KeywordRow[]>([]);
   const [kwLoading, setKwLoading] = useState(false);
   const [kwError, setKwError] = useState("");
+
+  useEffect(() => {
+    // Served by the API so there is one list. Every model list that got
+    // duplicated into this file drifted from the backend eventually.
+    let alive = true;
+    apiFetch(`${API_URL}/markets`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && Array.isArray(d?.markets)) setMarkets(d.markets); })
+      .catch(() => { /* the select falls back to the audit's own market */ });
+    return () => { alive = false; };
+  }, []);
 
   const runKeywords = async () => {
     const keywords = Array.from(new Set(
@@ -1570,7 +1589,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
     try {
       const res = await apiFetch(`${API_URL}/keyword-research`, {
         method: "POST",
-        body: JSON.stringify({ keywords, country: data.country || "US" }),
+        body: JSON.stringify({ keywords, country: kwMarket }),
       });
       const out = await res.json();
       if (!res.ok || out?.error && !Array.isArray(out?.results)) {
@@ -2085,13 +2104,28 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
                 className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-900"
               />
             </label>
-            <button
-              onClick={runKeywords}
-              disabled={kwLoading || !kwText.trim()}
-              className="mt-2 h-10 rounded-lg bg-neutral-900 px-5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-            >
-              {kwLoading ? t.kwRunning : t.kwRun}
-            </button>
+            <div className="mt-2 flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs text-neutral-500">{t.kwMarket}</span>
+                <select
+                  value={kwMarket}
+                  onChange={(e) => setKwMarket(e.target.value)}
+                  className="h-10 rounded-lg border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-900"
+                >
+                  {/* Until the list arrives, the audit's own market is the only
+                      honest option — better one real choice than a guessed set. */}
+                  {(markets.length ? markets : [{ code: kwMarket, name: kwMarket }])
+                    .map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}
+                </select>
+              </label>
+              <button
+                onClick={runKeywords}
+                disabled={kwLoading || !kwText.trim()}
+                className="h-10 rounded-lg bg-neutral-900 px-5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+              >
+                {kwLoading ? t.kwRunning : t.kwRun}
+              </button>
+            </div>
             {kwError && <p className="mt-2 text-xs text-red-600">{kwError}</p>}
 
             {kwRows.length > 0 && (
@@ -2132,7 +2166,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-3 text-[11px] leading-relaxed text-neutral-400">{t.kwFootnote}</p>
+                <p className="mt-3 text-[11px] leading-relaxed text-neutral-400">{t.kwFootnote(markets.find((m) => m.code === kwMarket)?.name || kwMarket)}</p>
               </>
             )}
           </section>
