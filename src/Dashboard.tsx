@@ -185,6 +185,18 @@ export type AuditData = {
 
 /* ── /page-check: measured from the page, not written by a model ── */
 
+export type KeywordRow = {
+  keyword: string;
+  search_volume: number | null;
+  /* 0-100, chance of reaching the organic top ten. Not the `ad_competition`
+     that comes with search volume, which counts advertisers bidding — the two
+     are routinely confused and mean different things. */
+  keyword_difficulty: number | null;
+  cpc: number | null;
+  ad_competition: number | null;
+  too_long: boolean;
+};
+
 export type PageChange = {
   field: string;
   where: string;
@@ -355,6 +367,20 @@ interface Strings {
   competitorsSub: (n: number) => string;
   colPrompt2: string;
   colVolume: string;
+  kwTitle: string;
+  kwSub: string;
+  kwLabel: string;
+  kwPlaceholder: string;
+  kwRun: string;
+  kwRunning: string;
+  kwFailed: string;
+  kwColKeyword: string;
+  kwColDifficulty: string;
+  kwColCpc: string;
+  kwDifficultyTitle: string;
+  kwCpcTitle: string;
+  kwTooLong: string;
+  kwFootnote: string;
   volumeTitle: string;
   volumeMissing: string;
   colAnswer: string;
@@ -506,6 +532,20 @@ const STR: Record<Lang, Strings> = {
     competitorsSub: (n) => `${n} prompt${n === 1 ? "" : "s"} where they appear and you don't.`,
     colPrompt2: "Prompt",
     colVolume: "Google volume",
+    kwTitle: "Keyword research",
+    kwSub: "Demand and ranking difficulty for phrases you are considering, before deciding which to go after.",
+    kwLabel: "One phrase per line",
+    kwPlaceholder: "ai visibility tracking\nbrand monitoring for llms\ngeo agency",
+    kwRun: "Look up",
+    kwRunning: "Looking up…",
+    kwFailed: "Could not look those up. Try again.",
+    kwColKeyword: "Phrase",
+    kwColDifficulty: "Difficulty",
+    kwColCpc: "CPC",
+    kwDifficultyTitle: "0-100, the chance of reaching Google's organic top ten. Not the advertiser competition that comes with search volume — a different number that is often confused with this one.",
+    kwCpcTitle: "What advertisers pay per click. A rough read on how commercial the phrase is.",
+    kwTooLong: "too long to look up",
+    kwFootnote: "Google data, for the market this audit was run in. A dash means Google has no data for that phrase, or it was over the 10-word limit — neither is zero.",
     volumeTitle: "Monthly Google searches for this exact phrase. Not how often an AI is asked it — nobody publishes that.",
     volumeMissing: "Either the phrase is too long for the keyword API, or Google has no data for it. Not zero.",
     colAnswer: "Answer",
@@ -657,6 +697,20 @@ const STR: Record<Lang, Strings> = {
     competitorsSub: (n) => `${n} промптов, где есть они и нет вас.`,
     colPrompt2: "Промпт",
     colVolume: "Частотность Google",
+    kwTitle: "Подбор запросов",
+    kwSub: "Спрос и сложность продвижения по фразам, которые вы рассматриваете, — до того как выбрать, за какие браться.",
+    kwLabel: "По одной фразе в строке",
+    kwPlaceholder: "отслеживание упоминаний в ai\nмониторинг бренда\ngeo агентство",
+    kwRun: "Проверить",
+    kwRunning: "Проверяем…",
+    kwFailed: "Не удалось проверить. Попробуйте ещё раз.",
+    kwColKeyword: "Фраза",
+    kwColDifficulty: "Сложность",
+    kwColCpc: "CPC",
+    kwDifficultyTitle: "0-100, шанс попасть в органический топ-10 Google. Это не «конкуренция», которая приходит вместе с частотностью: та считает рекламодателей, и её постоянно путают с этой.",
+    kwCpcTitle: "Сколько рекламодатели платят за клик. Грубая оценка того, насколько фраза коммерческая.",
+    kwTooLong: "слишком длинная",
+    kwFootnote: "Данные Google по рынку, в котором запускался аудит. Прочерк значит, что у Google нет данных по фразе или она длиннее 10 слов, — и то и другое не ноль.",
     volumeTitle: "Сколько раз в месяц эту фразу ищут в Google. Не то же, сколько раз её спрашивают у AI — таких данных не публикует никто.",
     volumeMissing: "Либо фраза слишком длинная для API частотности, либо у Google нет по ней данных. Это не ноль.",
     colAnswer: "Ответ",
@@ -1498,6 +1552,42 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
   const [tab, setTab] = useState<ModelKey>("all");
   const [showAllCitations, setShowAllCitations] = useState(false);
 
+  /* ---- keyword research (POST /keyword-research) ----
+
+     Separate from an audit on purpose: this answers "is this phrase worth
+     going after", which is the question that comes before "does a model name
+     us for it". Two DataForSEO endpoints behind it, about ten cents a lookup. */
+  const [kwText, setKwText] = useState("");
+  const [kwRows, setKwRows] = useState<KeywordRow[]>([]);
+  const [kwLoading, setKwLoading] = useState(false);
+  const [kwError, setKwError] = useState("");
+
+  const runKeywords = async () => {
+    const keywords = Array.from(new Set(
+      kwText.split("\n").map((l) => l.trim()).filter(Boolean)));
+    if (!keywords.length) return;
+    setKwLoading(true); setKwError(""); setKwRows([]);
+    try {
+      const res = await apiFetch(`${API_URL}/keyword-research`, {
+        method: "POST",
+        body: JSON.stringify({ keywords, country: data.country || "US" }),
+      });
+      const out = await res.json();
+      if (!res.ok || out?.error && !Array.isArray(out?.results)) {
+        setKwError(out?.detail || out?.error || t.kwFailed);
+      } else {
+        setKwRows(out.results || []);
+        // The lookup can succeed for some rows and still carry a vendor-level
+        // problem; showing both beats hiding one.
+        if (out.error) setKwError(out.error);
+      }
+    } catch {
+      setKwError(t.kwFailed);
+    } finally {
+      setKwLoading(false);
+    }
+  };
+
   /* ---- page check (POST /page-check) ----
      Runs only when asked. Keeping it off the overview is deliberate: the
      visibility page answers "are we named", this answers "why not", and
@@ -1975,6 +2065,75 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
                   );
                 })}
               </div>
+            )}
+          </section>
+
+          {/* ── Keyword research. Deliberately next to the page check rather
+                than among the written recommendations: both are measured
+                numbers, and the model-written items below are suggestions. ── */}
+          <section className="mt-8 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
+            <h2 className="text-lg font-semibold">{t.kwTitle}</h2>
+            <p className="mt-1 text-sm text-neutral-500">{t.kwSub}</p>
+
+            <label className="mt-5 block">
+              <span className="mb-1 block text-xs text-neutral-500">{t.kwLabel}</span>
+              <textarea
+                value={kwText}
+                onChange={(e) => setKwText(e.target.value)}
+                rows={4}
+                placeholder={t.kwPlaceholder}
+                className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+              />
+            </label>
+            <button
+              onClick={runKeywords}
+              disabled={kwLoading || !kwText.trim()}
+              className="mt-2 h-10 rounded-lg bg-neutral-900 px-5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+            >
+              {kwLoading ? t.kwRunning : t.kwRun}
+            </button>
+            {kwError && <p className="mt-2 text-xs text-red-600">{kwError}</p>}
+
+            {kwRows.length > 0 && (
+              <>
+                <table className="mt-5 w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-200 text-left text-xs text-neutral-400">
+                      <th className="pb-2 font-medium">{t.kwColKeyword}</th>
+                      <th className="pb-2 pl-4 text-right font-medium" title={t.volumeTitle}>{t.colVolume}</th>
+                      <th className="pb-2 pl-4 text-right font-medium" title={t.kwDifficultyTitle}>{t.kwColDifficulty}</th>
+                      <th className="pb-2 pl-4 text-right font-medium" title={t.kwCpcTitle}>{t.kwColCpc}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kwRows.map((r, i) => (
+                      <tr key={i} className="border-b border-neutral-100 last:border-0">
+                        <td className="py-2 pr-3 text-xs">
+                          {r.keyword}
+                          {r.too_long && <span className="ml-2 text-[10px] text-neutral-400">{t.kwTooLong}</span>}
+                        </td>
+                        <td className="py-2 pl-4 text-right text-xs tabular-nums">
+                          {typeof r.search_volume === "number"
+                            ? r.search_volume.toLocaleString(lang === "ru" ? "ru-RU" : "en-US")
+                            : <span className="text-neutral-300">—</span>}
+                        </td>
+                        {/* 0 is a real difficulty, so it must not fall into the dash. */}
+                        <td className="py-2 pl-4 text-right text-xs tabular-nums">
+                          {typeof r.keyword_difficulty === "number"
+                            ? r.keyword_difficulty
+                            : <span className="text-neutral-300">—</span>}
+                        </td>
+                        <td className="py-2 pl-4 text-right text-xs tabular-nums">
+                          {typeof r.cpc === "number"
+                            ? `$${r.cpc.toFixed(2)}`
+                            : <span className="text-neutral-300">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-3 text-[11px] leading-relaxed text-neutral-400">{t.kwFootnote}</p>
+              </>
             )}
           </section>
 
