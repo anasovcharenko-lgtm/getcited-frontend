@@ -79,20 +79,29 @@ const CLAIMS = [
     source: "Ahrefs Web Analytics, measuring ahrefs.com",
   },
   {
-    figure: "2×",
-    claim: "AI-referred traffic to retail sites doubled in a year.",
-    detail: "Still a small share of the total. The direction is the point, not the size.",
-    host: "business.adobe.com", path: "/blog/ai-traffic-surge-retail-sites",
-    href: "https://business.adobe.com/blog/ai-traffic-surge-retail-sites-not-machine-readable",
-    source: "Adobe Analytics, June 2026",
-  },
-  {
     figure: "~55%",
     claim: "Around half of Google searches now return an AI Overview.",
     detail: "Informational and longer questions most of all — and not the same half from one week to the next.",
     host: "dataforseo.com", path: "/apis/serp-api",
     href: "https://dataforseo.com/apis/serp-api",
     source: "DataForSEO SERP data",
+  },
+  /* This one replaced a second-hand "AI traffic doubled" figure. That claim
+     argued for the category, which the hero line already does, and said
+     nothing about why anyone needs this product. This one is the measured
+     version of the section immediately below it — so the assertion that each
+     platform is its own ecosystem now arrives already evidenced.
+
+     Stated as a Jaccard index as well as a percentage because that is the
+     figure in the paper, and a reader who checks should find the same number
+     rather than a rounded restatement of it. */
+  {
+    figure: "20%",
+    claim: "Any two AI platforms share only about a fifth of the sources they cite most.",
+    detail: "Ten platforms — among them ChatGPT, Google AI, Perplexity and DeepSeek — 17,211 citations over 6,356 domains. Mean overlap between any pair's top-20 cited sources: a Jaccard index of 0.201. Being named by one is not evidence about any other.",
+    host: "arxiv.org", path: "/abs/2610.11932",
+    href: "https://arxiv.org/abs/2610.11932",
+    source: "Liu et al., Fudan University — measured March–April 2026",
   },
 ];
 
@@ -591,7 +600,19 @@ export default function App() {
           <p className="mt-5 max-w-2xl text-lg leading-relaxed text-neutral-500">
             Being named by ChatGPT tells you nothing about Google AI Overviews. They read
             different sources, answer different question shapes, and change independently.
-            Tracking one and calling it AI visibility is a guess.
+            Tracking one and calling it AI visibility is a guess —{" "}
+            {/* "Tells you nothing" was rhetoric until this paper measured it. The
+                link is here as well as in the claims band because this is the
+                sentence a sceptical buyer stops on. */}
+            <a
+              href="https://arxiv.org/abs/2610.11932"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-700 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
+            >
+              and a measured one
+            </a>
+            .
           </p>
         </Reveal>
         <div className="mt-14 overflow-hidden rounded-2xl border border-neutral-150">
