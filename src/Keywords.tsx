@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { apiFetch } from "./api";
 import { supabase } from "./supabase";
 import { signInWithGoogle } from "./auth";
+import { isAdmin } from "./admins";
 import type { KeywordRow } from "./Dashboard";
 
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -46,6 +47,8 @@ const COPY = {
     running: "Looking up…",
     failed: "The lookup failed.",
     signedOut: "Sign in to look up keyword data.",
+    notYours: "Keyword research is not open yet.",
+    notYoursWhy: "Each lookup is a paid request to a data vendor, so it is limited to the account that pays for it until it becomes part of a plan.",
     signIn: "Sign in with Google",
     counts: (total: number, ok: number, skip: number) =>
       skip > 0
@@ -79,6 +82,8 @@ const COPY = {
     running: "Проверяю…",
     failed: "Запрос не прошёл.",
     signedOut: "Войдите, чтобы смотреть данные по ключевым словам.",
+    notYours: "Исследование ключевых слов пока закрыто.",
+    notYoursWhy: "Каждый запрос платный и уходит к поставщику данных, поэтому доступ есть только у аккаунта, который за него платит — пока это не станет частью тарифа.",
     signIn: "Войти через Google",
     counts: (total: number, ok: number, skip: number) =>
       skip > 0
@@ -105,12 +110,20 @@ const COPY = {
 export default function Keywords({ lang = "en" }: { lang?: "en" | "ru" }) {
   const t = COPY[lang];
 
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  /* Who is looking. The email decides whether the tool is offered, but only
+     for the message — the API refuses a non-owner on its own, and that is the
+     check that counts. This one exists so a stranger reads a sentence instead
+     of watching a button return 403. */
+  const [email, setEmail] = useState<string | null | undefined>(undefined);
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSignedIn(!!s));
+    supabase.auth.getSession().then(({ data }) => setEmail(data.session?.user?.email ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (_e, s) => setEmail(s?.user?.email ?? null));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  const signedIn = email === undefined ? null : !!email;
+  const allowed = isAdmin(email);
 
   const [text, setText] = useState("");
   const [market, setMarket] = useState(lang === "ru" ? "RU" : "US");
@@ -126,7 +139,7 @@ export default function Keywords({ lang = "en" }: { lang?: "en" | "ru" }) {
   const [ranFor, setRanFor] = useState("");
 
   useEffect(() => {
-    if (!signedIn) return;
+    if (!allowed) return;
     let alive = true;
     apiFetch(`${API_URL}/markets`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
@@ -137,7 +150,7 @@ export default function Keywords({ lang = "en" }: { lang?: "en" | "ru" }) {
       })
       .catch(() => { if (alive) setMarketsFailed(true); });
     return () => { alive = false; };
-  }, [signedIn]);
+  }, [allowed]);
 
   const phrases = useMemo(
     () => Array.from(new Set(text.split("\n").map((l) => l.trim()).filter(Boolean))),
@@ -218,7 +231,14 @@ export default function Keywords({ lang = "en" }: { lang?: "en" | "ru" }) {
           </div>
         )}
 
-        {signedIn && (
+        {signedIn && !allowed && (
+          <div className="mt-8 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
+            <p className="text-sm text-neutral-600">{t.notYours}</p>
+            <p className="mt-2 text-xs text-neutral-400">{t.notYoursWhy}</p>
+          </div>
+        )}
+
+        {allowed && (
           <>
             <section className="mt-8 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
               <label className="block">

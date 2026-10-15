@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import { supabase } from "./supabase";
 import { saveAddedPrompts, activeModels } from "./saveAudit";
 import { apiFetch } from "./api";
+import { isAdmin } from "./admins";
 
 /* ────────────────────────────────────────────────────────────────
    Types — match the current backend response shape (api.py).
@@ -1572,6 +1573,15 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
   const [kwRows, setKwRows] = useState<KeywordRow[]>([]);
   const [kwLoading, setKwLoading] = useState(false);
   const [kwError, setKwError] = useState("");
+  /* Whether to offer the panel at all. The lookup is owner-only on the server
+     now, so for a customer the button could only ever return 403 — and a
+     feature that is visible and refuses is worse than one that is absent. */
+  const [canKeywords, setCanKeywords] = useState(false);
+  useEffect(() => {
+    supabase.auth.getSession()
+      .then(({ data }) => setCanKeywords(isAdmin(data.session?.user?.email)))
+      .catch(() => setCanKeywords(false));
+  }, []);
 
   useEffect(() => {
     // Served by the API so there is one list. Every model list that got
@@ -2090,6 +2100,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
             )}
           </section>
 
+          {canKeywords && (<>
           {/* ── Keyword research. Deliberately next to the page check rather
                 than among the written recommendations: both are measured
                 numbers, and the model-written items below are suggestions. ── */}
@@ -2184,6 +2195,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
               </>
             )}
           </section>
+          </>)}
 
           <p className="mt-10 text-xs font-medium uppercase tracking-widest text-neutral-400">{t.pageCheckWrittenBelow}</p>
           <div className="mt-4 space-y-8">
