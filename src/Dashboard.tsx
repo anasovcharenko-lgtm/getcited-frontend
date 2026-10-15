@@ -375,6 +375,7 @@ interface Strings {
   kwRunning: string;
   kwFailed: string;
   kwColKeyword: string;
+  kwFullTool: string;
   kwColDifficulty: string;
   kwColCpc: string;
   kwDifficultyTitle: string;
@@ -541,6 +542,7 @@ const STR: Record<Lang, Strings> = {
     kwRunning: "Looking up…",
     kwFailed: "Could not look those up. Try again.",
     kwColKeyword: "Phrase",
+    kwFullTool: "Open the full tool",
     kwColDifficulty: "Difficulty",
     kwColCpc: "CPC",
     kwDifficultyTitle: "0-100, the chance of reaching Google's organic top ten. Not the advertiser competition that comes with search volume — a different number that is often confused with this one.",
@@ -707,6 +709,7 @@ const STR: Record<Lang, Strings> = {
     kwRunning: "Проверяем…",
     kwFailed: "Не удалось проверить. Попробуйте ещё раз.",
     kwColKeyword: "Фраза",
+    kwFullTool: "Открыть полный инструмент",
     kwColDifficulty: "Сложность",
     kwColCpc: "CPC",
     kwDifficultyTitle: "0-100, шанс попасть в органический топ-10 Google. Это не «конкуренция», которая приходит вместе с частотностью: та считает рекламодателей, и её постоянно путают с этой.",
@@ -2091,7 +2094,18 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
                 than among the written recommendations: both are measured
                 numbers, and the model-written items below are suggestions. ── */}
           <section className="mt-8 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
-            <h2 className="text-lg font-semibold">{t.kwTitle}</h2>
+            <div className="flex items-baseline justify-between gap-4">
+              <h2 className="text-lg font-semibold">{t.kwTitle}</h2>
+              {/* A plain anchor rather than a router Link: this panel is the
+                  only part of the dashboard that would need the router, and a
+                  full load costs nothing on a page people leave anyway. */}
+              <a
+                href={lang === "ru" ? "/ru/keywords" : "/keywords"}
+                className="shrink-0 text-xs text-neutral-500 underline hover:text-neutral-900"
+              >
+                {t.kwFullTool}
+              </a>
+            </div>
             <p className="mt-1 text-sm text-neutral-500">{t.kwSub}</p>
 
             <label className="mt-5 block">
