@@ -51,7 +51,12 @@ export type AuditResult = {
   /* Google search volume for the prompt used verbatim as a search phrase.
      Absent when the phrase is too long for the API or Google has no data. */
   search_volume?: number;
-  keyword_source?: "exact";
+  /* The phrase the figure belongs to. Usually NOT the prompt: a prompt is a
+     sentence and nobody searches sentences, so the backend derives a short
+     phrase and prices that. Shown on screen for the same reason it is stored —
+     a volume beside a prompt reads as "this many people typed this". */
+  keyword_phrase?: string;
+  keyword_source?: "exact" | "derived";
   gemini: ModelMentionInfo;
   chatgpt: ModelMentionInfo;
   // Optional: every run saved before a model existed has no key for it.
@@ -179,6 +184,10 @@ export type AuditData = {
   citations_score: number;
   results: AuditResult[];
   competitor_ranking: CompetitorStat[];
+  /* Demand and visibility per intent cluster. Optional: a run made before the
+     backend computed it has none, and the section hides rather than showing
+     zeros that would read as "no demand anywhere". */
+  clusters?: Cluster[];
   citations: Citation[];
   sample_quote?: string;
   recommendations: string;
@@ -196,6 +205,32 @@ export type KeywordRow = {
   cpc: number | null;
   ad_competition: number | null;
   too_long: boolean;
+};
+
+/* One intent cluster — comparison questions, commercial questions, and so on.
+
+   Two coverages live here and the screen must keep them apart, because they
+   answer different questions and sharing a word would repeat the mistake that
+   swapped mentions and citations:
+
+     with_volume     prompts Google had a figure for, bounded by the keyword
+                     API's 10-word / 80-character limits
+     mention_rate    how often the brand was named, over answers received
+
+   `unique_phrases` is smaller than `with_volume` whenever two prompts derived
+   the same search phrase — the sum is over searches, not over our rows. */
+export type Cluster = {
+  cluster: string;
+  prompts: number;
+  answers: number;
+  named: number;
+  mention_rate: number | null;
+  with_volume: number;
+  unique_phrases: number;
+  search_volume_avg: number | null;
+  search_volume_total: number | null;
+  /* Average monthly demand the brand is currently not named for. */
+  missed_demand: number | null;
 };
 
 export type PageChange = {
@@ -377,6 +412,19 @@ interface Strings {
   kwFailed: string;
   kwColKeyword: string;
   kwFullTool: string;
+  volumeDerived: string;
+  volumeExact: string;
+  clTitle: string;
+  clSub: string;
+  clColCluster: string;
+  clColDemand: string;
+  clColVisibility: string;
+  clColMissed: string;
+  clCoverage: (withVol: number, prompts: number) => string;
+  clPhrases: (n: number) => string;
+  clNoData: string;
+  clMissedTitle: string;
+  clNames: Record<string, string>;
   kwColDifficulty: string;
   kwColCpc: string;
   kwDifficultyTitle: string;
@@ -544,6 +592,23 @@ const STR: Record<Lang, Strings> = {
     kwFailed: "Could not look those up. Try again.",
     kwColKeyword: "Phrase",
     kwFullTool: "Open the full tool",
+    volumeDerived: "This figure is for the search phrase shown, not for the prompt. Nobody types the prompt into Google.",
+    volumeExact: "This figure is for the prompt itself, which was short enough to ask about.",
+    clTitle: "Where demand meets invisibility",
+    clSub: "Questions grouped by what they are asking for. The cluster to work on first is the one with real demand behind it where you are not named — not simply the biggest one.",
+    clColCluster: "Cluster",
+    clColDemand: "Demand / mo",
+    clColVisibility: "You are named",
+    clColMissed: "Missed demand",
+    clCoverage: (w, p) => `volume for ${w} of ${p} prompts`,
+    clPhrases: (n) => `${n} distinct ${n === 1 ? "phrase" : "phrases"}`,
+    clNoData: "No volume data in this cluster — unknown demand, which is not the same as none.",
+    clMissedTitle: "Average monthly demand in this cluster that you are not currently named for. Only as complete as the volume coverage beside it.",
+    clNames: {
+      comparison: "Comparison", commercial: "Commercial", problem: "Problem",
+      technical: "Technical", vertical: "Industry", tracked: "Tracked",
+      custom: "Your own", other: "Other",
+    },
     kwColDifficulty: "Difficulty",
     kwColCpc: "CPC",
     kwDifficultyTitle: "0-100, the chance of reaching Google's organic top ten. Not the advertiser competition that comes with search volume — a different number that is often confused with this one.",
@@ -711,6 +776,31 @@ const STR: Record<Lang, Strings> = {
     kwFailed: "Не удалось проверить. Попробуйте ещё раз.",
     kwColKeyword: "Фраза",
     kwFullTool: "Открыть полный инструмент",
+    volumeDerived: "Цифра относится к показанной поисковой фразе, а не к промпту. Промпт в Google никто не набирает.",
+    volumeExact: "Цифра относится к самому промпту — он оказался достаточно коротким, чтобы спросить.",
+    clTitle: "Где спрос совпадает с невидимостью",
+    clSub: "Вопросы, сгруппированные по тому, что в них спрашивают. Работать надо не с самым крупным кластером, а с тем, где есть реальный спрос и где вас не называют.",
+    clColCluster: "Кластер",
+    clColDemand: "Спрос / мес",
+    clColVisibility: "Вас называют",
+    clColMissed: "Упущенный спрос",
+    clCoverage: (w, p) => `частотность по ${w} из ${p} промптов`,
+    /* Russian has three plural forms, not two, and "2 разных фраз" is the
+       mistake an English-shaped ternary makes. 2–4 take their own ending. */
+    clPhrases: (n) => {
+      const ten = n % 10, hundred = n % 100;
+      const word = ten === 1 && hundred !== 11 ? "фраза"
+                 : ten >= 2 && ten <= 4 && !(hundred >= 12 && hundred <= 14) ? "фразы"
+                 : "фраз";
+      return `${n} ${word}`;
+    },
+    clNoData: "В этом кластере нет данных по частотности — спрос неизвестен, а это не то же самое, что его отсутствие.",
+    clMissedTitle: "Средний месячный спрос в этом кластере, по которому вас сейчас не называют. Полон ровно настолько, насколько полно покрытие рядом.",
+    clNames: {
+      comparison: "Сравнение", commercial: "Коммерческие", problem: "Проблемные",
+      technical: "Технические", vertical: "Отраслевые", tracked: "Отслеживаемые",
+      custom: "Свои", other: "Прочие",
+    },
     kwColDifficulty: "Сложность",
     kwColCpc: "CPC",
     kwDifficultyTitle: "0-100, шанс попасть в органический топ-10 Google. Это не «конкуренция», которая приходит вместе с частотностью: та считает рекламодателей, и её постоянно путают с этой.",
@@ -1109,7 +1199,9 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
         const shown = r.chatgpt.answer ? r.chatgpt : r.gemini.answer ? r.gemini : null;
         const answer = shown?.answer || "";
         return { prompt: r.prompt, rivals, found, answer, info: shown, youHere,
-                 searchVolume: r.search_volume };
+                 searchVolume: r.search_volume,
+                 keywordPhrase: r.keyword_phrase,
+                 keywordSource: r.keyword_source };
       })
       .filter((r) => !r.youHere && r.rivals.length > 0);
   }, [data.results]);
@@ -1245,6 +1337,15 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
                     {typeof r.searchVolume === "number" ? (
                       <span className="text-xs text-neutral-700" title={t.volumeTitle}>
                         {r.searchVolume.toLocaleString(lang === "ru" ? "ru-RU" : "en-US")}
+                        {/* The phrase, every time there is a number. Without it
+                            the column claims people type the prompt, and for a
+                            derived row that is simply false. */}
+                        {r.keywordPhrase && (
+                          <span className="mt-0.5 block text-[10px] leading-tight text-neutral-400"
+                                title={r.keywordSource === "derived" ? t.volumeDerived : t.volumeExact}>
+                            {r.keywordPhrase}
+                          </span>
+                        )}
                       </span>
                     ) : (
                       <span className="text-xs text-neutral-300" title={t.volumeMissing}>{t.noVolume}</span>
@@ -2100,6 +2201,88 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
             )}
           </section>
 
+          {/* ── Demand against visibility, per cluster. Placed above the
+                keyword panel because it answers the question the panel only
+                supplies parts of: not "what does this phrase cost" but "which
+                group of questions is worth the work at all". ── */}
+          {Array.isArray(data.clusters) && data.clusters.length > 0 && (
+          <section className="mt-8 rounded-2xl border border-neutral-150 p-6">
+            <h2 className="text-lg font-semibold">{t.clTitle}</h2>
+            <p className="mt-1 max-w-2xl text-sm text-neutral-500">{t.clSub}</p>
+
+            <div className="mt-5 overflow-hidden rounded-xl border border-neutral-150">
+              <div className="grid grid-cols-[1.1fr_1fr_0.9fr_0.9fr] gap-2 bg-neutral-50 px-4 py-2.5 text-[10px] uppercase tracking-wide text-neutral-400">
+                <span>{t.clColCluster}</span>
+                <span>{t.clColDemand}</span>
+                <span>{t.clColVisibility}</span>
+                <span title={t.clMissedTitle}>{t.clColMissed}</span>
+              </div>
+              {data.clusters.map((c) => {
+                const loc = lang === "ru" ? "ru-RU" : "en-US";
+                return (
+                  <div key={c.cluster} className="grid grid-cols-[1.1fr_1fr_0.9fr_0.9fr] items-start gap-2 border-t border-neutral-100 px-4 py-3">
+                    <div>
+                      <p className="text-xs font-medium">{t.clNames[c.cluster] || c.cluster}</p>
+                      <p className="mt-0.5 text-[10px] text-neutral-400">
+                        {t.clCoverage(c.with_volume, c.prompts)}
+                      </p>
+                    </div>
+
+                    {/* Average, not sum, as the headline. A sum grows with how
+                        many prompts happened to fit the keyword API's length
+                        limits, so two clusters measured at different coverage
+                        would not be comparable at all. The sum stays as the
+                        smaller line, beside the number of distinct searches it
+                        covers — several prompts often share one phrase. */}
+                    <div>
+                      {typeof c.search_volume_avg === "number" ? (
+                        <>
+                          <p className="text-xs tabular-nums">{c.search_volume_avg.toLocaleString(loc)}</p>
+                          <p className="mt-0.5 text-[10px] text-neutral-400">
+                            {(c.search_volume_total ?? 0).toLocaleString(loc)} · {t.clPhrases(c.unique_phrases)}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-neutral-300" title={t.clNoData}>—</p>
+                      )}
+                    </div>
+
+                    <div>
+                      {typeof c.mention_rate === "number" ? (
+                        <>
+                          <p className="text-xs tabular-nums">{c.mention_rate}%</p>
+                          <p className="mt-0.5 text-[10px] text-neutral-400">{c.named} / {c.answers}</p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-neutral-300">—</p>
+                      )}
+                    </div>
+
+                    {/* The one number worth sorting by, which is why the rows
+                        arrive already sorted by it. A cluster with no volume
+                        data shows nothing here rather than a zero: unknown
+                        demand is not absent demand, and a zero would bury it
+                        for the wrong reason. */}
+                    <div>
+                      {typeof c.missed_demand === "number" ? (
+                        <p className="text-xs font-medium tabular-nums">
+                          {c.missed_demand.toLocaleString(loc)}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-neutral-300" title={t.clNoData}>—</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+          )}
+
+          {/* The clusters above are NOT behind this gate, deliberately. Their
+              volume figures were computed during an audit the customer already
+              paid for; the panel below fires fresh paid lookups on demand,
+              which is the thing that has an owner. */}
           {canKeywords && (<>
           {/* ── Keyword research. Deliberately next to the page check rather
                 than among the written recommendations: both are measured
