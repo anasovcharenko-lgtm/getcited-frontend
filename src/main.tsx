@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import RuPage from './RuPage.tsx'
 import Legal from './Legal.tsx'
+import Keywords from './Keywords.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -12,6 +13,13 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/ru" element={<RuPage />} />
+
+        {/* Keyword research on its own page. The same lookup exists inside the
+            recommendations screen, but there it belongs to one audit and opens
+            on that audit's market; the question "is this phrase worth going
+            after" usually comes before there is an audit at all. */}
+        <Route path="/keywords" element={<Keywords lang="en" />} />
+        <Route path="/ru/keywords" element={<Keywords lang="ru" />} />
 
         <Route path="/legal/:slug" element={<Legal lang="en" />} />
         <Route path="/ru/legal/:slug" element={<Legal lang="ru" />} />
