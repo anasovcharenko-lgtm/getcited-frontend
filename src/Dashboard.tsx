@@ -306,9 +306,10 @@ interface Strings {
   you: string;
   howToFix: string;
   landscapeTitle: string;
+  landscapeLegend: string;
+  landscapeCited: (n: number, answers: number) => string;
+  landscapeBare: (n: number, answers: number) => string;
   landscapeSub: string;
-  landscapeXAxis: string;
-  landscapeYAxis: string;
   bestCoveredTitle: string;
   bestCoveredEmpty: string;
   seeCompetitorsDoBetter: string;
@@ -500,9 +501,10 @@ const STR: Record<Lang, Strings> = {
     you: "you",
     howToFix: "How to fix this →",
     landscapeTitle: "Competitive landscape",
-    landscapeSub: "Citations vs bare mentions · bubble size = total appearances",
-    landscapeXAxis: "Citations (with link)",
-    landscapeYAxis: "Mentions (no link)",
+    landscapeSub: "Named with a link to the site, against named with no link at all",
+    landscapeLegend: "Top bar: cited with a link · bottom bar: named, no link · numbers are counts out of answers received",
+    landscapeCited: (n, a) => `Cited with a link in ${n} of ${a} answers`,
+    landscapeBare: (n, a) => `Named without a link in ${n} of ${a} answers`,
     bestCoveredTitle: "Your best covered topics",
     bestCoveredEmpty: "No strongly covered topics yet.",
     seeCompetitorsDoBetter: "See where competitors do better →",
@@ -518,7 +520,10 @@ const STR: Record<Lang, Strings> = {
     historyNotEnough: "Not enough data yet",
     historyNotEnoughSub: "Run a few more audits for this brand and the trend will appear here.",
     whatAiSays: "What AI says about your brand",
-    whatAiSaysEmpty: "No direct quote captured yet — run another audit to try again.",
+    /* It said "run another audit to try again", which blames a glitch. The
+         card is empty because no model named the brand, so there was no
+         sentence to quote. That is a result, not a failure. */
+    whatAiSaysEmpty: "No model named you in this run, so there is no sentence to quote.",
     seeHowAccurate: "See how accurate this is →",
     /* It was "the pages AI models cite most in your category", which promised
        a ranking. This table is a different cut: one row per question, showing
@@ -700,9 +705,10 @@ const STR: Record<Lang, Strings> = {
     you: "вы",
     howToFix: "Как это исправить →",
     landscapeTitle: "Конкурентный ландшафт",
-    landscapeSub: "Цитирования и упоминания без ссылки · размер пузыря = всего появлений",
-    landscapeXAxis: "Цитирования (со ссылкой)",
-    landscapeYAxis: "Упоминания (без ссылки)",
+    landscapeSub: "Назвали со ссылкой на сайт против назвали без ссылки",
+    landscapeLegend: "Верхняя полоса — со ссылкой · нижняя — без ссылки · числа это количество из полученных ответов",
+    landscapeCited: (n, a) => `Со ссылкой в ${n} из ${a} ответов`,
+    landscapeBare: (n, a) => `Без ссылки в ${n} из ${a} ответов`,
     bestCoveredTitle: "Лучше всего покрытые темы",
     bestCoveredEmpty: "Пока нет уверенно покрытых тем.",
     seeCompetitorsDoBetter: "Смотреть, где конкуренты лучше →",
@@ -718,7 +724,7 @@ const STR: Record<Lang, Strings> = {
     historyNotEnough: "Пока недостаточно данных",
     historyNotEnoughSub: "Запустите ещё несколько аудитов этого бренда — и здесь появится динамика.",
     whatAiSays: "Что AI говорит о вашем бренде",
-    whatAiSaysEmpty: "Пока не удалось выделить цитату — попробуйте запустить аудит ещё раз.",
+    whatAiSaysEmpty: "Ни одна модель не назвала вас в этом прогоне — цитировать нечего.",
     seeHowAccurate: "Проверить точность →",
     citationsTable: "Какие источники отвечают на каждый вопрос",
     viewAllCitations: (n) => `Показать все ${n} →`,
@@ -2216,73 +2222,37 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     return buckets;
   }, [data.recommendations, t]);
 
-  /* ---- bubble chart geometry (citations x, bare mentions y) ---- */
-  const bubbleData = useMemo(() => {
+  /* ---- competitive landscape rows ----
+
+     This was a bubble chart, and five brands with counts between zero and three
+     cannot fill a plane. Scaled to the brands, a single bare mention drew the
+     one brand with 0% visibility at the very top; scaled to the answers,
+     everything collapsed into the bottom-left corner with the labels on top of
+     each other. Both are true pictures of five small numbers in a space built
+     for a hundred larger ones.
+
+     Two bars per brand says the same thing — a citation and a bare mention are
+     different outcomes — and says it at any sample size. Labels sit in their
+     own column, so they cannot collide however close the values are. */
+  const landscapeRows = useMemo(() => {
     const all = data.competitor_ranking;
-
-    /* Both axes are counts out of the same denominator — answers received — so
-       that is what they are scaled by, and a position means "share of answers".
-       A brand named once in thirteen sits a thirteenth of the way up.
-
-       They used to be scaled by the highest value among the brands, which is
-       how a brand with a single bare mention, against competitors who had none,
-       was drawn at the very top of the chart: the maximum was one, so one
-       filled the axis. On a screen that says 0% visibility beside it, that
-       reads as dominance, and it was the opposite.
-
-       The observed maximum is the fallback for a stored run from before the
-       denominator was returned — and `|| 1` keeps the divisor off zero. */
+    /* Widths are a share of answers received, the denominator both counts come
+       out of, so a bar length means the same thing on every row and between two
+       audits. The observed maximum is the fallback for a run stored before
+       `answers` was returned. */
     const denom = data.answers
-      || Math.max(...all.map((c) => Math.max(c.mentions_with_link, c.mentions_without_link)), 0)
+      || Math.max(...all.map((c) => c.total_mentions), 0)
       || 1;
-    const maxX = denom;
-    const maxY = denom;
-    const maxTotal = Math.max(...all.map((c) => c.total_mentions), 1);
-    const plotW = 340, plotH = 150, left = 60, top = 40;
-
-    /* Zero maps to an inset, not to the axis itself. Brands with no mentions
-       were landing exactly on the lines, which read as a rendering fault rather
-       than as data. */
-    const INSET = 0.12;
-    const scale = (v: number, max: number) =>
-      max === 0 ? INSET : INSET + Math.min(v / max, 1) * (1 - INSET * 2);
-
-    const placed = all.map((c) => {
-      const fracX = scale(c.mentions_with_link, maxX);
-      const fracY = scale(c.mentions_without_link, maxY);
-      const r = 8 + (c.total_mentions / maxTotal) * 22;
-      const cx = Math.min(Math.max(left + fracX * plotW, left + r), left + plotW - r);
-      const cy = Math.min(Math.max(top + plotH - fracY * plotH, top + r), top + plotH - r);
-      return { ...c, cx, cy, r };
-    });
-
-    /* Brands with identical numbers land on the same point and their labels
-       overlap into an unreadable smudge. Spread a tied cluster along an arc. */
-    const byPoint = new Map<string, typeof placed>();
-    for (const b of placed) {
-      const key = `${Math.round(b.cx)}:${Math.round(b.cy)}`;
-      byPoint.set(key, [...(byPoint.get(key) || []), b]);
-    }
-    const spread = placed.map((b) => {
-      const key = `${Math.round(b.cx)}:${Math.round(b.cy)}`;
-      const group = byPoint.get(key)!;
-      if (group.length < 2) return b;
-      const idx = group.indexOf(b);
-      const angle = (idx / group.length) * Math.PI * 2;
-      const offset = 14 + b.r;
-      return {
-        ...b,
-        cx: Math.min(Math.max(b.cx + Math.cos(angle) * offset, left + b.r), left + plotW - b.r),
-        cy: Math.min(Math.max(b.cy + Math.sin(angle) * offset, top + b.r), top + plotH - b.r),
-      };
-    });
-
-    // Labels above by default, below when a neighbour is close.
-    return spread.map((b, i) => {
-      const crowded = spread.some((o, j) => j < i && Math.abs(o.cx - b.cx) < 70 && Math.abs(o.cy - b.cy) < 30);
-      return { ...b, labelY: crowded ? b.cy + b.r + 14 : b.cy - b.r - 7 };
-    });
-  }, [data.competitor_ranking]);
+    return all
+      .map((c) => ({
+        ...c,
+        citedPct: Math.min((c.mentions_with_link / denom) * 100, 100),
+        barePct: Math.min((c.mentions_without_link / denom) * 100, 100),
+      }))
+      .sort((a, b) =>
+        (b.mentions_with_link - a.mentions_with_link) ||
+        (b.mentions_without_link - a.mentions_without_link));
+  }, [data.competitor_ranking, data.answers]);
 
   /* ---- history chart geometry ---- */
   const historyGeom = useMemo(() => {
@@ -2881,25 +2851,48 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           <button onClick={() => setView("recommendations")} className="mt-3 block w-full text-right text-xs text-neutral-400 hover:text-neutral-900">{t.howToFix}</button>
         </div>
 
-        {/* Competitive landscape bubble chart */}
-        {bubbleData.length > 1 && (
+        {/* Competitive landscape */}
+        {landscapeRows.length > 1 && (
           <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
             <p className="text-sm font-medium">{t.landscapeTitle}</p>
             <p className="mt-0.5 text-xs text-neutral-400">{t.landscapeSub}</p>
-            <svg viewBox="0 0 460 260" width="100%" height="240" className="mt-2">
-              <line x1="60" y1="30" x2="60" y2="190" stroke="#e5e5e5" strokeWidth={1} />
-              <line x1="60" y1="190" x2="410" y2="190" stroke="#e5e5e5" strokeWidth={1} />
-              <text x="20" y="110" fontSize="11" fill="#a3a3a3" transform="rotate(-90 20 110)" textAnchor="middle">{t.landscapeYAxis}</text>
-              <text x="235" y="220" fontSize="11" fill="#a3a3a3" textAnchor="middle">{t.landscapeXAxis}</text>
-              {bubbleData.map((b) => (
-                <g key={b.name}>
-                  <circle cx={b.cx} cy={b.cy} r={b.r} fill={b.is_your_brand ? "#171717" : "#a3a3a3"} opacity={b.is_your_brand ? 0.9 : 0.35} />
-                  <text x={b.cx} y={b.labelY} fontSize="11" fontWeight={500} textAnchor="middle" fill="#171717">
+
+            <div className="mt-4 space-y-2.5">
+              {landscapeRows.map((b) => (
+                <div key={b.name} className="grid grid-cols-[130px_1fr_auto] items-center gap-3">
+                  <p className={`truncate text-xs ${b.is_your_brand ? "font-medium text-neutral-900" : "text-neutral-500"}`}>
                     {statLabel(b.name, b.is_your_brand, t.you)}
-                  </text>
-                </g>
+                  </p>
+
+                  {/* Two bars, stacked, sharing one track. Cited sits on top
+                      because it is the stronger outcome, and a brand with
+                      nothing still gets an empty track rather than vanishing —
+                      absence is part of the comparison. */}
+                  <div className="space-y-1">
+                    <div className="h-2 w-full rounded-full bg-neutral-100">
+                      <div
+                        className={`h-2 rounded-full ${b.is_your_brand ? "bg-neutral-900" : "bg-neutral-400"}`}
+                        style={{ width: `${b.citedPct}%` }}
+                        title={t.landscapeCited(b.mentions_with_link, data.answers || 0)}
+                      />
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-neutral-100">
+                      <div
+                        className={`h-2 rounded-full ${b.is_your_brand ? "bg-neutral-400" : "bg-neutral-200"}`}
+                        style={{ width: `${b.barePct}%` }}
+                        title={t.landscapeBare(b.mentions_without_link, data.answers || 0)}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="whitespace-nowrap text-[11px] tabular-nums text-neutral-400">
+                    {b.mentions_with_link} / {b.mentions_without_link}
+                  </p>
+                </div>
               ))}
-            </svg>
+            </div>
+
+            <p className="mt-3 text-[11px] text-neutral-400">{t.landscapeLegend}</p>
           </div>
         )}
 
