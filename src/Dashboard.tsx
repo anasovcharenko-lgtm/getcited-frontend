@@ -2168,11 +2168,27 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     return buckets;
   }, [data.recommendations, t]);
 
-  /* ---- bubble chart geometry (Mentions x, Citations y) ---- */
+  /* ---- bubble chart geometry (citations x, bare mentions y) ---- */
   const bubbleData = useMemo(() => {
     const all = data.competitor_ranking;
-    const maxX = Math.max(...all.map((c) => c.mentions_with_link), 0);
-    const maxY = Math.max(...all.map((c) => c.mentions_without_link), 0);
+
+    /* Both axes are counts out of the same denominator — answers received — so
+       that is what they are scaled by, and a position means "share of answers".
+       A brand named once in thirteen sits a thirteenth of the way up.
+
+       They used to be scaled by the highest value among the brands, which is
+       how a brand with a single bare mention, against competitors who had none,
+       was drawn at the very top of the chart: the maximum was one, so one
+       filled the axis. On a screen that says 0% visibility beside it, that
+       reads as dominance, and it was the opposite.
+
+       The observed maximum is the fallback for a stored run from before the
+       denominator was returned — and `|| 1` keeps the divisor off zero. */
+    const denom = data.answers
+      || Math.max(...all.map((c) => Math.max(c.mentions_with_link, c.mentions_without_link)), 0)
+      || 1;
+    const maxX = denom;
+    const maxY = denom;
     const maxTotal = Math.max(...all.map((c) => c.total_mentions), 1);
     const plotW = 340, plotH = 150, left = 60, top = 40;
 
@@ -2180,7 +2196,8 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
        were landing exactly on the lines, which read as a rendering fault rather
        than as data. */
     const INSET = 0.12;
-    const scale = (v: number, max: number) => (max === 0 ? INSET : INSET + (v / max) * (1 - INSET * 2));
+    const scale = (v: number, max: number) =>
+      max === 0 ? INSET : INSET + Math.min(v / max, 1) * (1 - INSET * 2);
 
     const placed = all.map((c) => {
       const fracX = scale(c.mentions_with_link, maxX);
