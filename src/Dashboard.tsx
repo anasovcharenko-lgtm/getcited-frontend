@@ -393,6 +393,12 @@ interface Strings {
   sourcesChecked: (n: number, present: number) => string;
   sourcesRun: string;
   sourcesRunning: string;
+  sourcesRunningN: (n: number) => string;
+  sourcesProgress: (done: number, total: number) => string;
+  rivalsOnPage: (names: string) => string;
+  noRivalsOnPage: string;
+  pageUnreadable: string;
+  openDomain: string;
   sourcesFailed: string;
   andMore: (n: number) => string;
   inPost: string;
@@ -573,6 +579,12 @@ const STR: Record<Lang, Strings> = {
         : `Checked all ${n}. ${present} mention${present === 1 ? "s" : ""} you.`,
     sourcesRun: "Check which of them mention you →",
     sourcesRunning: "Opening pages…",
+    sourcesRunningN: (n) => `Opening ${n} page${n === 1 ? "" : "s"}, about ${Math.max(3, Math.round(n * 0.6))}s…`,
+    sourcesProgress: (done, total) => `Checked ${done} of ${total}…`,
+    rivalsOnPage: (names) => `on this page: ${names}`,
+    noRivalsOnPage: "nobody from your list is on this page",
+    pageUnreadable: "could not be read",
+    openDomain: "Show the pages",
     sourcesFailed: "Could not reach the checker. Try again in a moment.",
     andMore: (n) => `+${n} more`,
     inPost: "in the post",
@@ -757,6 +769,20 @@ const STR: Record<Lang, Strings> = {
         : `Проверили все ${n}. Вас упоминают: ${present}.`,
     sourcesRun: "Проверить, кто из них вас упоминает →",
     sourcesRunning: "Открываем страницы…",
+    /* Three plural forms, and the naive "n < 5" test breaks at 21: it would
+       print "21 страниц". The tens and hundreds both have to be looked at. */
+    sourcesRunningN: (n) => {
+      const ten = n % 10, hundred = n % 100;
+      const word = ten === 1 && hundred !== 11 ? "страницу"
+                 : ten >= 2 && ten <= 4 && !(hundred >= 12 && hundred <= 14) ? "страницы"
+                 : "страниц";
+      return `Открываем ${n} ${word}, примерно ${Math.max(3, Math.round(n * 0.6))} сек…`;
+    },
+    sourcesProgress: (done, total) => `Проверено ${done} из ${total}…`,
+    rivalsOnPage: (names) => `на этой странице: ${names}`,
+    noRivalsOnPage: "никого из вашего списка на этой странице нет",
+    pageUnreadable: "не удалось прочитать",
+    openDomain: "Показать страницы",
     sourcesFailed: "Не удалось связаться с проверкой. Попробуйте ещё раз.",
     andMore: (n) => `+ещё ${n}`,
     inPost: "в посте",
@@ -1449,6 +1475,10 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  /* Which domain's pages are open. A domain is a bundle: mindbox.ru 4x is
+     four different pages, and which page the model read is the thing worth
+     seeing. The URLs were already here, folded away. */
+  const [openDomain, setOpenDomain] = useState<string | null>(null);
 
   const domains = useMemo(() => {
     const byDomain = new Map<string, { urls: string[]; count: number }>();
@@ -1462,28 +1492,53 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
       .sort((a, b) => b.count - a.count);
   }, [data.citations]);
 
+  /* Sent in small batches, all in flight at once, with the chips updating as
+     each lands. One request for everything took five seconds behind a greyed
+     out label, which reads as a hang; this way the domains light up one by one
+     and the waiting is visible instead of guessed at.
+
+     Parallel rather than sequential on purpose — sequential batches would show
+     progress and be slower overall, which is a bad trade. Total time stays the
+     slowest batch. */
+  const BATCH = 3;
+
   const run = async () => {
+    const urls = domains.flatMap((d) => d.urls);
     setLoading(true);
     setFailed(false);
-    try {
+    setChecks([]);
+    setExpanded(true);
+
+    const batches: string[][] = [];
+    for (let i = 0; i < urls.length; i += BATCH) batches.push(urls.slice(i, i + BATCH));
+
+    const body = {
+      brand: data.brand,
+      brand_domain: data.brand_domain || "",
+      competitors: data.competitor_ranking.filter((c) => !c.is_your_brand).map((c) => c.name),
+    };
+
+    const settled = await Promise.allSettled(batches.map(async (batch) => {
       const res = await apiFetch(`${API_URL}/source-gap`, {
         method: "POST",
-        body: JSON.stringify({
-          urls: domains.flatMap((d) => d.urls),
-          brand: data.brand,
-          brand_domain: data.brand_domain || "",
-          competitors: data.competitor_ranking.filter((c) => !c.is_your_brand).map((c) => c.name),
-        }),
+        body: JSON.stringify({ ...body, urls: batch }),
       });
       if (!res.ok) throw new Error(String(res.status));
       const json = await res.json();
-      setChecks(json.results || []);
-      setExpanded(true);
-    } catch {
+      // Appended as it arrives rather than collected at the end, which is the
+      // whole point: the screen moves while the rest is still running.
+      setChecks((prev) => [...(prev || []), ...(json.results || [])]);
+      return json.results || [];
+    }));
+
+    // A batch that failed must not look like pages that came back clean. If
+    // every one failed there is nothing on screen, so say so; if some worked,
+    // the rows that arrived are real and the rest simply have no verdict.
+    if (settled.every((r) => r.status === "rejected")) {
+      setChecks(null);
       setFailed(true);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const statusFor = (domain: string) => {
@@ -1505,19 +1560,27 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
     <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
       <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.sourcesTitle}</p>
       <p className="mt-1.5 text-xs text-neutral-500">
-        {checks
-          ? t.sourcesChecked(domains.length, presentCount)
-          : t.sourcesSummary(domains.length)}
+        {/* While batches are still landing this says how far it has got.
+            "Checked all 10" the moment the first three return would be a
+            claim about pages nobody has opened yet. */}
+        {loading && checks
+          ? t.sourcesProgress(checks.length, domains.flatMap((d) => d.urls).length)
+          : checks
+            ? t.sourcesChecked(domains.length, presentCount)
+            : t.sourcesSummary(domains.length)}
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
         {visible.map((d) => {
           const st = statusFor(d.domain);
           return (
-            <span
+            <button
               key={d.domain}
-              title={st?.reason || undefined}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${
+              onClick={() => setOpenDomain(openDomain === d.domain ? null : d.domain)}
+              title={st?.reason || t.openDomain}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] hover:border-neutral-400 ${
+                openDomain === d.domain ? "border-neutral-400 bg-white" : ""
+              } ${
                 st?.status === "present"
                   ? "border-neutral-900 text-neutral-900"
                   : "border-neutral-200 text-neutral-500"
@@ -1531,7 +1594,7 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
                 </span>
               )}
               {st?.status === "unreadable" && <span className="text-[10px] text-neutral-300">?</span>}
-            </span>
+            </button>
           );
         })}
         {!expanded && domains.length > 3 && (
@@ -1541,9 +1604,52 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
         )}
       </div>
 
+      {/* The pages behind one domain. Same shape as the Sources list under an
+          answer — host, then path in lighter type — so a link reads the same
+          way wherever it appears in the product.
+
+          `competitors_on_page` has been coming back from the check all along
+          and was never shown. It is the most useful thing here: not "you are
+          missing from this domain" but "here is the page, and here is who is
+          on it instead". */}
+      {openDomain && (
+        <div className="mt-3 space-y-1.5 border-t border-neutral-150 pt-3">
+          {(domains.find((d) => d.domain === openDomain)?.urls || []).map((url) => {
+            const check = (checks || []).find((c) => c.url === url);
+            const rivals = check?.competitors_on_page || [];
+            let path = url;
+            try { path = new URL(url).pathname + new URL(url).search; } catch { /* keep raw */ }
+            return (
+              <div key={url}>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-baseline gap-1.5 text-[11px] hover:underline"
+                >
+                  <span className="text-neutral-700">{openDomain}</span>
+                  <span className="text-neutral-400">{path}</span>
+                </a>
+                {check && (
+                  <p className="text-[10px] text-neutral-400">
+                    {check.status === "unreadable"
+                      ? (check.reason || t.pageUnreadable)
+                      : rivals.length
+                        ? t.rivalsOnPage(rivals.join(", "))
+                        : t.noRivalsOnPage}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {!checks && (
         <button onClick={run} disabled={loading} className="mt-4 text-xs text-neutral-500 hover:text-neutral-900 disabled:opacity-50">
-          {loading ? t.sourcesRunning : t.sourcesRun}
+          {/* The count and a rough wait. Five seconds of a greyed-out 11px label
+              that only says "opening pages" reads as a hang. */}
+          {loading ? t.sourcesRunningN(domains.flatMap((d) => d.urls).length) : t.sourcesRun}
         </button>
       )}
       {failed && <p className="mt-3 text-xs text-neutral-400">{t.sourcesFailed}</p>}
