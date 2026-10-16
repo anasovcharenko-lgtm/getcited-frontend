@@ -13,7 +13,22 @@
     <link rel="alternate" hreflang="ru" href="https://getcited.space/ru" />
     <link rel="alternate" hreflang="x-default" href="https://getcited.space/" />
 
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- The icon carries a version, and that is the whole point of it.
+
+         The old mark was replaced on 30 September, but the URL it lived at did
+         not change, so every browser that had already fetched /favicon.svg kept
+         showing the previous one — including Chrome's address bar, which keeps
+         its own favicon store and does not refresh it just because the page
+         did. A different URL is a different cache entry everywhere, which is
+         the only version of this fix that does not depend on anyone clearing
+         anything.
+
+         If the icon ever changes again, bump v. Nothing else is needed. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+    <!-- Declared rather than left to be guessed: Safari and iOS go looking for
+         /apple-touch-icon.png on their own, and with a catch-all rewrite in
+         front of the app that request comes back as the HTML page. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
     <meta name="theme-color" content="#ffffff" />
 
     <!-- Open Graph: what a link to the site looks like when someone shares it. -->
