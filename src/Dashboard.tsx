@@ -1250,6 +1250,11 @@ function useVisibilityHistory(brand: string) {
 /* Phrase a finding in the reader's language from the facts the backend sent.
    Falls back to the backend's English whenever an id is unknown or the facts
    are missing, so a new check added server-side still renders. */
+/* Model names stay in Latin script — they are product names, and a transliterated
+   "Джемини" would be harder to recognise, not easier. */
+const MODEL_RU = (key: string) =>
+  MODELS.find((m) => m.key === key)?.label ?? (key === "ai_overview" ? "AI Overview" : key);
+
 function localizeFinding(f: PageFinding, lang: Lang): { title: string; found: string; why: string } {
   if (lang !== "ru" || !f.facts) return { title: f.title, found: f.found, why: f.why };
   const x = f.facts as Record<string, never>;
@@ -1297,17 +1302,58 @@ function localizeFinding(f: PageFinding, lang: Lang): { title: string; found: st
       return {
         title: blocked.length ? "ИИ-краулеры заблокированы на этой странице" : (unnamed === Number(x.total_agents) ? "В robots.txt не назван ни один ИИ-краулер" : "У части ИИ-краулеров нет собственных правил"),
         found: (blocked.length ? `Заблокированы: ${blocked.join(", ")}. ` : "") +
+               ((): string => {
+                 /* The pairing of a blocked crawler with that model's own
+                    figure. Built from the numbers, not translated. */
+                 const e = x.evidence as unknown as {
+                   blocked_model: string; blocked_named: number; blocked_answers: number;
+                   allowed_model: string; allowed_named: number; allowed_answers: number;
+                 } | undefined;
+                 if (!e || !e.blocked_model) return "";
+                 return `По этому прогону ${MODEL_RU(e.blocked_model)} называет вас в ${e.blocked_named} из ${e.blocked_answers}, а ${MODEL_RU(e.allowed_model)} — в ${e.allowed_named} из ${e.allowed_answers}, и её краулер вы пускаете. `;
+               })() +
                (unnamed ? `У ${unnamed} ${plural(unnamed, "краулера", "краулеров", "краулеров")} нет собственных правил, они попадают под общую группу. ` : "") +
                (x.has_sitemap ? "" : "Sitemap не объявлен."),
         why: "Заблокированный краулер не лечится никаким контентом — это единственная поломка, из-за которой всё остальное бессмысленно. Краулеры без своих правил не заблокированы, так что само по себе это не срочно: важно, что общая группа писалась под поисковики и может закрывать пути по причинам, которые уже неактуальны.",
       };
     }
-    case "js_rendered":
+    case "js_rendered": {
+      /* Rebuilt from the figures rather than translated from the English
+         sentence: the backend writes one, and a second one here that has to
+         stay in step with it is a sentence that eventually will not. */
+      const models = (x.models as unknown as Record<string, { named: number; answers: number }> | undefined) || {};
+      const keys = Object.keys(models).filter((k) => models[k].answers > 0);
+      let spread = "";
+      if (keys.length >= 2) {
+        const rate = (k: string) => models[k].named / models[k].answers;
+        const ranked = [...keys].sort((a, b) => rate(a) - rate(b));
+        const worst = ranked[0], best = ranked[ranked.length - 1];
+        if (rate(worst) < rate(best)) {
+          spread = ` По этому прогону ${MODEL_RU(worst)} называет вас в ${models[worst].named} из ${models[worst].answers}, а ${MODEL_RU(best)} — в ${models[best].named} из ${models[best].answers}. Это та самая картина, которую даёт такой рендеринг: модели по-разному читают страницу — кто-то выполняет JavaScript, кто-то нет.`;
+        }
+      }
       return {
         title: "Пока не выполнится JavaScript, на странице почти нет текста",
-        found: `В самом HTML только ${Number(x.body_chars) || 0} символов текста.`,
+        found: `В самом HTML только ${Number(x.body_chars) || 0} символов текста.` + spread,
         why: "Большинство краулеров, которые питают ассистентов, не выполняют JavaScript и видят пустую страницу. Пока это так, ничто другое из списка не поможет.",
       };
+    }
+    case "indexable": {
+      const noindex = Boolean(x.noindex);
+      const canonical = String(x.canonical || "");
+      const where = [x.in_meta ? '<meta name="robots">' : "", x.in_header ? "заголовке X-Robots-Tag" : ""].filter(Boolean);
+      const parts = [
+        noindex ? `Страница просит не индексировать себя — в ${where.join(" и ")}.` : "",
+        canonical ? `Её canonical указывает на ${canonical}, а не на саму себя.` : "",
+      ].filter(Boolean);
+      return {
+        title: noindex ? "Страница просит не индексировать себя" : "Страница говорит, что настоящая — другая",
+        found: parts.join(" "),
+        why: noindex
+          ? "Ассистенты достают ответы из индексов, построенных ровно на этих сигналах, так что страница с таким тегом участвует либо как копия, либо никак. И ломается это молча: в браузере страница выглядит безупречно."
+          : "Canonical передаёт зачёт той странице, которую называет. Если так и задумано — проверять и улучшать надо именно её. Если это осталось от шаблона — эта страница работает на чужой адрес.",
+      };
+    }
     default:
       return { title: f.title, found: f.found, why: f.why };
   }
@@ -1323,6 +1369,8 @@ const WHERE_RU: Record<string, string> = {
   faq: "новый блок FAQ с разметкой FAQPage",
   "robots.txt": "/robots.txt",
   rendering: "сборка сайта",
+  "robots directive": '<meta name="robots"> / заголовок X-Robots-Tag',
+  canonical: '<link rel="canonical">',
 };
 
 /* The add-prompts control. Lives in a component because it is rendered on
@@ -1583,6 +1631,7 @@ function excerptToNodes(text: string, limit = 150): React.ReactNode[] {
    report. */
 function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: AuditData; t: Strings; lang: Lang; setLang: (l: Lang) => void; onBack: () => void; addBox?: React.ReactNode }) {
   const ran = useMemo(() => modelsIn(data), [data]);
+
   const rows = useMemo(() => {
     return data.results
       .map((r) => {
@@ -2416,6 +2465,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
             .slice(0, 5)
             .map((c) => ({ name: c.name, website: `https://${c.domain}` })),
           missed_prompts: missedPrompts,
+          model_results: modelResults,
         }),
       });
       const json: PageCheckResult = await res.json();
@@ -2436,6 +2486,24 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
   const history = useVisibilityHistory(data.brand);
 
   const ran = useMemo(() => modelsIn(data), [data]);
+
+  /* Per-model counts, sent with the page check so a fact about the markup can
+     be put next to the answers it explains — "GPTBot is blocked, and ChatGPT
+     names you in 2 of 8 while Gemini names you in 5". Neither half is worth
+     much alone, and nothing that only reads pages or only asks models can put
+     them together.
+
+     Registry-driven. The denominator is the prompts this model actually
+     answered, not the prompts asked: a model that went quiet on half the run
+     must not be scored as absent from it. */
+  const modelResults = useMemo(() => {
+    const out: Record<string, { named: number; answers: number }> = {};
+    for (const key of ran) {
+      const answers = data.results.filter((r) => r[key] !== undefined).length;
+      if (answers > 0) out[key] = { named: modelNamedCount(data, key), answers };
+    }
+    return out;
+  }, [data, ran]);
   useEffect(() => {
     // Opening a saved run while a model tab is selected that this run did not
     // use would show its zeros as a real measurement.
