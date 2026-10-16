@@ -392,7 +392,17 @@ interface Strings {
   menuProjects: string;
   menuHide: string;
   menuShow: string;
+  /* The nav has its own labels. Reusing the section headings put "Sources —
+     the pages AI models cite most in your category" into a 176px column, which
+     wraps to three lines and stops being a menu. A heading explains; a menu
+     label only has to be recognisable once you are already on the page. */
   menuScore: string;
+  menuRivals: string;
+  menuCovered: string;
+  menuSources: string;
+  menuHistory: string;
+  menuCitations: string;
+  menuRecs: string;
   sourcesSummary: (n: number) => string;
   sourcesChecked: (n: number, present: number) => string;
   sourcesRun: string;
@@ -576,6 +586,12 @@ const STR: Record<Lang, Strings> = {
     menuHide: "Hide the menu",
     menuShow: "Show the menu",
     menuScore: "Score",
+    menuRivals: "Competitors",
+    menuCovered: "Covered topics",
+    menuSources: "Sources",
+    menuHistory: "History",
+    menuCitations: "Citations",
+    menuRecs: "Recommendations",
     sourcesSummary: (n) => `${n} source${n === 1 ? "" : "s"} shaped these answers.`,
     sourcesChecked: (n, present) =>
       present === 0
@@ -766,6 +782,12 @@ const STR: Record<Lang, Strings> = {
     menuHide: "Скрыть меню",
     menuShow: "Показать меню",
     menuScore: "Оценка",
+    menuRivals: "Конкуренты",
+    menuCovered: "Покрытие",
+    menuSources: "Источники",
+    menuHistory: "История",
+    menuCitations: "Цитирования",
+    menuRecs: "Рекомендации",
     sourcesSummary: (n) => `${n} источник(ов) сформировали эти ответы.`,
     sourcesChecked: (n, present) =>
       present === 0
@@ -2605,12 +2627,12 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
             )}
             {navOpen && [
               ["sec-score", t.menuScore],
-              ["sec-rivals", t.comparedTo],
-              ["sec-covered", t.bestCoveredTitle],
-              ["sec-sources", t.sourcesTitle],
-              ["sec-history", t.history],
-              ["sec-citations", t.citationsTable],
-              ["sec-recs", t.recommendationsTitle],
+              ["sec-rivals", t.menuRivals],
+              ["sec-covered", t.menuCovered],
+              ["sec-sources", t.menuSources],
+              ["sec-history", t.menuHistory],
+              ["sec-citations", t.menuCitations],
+              ["sec-recs", t.menuRecs],
             ].map(([id, label]) => (
               <a
                 key={id}
