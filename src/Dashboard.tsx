@@ -1203,6 +1203,54 @@ const API_URL = "https://web-production-b2168.up.railway.app";
    ## headings and ** marks. Rendering full markdown here would pull in
    headings and tables mid-sentence; stripping the syntax and keeping only
    bold reads as prose while preserving the emphasis the model intended. */
+/* Cut at the end of a sentence. Never inside one.
+
+   `slice(0, 160)` lands wherever it lands, which is how the quote card showed
+   "Set Loyalty — po…" — two letters of a word, mid-clause.
+
+   So whole sentences are taken while they fit. If even the first one does not
+   fit, it is kept whole anyway and the limit gives way: half a sentence is not
+   a shorter excerpt, it is a broken one.
+
+   HARD_MAX is the one exception. A model that answers in a single 900-character
+   sentence would otherwise fill the card, and at that length the text has
+   stopped being a quote. There the cut falls back to a word boundary, which is
+   still never mid-word.
+
+   The ellipsis is added only when something was actually left behind. */
+const HARD_MAX_FACTOR = 2.5;
+
+function clip(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+
+  // Split after terminal punctuation, keeping it with its sentence.
+  const parts = text.match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g) || [text];
+
+  /* No exception for the first part. Letting it in unconditionally — which
+     `out && ...` did — meant `out` was never empty, the branch below never ran,
+     and a single 300-character sentence was returned in full against a limit of
+     100. */
+  let out = "";
+  for (const part of parts) {
+    if ((out + part).trim().length > limit) break;
+    out += part;
+  }
+  out = out.trim();
+
+  // Nothing fit: keep the first sentence whole, unless it is so long that it
+  // is no longer a quote.
+  if (!out) {
+    const first = parts[0].trim();
+    if (first.length <= limit * HARD_MAX_FACTOR) return first;
+    const head = first.slice(0, limit);
+    const space = head.lastIndexOf(" ");
+    const cut = space > limit / 2 ? head.slice(0, space) : head;
+    return cut.replace(/[\s,;:\u2014-]+$/, "") + "\u2026";
+  }
+
+  return out === text.trim() ? out : out + " \u2026";
+}
+
 function excerptToNodes(text: string, limit = 150): React.ReactNode[] {
   const cleaned = text
     .replace(/^[-*]\s+/gm, "")        // bullet markers at line start
@@ -1212,7 +1260,7 @@ function excerptToNodes(text: string, limit = 150): React.ReactNode[] {
     .replace(/#{1,6}\s+/g, "")
     .replace(/`+/g, "")
     .trim();
-  const clipped = cleaned.length > limit ? cleaned.slice(0, limit) + "…" : cleaned;
+  const clipped = clip(cleaned, limit);
 
   const out: React.ReactNode[] = [];
   let last = 0;
@@ -2965,7 +3013,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                   still carries "**" in this field, and those are the runs
                   someone opens from their projects list. Fixing it only on the
                   way in would leave the history broken. */}
-              <p className="mt-3 text-sm italic text-neutral-600">"{excerptToNodes(data.sample_quote, 160)}"</p>
+              <p className="mt-3 text-sm italic text-neutral-600">"{excerptToNodes(data.sample_quote, 200)}"</p>
               <button onClick={() => setView("covered")} className="mt-3 text-xs text-neutral-500 hover:text-neutral-900">{t.seeAiResponse} →</button>
             </>
           ) : (
