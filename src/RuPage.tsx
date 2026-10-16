@@ -357,7 +357,7 @@ export default function RuPage() {
     if (!user) { signInWithGoogle(); } else { setShowModal(true); }
   };
 
-  if (auditData) return <Dashboard data={auditData} auditId={auditId} onBack={() => setAuditData(null)} lang="ru" brandName={BRAND} />;
+  if (auditData) return <Dashboard data={auditData} auditId={auditId} onBack={() => setAuditData(null)} onProjects={() => { setAuditData(null); setShowProjects(true); }} lang="ru" brandName={BRAND} />;
   if (showProjects) return <Projects lang="ru" onBack={() => setShowProjects(false)} onOpen={(d, id) => { setAuditData(d); setAuditId(id); setShowProjects(false); }} />;
 
   return (

@@ -389,6 +389,20 @@ interface Strings {
   notCovered: string;
   modelFailed: (names: string) => string;
   sourcesTitle: string;
+  menuProjects: string;
+  menuHide: string;
+  menuShow: string;
+  /* The nav has its own labels. Reusing the section headings put "Sources —
+     the pages AI models cite most in your category" into a 176px column, which
+     wraps to three lines and stops being a menu. A heading explains; a menu
+     label only has to be recognisable once you are already on the page. */
+  menuScore: string;
+  menuRivals: string;
+  menuCovered: string;
+  menuSources: string;
+  menuHistory: string;
+  menuCitations: string;
+  menuRecs: string;
   sourcesSummary: (n: number) => string;
   sourcesChecked: (n: number, present: number) => string;
   sourcesRun: string;
@@ -568,6 +582,16 @@ const STR: Record<Lang, Strings> = {
     notCovered: "Not covered",
     modelFailed: (names: string) => `${names} didn't respond during this audit — the numbers below are incomplete.`,
     sourcesTitle: "Where AI looks for answers",
+    menuProjects: "← My projects",
+    menuHide: "Hide the menu",
+    menuShow: "Show the menu",
+    menuScore: "Score",
+    menuRivals: "Competitors",
+    menuCovered: "Covered topics",
+    menuSources: "Sources",
+    menuHistory: "History",
+    menuCitations: "Citations",
+    menuRecs: "Recommendations",
     sourcesSummary: (n) => `${n} source${n === 1 ? "" : "s"} shaped these answers.`,
     sourcesChecked: (n, present) =>
       present === 0
@@ -754,6 +778,16 @@ const STR: Record<Lang, Strings> = {
     notCovered: "Не покрыто",
     modelFailed: (names: string) => `${names} не ответил(а) во время аудита — цифры ниже неполные.`,
     sourcesTitle: "Откуда AI берёт ответы",
+    menuProjects: "← Мои проекты",
+    menuHide: "Скрыть меню",
+    menuShow: "Показать меню",
+    menuScore: "Оценка",
+    menuRivals: "Конкуренты",
+    menuCovered: "Покрытие",
+    menuSources: "Источники",
+    menuHistory: "История",
+    menuCitations: "Цитирования",
+    menuRecs: "Рекомендации",
     sourcesSummary: (n) => `${n} источник(ов) сформировали эти ответы.`,
     sourcesChecked: (n, present) =>
       present === 0
@@ -1715,11 +1749,26 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
   );
 }
 
-export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandName = "GetCited", auditId = null }: { data: AuditData; onBack: () => void; lang?: Lang; brandName?: string; auditId?: string | number | null }) {
+export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "en", brandName = "GetCited", auditId = null }: { data: AuditData; onBack: () => void; onProjects?: () => void; lang?: Lang; brandName?: string; auditId?: string | number | null }) {
   /* The page URL sets the starting language, but the reader can change it.
      The audit itself can be in a different language from the interface - a
      Russian-market audit is often read by an English-speaking colleague. */
   const [lang, setLang] = useState<Lang>(initialLang);
+  /* Whether the side nav is showing. Remembered, because someone who closed it
+     to read the page in peace wants it closed on the next audit too — and
+     because the alternative is them closing it every single time.
+
+     Wrapped: storage throws in a private window and on a blocked-cookies
+     browser, and a nav preference is not worth a blank page. */
+  const [navOpen, setNavOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem("gc.nav") !== "closed"; } catch { return true; }
+  });
+  const toggleNav = () => {
+    setNavOpen((was) => {
+      try { localStorage.setItem("gc.nav", was ? "closed" : "open"); } catch { /* fine */ }
+      return !was;
+    });
+  };
   const t = STR[lang];
 
   /* A partial payload should degrade, not blank the page. Missing arrays are
@@ -2539,7 +2588,64 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      {/* Everything on this page is one long column, and until now the only way
+          to reach the bottom of it was to scroll past the top of it. The nav is
+          a plain anchor list rather than routing: the sections are all already
+          rendered, so there is nothing to load and nothing to get out of sync.
+
+          Hidden below lg — at phone width a fixed column would eat the page it
+          is meant to help you read. */}
+      <div className="mx-auto flex max-w-6xl gap-8 px-6 py-10">
+        <nav className={`hidden shrink-0 lg:block ${navOpen ? "w-44" : "w-8"}`}>
+          <div className="sticky top-24 space-y-0.5">
+            {/* Three lines, always in the same spot whether the nav is open or
+                shut, so closing it does not make the way back disappear. */}
+            <button
+              onClick={toggleNav}
+              aria-expanded={navOpen}
+              aria-label={navOpen ? t.menuHide : t.menuShow}
+              title={navOpen ? t.menuHide : t.menuShow}
+              className="mb-2 flex h-7 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
+            >
+              <span className="flex flex-col gap-[3px]">
+                <span className="block h-[1.5px] w-3.5 rounded bg-current" />
+                <span className="block h-[1.5px] w-3.5 rounded bg-current" />
+                <span className="block h-[1.5px] w-3.5 rounded bg-current" />
+              </span>
+            </button>
+
+            {navOpen && onProjects && (
+              <>
+                <button
+                  onClick={onProjects}
+                  className="block w-full rounded-lg px-3 py-1.5 text-left text-xs font-medium text-neutral-900 hover:bg-neutral-100"
+                >
+                  {t.menuProjects}
+                </button>
+                <div className="!my-2 border-t border-neutral-100" />
+              </>
+            )}
+            {navOpen && [
+              ["sec-score", t.menuScore],
+              ["sec-rivals", t.menuRivals],
+              ["sec-covered", t.menuCovered],
+              ["sec-sources", t.menuSources],
+              ["sec-history", t.menuHistory],
+              ["sec-citations", t.menuCitations],
+              ["sec-recs", t.menuRecs],
+            ].map(([id, label]) => (
+              <a
+                key={id}
+                href={`#${id}`}
+                className="block rounded-lg px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+              >
+                {label}
+              </a>
+            ))}
+          </div>
+        </nav>
+
+        <main className="min-w-0 flex-1">
 
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -2576,7 +2682,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
           </div>
         )}
 
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div id="sec-score" className="mb-6 scroll-mt-24 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.aiVisibilityScore}</p>
             <div className="mt-2 text-5xl font-bold tracking-tight">{metrics.scorePct}%</div>
@@ -2624,7 +2730,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
         {/* Where you stand vs competitors */}
         <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
           <div className="mb-4 flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.comparedTo}</p>
+            <p id="sec-rivals" className="scroll-mt-24 text-xs font-medium uppercase tracking-widest text-neutral-400">{t.comparedTo}</p>
             <div className="flex flex-col items-end gap-1">
               <button onClick={() => setView("competitors")} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900">
                 {t.seeUncovered} <ChevronRight className="h-3 w-3" />
@@ -2698,7 +2804,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
         )}
 
         {/* Best covered topics */}
-        <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
+        <div id="sec-covered" className="mb-6 scroll-mt-24 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.bestCoveredTitle}</p>
             {bestCoveredPrompts.length > 0 && (
@@ -2767,7 +2873,7 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
         </div>
 
         {/* History */}
-        <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
+        <div id="sec-history" className="mb-6 scroll-mt-24 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
           <div className="flex items-baseline justify-between">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.history}</p>
             {historyGeom && (
@@ -2810,11 +2916,11 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
           )}
         </div>
 
-        <SourceGap data={data} t={t} />
+        <div id="sec-sources" className="scroll-mt-24"><SourceGap data={data} t={t} /></div>
 
         {/* Citations table */}
         {data.citations && data.citations.length > 0 && (
-          <div ref={citationsRef} className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
+          <div id="sec-citations" ref={citationsRef} className="mb-6 scroll-mt-24 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.citationsTable}</p>
             <table className="mt-4 w-full text-sm">
               <thead>
@@ -2857,14 +2963,15 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
         )}
 
         {/* Recommendations entry point */}
-        <button onClick={() => setView("recommendations")} className="flex w-full items-center justify-between rounded-2xl border border-neutral-150 bg-neutral-900 p-6 text-left text-white transition-colors hover:bg-neutral-800">
+        <button id="sec-recs" onClick={() => setView("recommendations")} className="flex w-full scroll-mt-24 items-center justify-between rounded-2xl border border-neutral-150 bg-neutral-900 p-6 text-left text-white transition-colors hover:bg-neutral-800">
           <div>
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.recommendationsTitle}</p>
             <p className="mt-1 text-sm text-neutral-300">{t.recommendationsSub}</p>
           </div>
           <ArrowLeft className="h-5 w-5 rotate-180" />
         </button>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
