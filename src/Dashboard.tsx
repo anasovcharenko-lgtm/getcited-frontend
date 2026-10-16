@@ -519,7 +519,10 @@ const STR: Record<Lang, Strings> = {
     whatAiSays: "What AI says about your brand",
     whatAiSaysEmpty: "No direct quote captured yet — run another audit to try again.",
     seeHowAccurate: "See how accurate this is →",
-    citationsTable: "Sources — the pages AI models cite most in your category",
+    /* It was "the pages AI models cite most in your category", which promised
+       a ranking. This table is a different cut: one row per question, showing
+       where that answer came from. The ranking is the chip list above. */
+    citationsTable: "Which sources answer each question",
     viewAllCitations: (n) => `View all ${n} →`,
     showLess: "Show less",
     colPrompt: "Prompt",
@@ -590,7 +593,7 @@ const STR: Record<Lang, Strings> = {
     menuCovered: "Covered topics",
     menuSources: "Sources",
     menuHistory: "History",
-    menuCitations: "Citations",
+    menuCitations: "Sources by question",
     menuRecs: "Recommendations",
     sourcesSummary: (n) => `${n} source${n === 1 ? "" : "s"} shaped these answers.`,
     sourcesChecked: (n, present) =>
@@ -715,7 +718,7 @@ const STR: Record<Lang, Strings> = {
     whatAiSays: "Что AI говорит о вашем бренде",
     whatAiSaysEmpty: "Пока не удалось выделить цитату — попробуйте запустить аудит ещё раз.",
     seeHowAccurate: "Проверить точность →",
-    citationsTable: "Источники — страницы, на которые AI ссылается чаще всего в вашей категории",
+    citationsTable: "Какие источники отвечают на каждый вопрос",
     viewAllCitations: (n) => `Показать все ${n} →`,
     showLess: "Свернуть",
     colPrompt: "Промпт",
@@ -786,7 +789,7 @@ const STR: Record<Lang, Strings> = {
     menuCovered: "Покрытие",
     menuSources: "Источники",
     menuHistory: "История",
-    menuCitations: "Цитирования",
+    menuCitations: "По вопросам",
     menuRecs: "Рекомендации",
     sourcesSummary: (n) => `${n} источник(ов) сформировали эти ответы.`,
     sourcesChecked: (n, present) =>
@@ -2036,6 +2039,19 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     return Array.from(byPrompt.values());
   }, [data.citations]);
 
+  /* Volume lives on the result row, keyed by the prompt text — the same lookup
+     the prompts table does. The demand column had been printing a hardcoded
+     dash since before there was anything to put in it. */
+  const volumeByPrompt = useMemo(() => {
+    const m = new Map<string, { volume: number; phrase?: string }>();
+    for (const r of data.results) {
+      if (typeof r.search_volume === "number") {
+        m.set(r.prompt, { volume: r.search_volume, phrase: r.keyword_phrase });
+      }
+    }
+    return m;
+  }, [data.results]);
+
   const visibleCitations = showAllCitations ? citationGroups : citationGroups.slice(0, 10);
 
   const failedModels = useMemo(() => {
@@ -2935,7 +2951,23 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                 {visibleCitations.map((g, i) => (
                   <tr key={i} className="border-b border-neutral-50 align-top">
                     <td className="max-w-[280px] py-2.5 pr-4 text-xs text-neutral-700">{g.prompt}</td>
-                    <td className="py-2.5 text-center text-xs text-neutral-400">{t.svPending}</td>
+                    {/* A dash when Google has no figure or the phrase was too
+                        long to ask about. Absent, never zero — zero would claim
+                        nobody searches it. */}
+                    <td className="py-2.5 text-center text-xs">
+                      {(() => {
+                        const v = volumeByPrompt.get(g.prompt);
+                        if (!v) return <span className="text-neutral-300" title={t.volumeMissing}>—</span>;
+                        return (
+                          <span className="text-neutral-600" title={v.phrase ? t.volumeDerived : t.volumeTitle}>
+                            {v.volume.toLocaleString(lang === "ru" ? "ru-RU" : "en-US")}
+                            {v.phrase && (
+                              <span className="mt-0.5 block text-[10px] leading-tight text-neutral-400">{v.phrase}</span>
+                            )}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="py-2.5 text-center">
                       <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
                         {g.sources[0].gemini_count >= g.sources[0].chatgpt_count ? "Gemini" : "ChatGPT"}
