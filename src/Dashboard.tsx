@@ -144,6 +144,10 @@ export type SourceCheck = {
   status: "absent" | "present" | "unreadable";
   reason: string;
   competitors_on_page: string[];
+  /* The page's own <title>. Empty when the fetch never got far enough
+     to see one — a timeout, a dead domain — which is exactly when the
+     slug fallback has to carry it. */
+  title?: string;
   found_in?: "post" | "comment" | "";
 };
 
@@ -1257,6 +1261,31 @@ function clip(text: string, limit: number): string {
   return out === text.trim() ? out : out + " \u2026";
 }
 
+/* A readable name for a page we could not read.
+
+   A McKinsey link is 120 characters of slug and tracking parameters and tells
+   the reader nothing. The last path segment usually carries the headline the
+   publisher wrote — "members-only-delivering-greater-value-through-loyalty-and-
+   pricing" — so it is unhyphenated and given a capital. Crude, and still far
+   better than the raw path.
+
+   Returns "" when the slug is not words: an id, a date, a bare domain. A made-up
+   title is worse than none, and the caller falls back to the path. */
+function titleFromSlug(url: string): string {
+  let last = "";
+  try {
+    const parts = new URL(url).pathname.split("/").filter(Boolean);
+    last = parts[parts.length - 1] || "";
+  } catch { return ""; }
+  last = last.replace(/\.(html?|php|aspx?)$/i, "");
+  if (!/[a-z\u0430-\u044f]/i.test(last)) return "";       // ids and dates, not words
+  // Publishers prefix the slug with the post id — vc.ru gives
+  // "2521314-top-10-programm". The number is for their database, not the reader.
+  const words = last.replace(/^\d+[-_]+/, "").replace(/[-_]+/g, " ").trim();
+  if (words.length < 8 || !words.includes(" ")) return ""; // one token is not a title
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function excerptToNodes(text: string, limit = 150): React.ReactNode[] {
   const cleaned = text
     .replace(/^[-*]\s+/gm, "")        // bullet markers at line start
@@ -1712,8 +1741,13 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
                   title={url}
                   className="flex items-baseline gap-1.5 text-[11px] hover:underline"
                 >
-                  <span className="shrink-0 text-neutral-700">{openDomain}</span>
-                  <span className="truncate text-neutral-400">{path}</span>
+                  <span className="shrink-0 text-neutral-500">{openDomain}</span>
+                  {/* The page's name, not its address. The real title when the
+                      check could read the page, the slug when it could not, and
+                      the path when the slug is an id rather than words. */}
+                  <span className="truncate text-neutral-800">
+                    {check?.title || titleFromSlug(url) || path}
+                  </span>
                 </a>
                 {/* Why there is no verdict, or who is on the page. Kept, because
                     "we could not read this" is a different answer from "you are
