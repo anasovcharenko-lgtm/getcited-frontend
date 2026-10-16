@@ -412,6 +412,7 @@ interface Strings {
   rivalsOnPage: (names: string) => string;
   noRivalsOnPage: string;
   pageUnreadable: string;
+  citedTimes: (n: number) => string;
   openDomain: string;
   sourcesFailed: string;
   andMore: (n: number) => string;
@@ -604,6 +605,7 @@ const STR: Record<Lang, Strings> = {
     rivalsOnPage: (names) => `on this page: ${names}`,
     noRivalsOnPage: "nobody from your list is on this page",
     pageUnreadable: "could not be read",
+    citedTimes: (n) => `Cited ${n} time${n === 1 ? "" : "s"} across this audit`,
     openDomain: "Show the pages",
     sourcesFailed: "Could not reach the checker. Try again in a moment.",
     andMore: (n) => `+${n} more`,
@@ -808,6 +810,13 @@ const STR: Record<Lang, Strings> = {
     rivalsOnPage: (names) => `на этой странице: ${names}`,
     noRivalsOnPage: "никого из вашего списка на этой странице нет",
     pageUnreadable: "не удалось прочитать",
+    citedTimes: (n) => {
+      const ten = n % 10, hundred = n % 100;
+      const word = ten === 1 && hundred !== 11 ? "раз"
+                 : ten >= 2 && ten <= 4 && !(hundred >= 12 && hundred <= 14) ? "раза"
+                 : "раз";
+      return `Процитирован ${n} ${word} за этот аудит`;
+    },
     openDomain: "Показать страницы",
     sourcesFailed: "Не удалось связаться с проверкой. Попробуйте ещё раз.",
     andMore: (n) => `+ещё ${n}`,
@@ -1601,7 +1610,7 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
               }`}
             >
               {d.domain}
-              <b className="font-medium text-neutral-900">{d.count}×</b>
+              <b className="font-medium text-neutral-900" title={t.citedTimes(d.count)}>{d.count}×</b>
               {st?.status === "present" && (
                 <span className="text-[10px] text-neutral-500">
                   {st.foundIn === "comment" ? t.inComment : t.inPost}
@@ -1627,7 +1636,7 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
           missing from this domain" but "here is the page, and here is who is
           on it instead". */}
       {openDomain && (
-        <div className="mt-3 space-y-1.5 border-t border-neutral-150 pt-3">
+        <div className="mt-3 space-y-2.5 border-t border-neutral-150 pt-3">
           {(domains.find((d) => d.domain === openDomain)?.urls || []).map((url) => {
             const check = (checks || []).find((c) => c.url === url);
             const rivals = check?.competitors_on_page || [];
@@ -1635,17 +1644,27 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
             try { path = new URL(url).pathname + new URL(url).search; } catch { /* keep raw */ }
             return (
               <div key={url}>
+                {/* One line per page. A McKinsey URL is 120 characters of
+                    tracking parameters and wrapped to three lines, which turned
+                    a list of ten pages into a wall; the full address is still
+                    in the title and one click away. */}
                 <a
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-baseline gap-1.5 text-[11px] hover:underline"
+                  title={url}
+                  className="flex items-baseline gap-1.5 text-[11px] hover:underline"
                 >
-                  <span className="text-neutral-700">{openDomain}</span>
-                  <span className="text-neutral-400">{path}</span>
+                  <span className="shrink-0 text-neutral-700">{openDomain}</span>
+                  <span className="truncate text-neutral-400">{path}</span>
                 </a>
+                {/* Why there is no verdict, or who is on the page. Kept, because
+                    "we could not read this" is a different answer from "you are
+                    not on it" — but set below the link and in lighter type,
+                    since it is a footnote to the address, not a second heading.
+                    It read as competing with the link before. */}
                 {check && (
-                  <p className="text-[10px] text-neutral-400">
+                  <p className="mt-0.5 text-[10px] leading-tight text-neutral-300">
                     {check.status === "unreadable"
                       ? (check.reason || t.pageUnreadable)
                       : rivals.length
@@ -2908,7 +2927,12 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           </div>
           {data.sample_quote ? (
             <>
-              <p className="mt-3 text-sm italic text-neutral-600">"{data.sample_quote}"</p>
+              {/* Through the same cleaner the prompt excerpts use. The backend
+                  strips markdown now, but every audit stored before it did
+                  still carries "**" in this field, and those are the runs
+                  someone opens from their projects list. Fixing it only on the
+                  way in would leave the history broken. */}
+              <p className="mt-3 text-sm italic text-neutral-600">"{excerptToNodes(data.sample_quote, 160)}"</p>
               <button onClick={() => setView("covered")} className="mt-3 text-xs text-neutral-500 hover:text-neutral-900">{t.seeAiResponse} →</button>
             </>
           ) : (
