@@ -419,6 +419,21 @@ interface Strings {
   infTier2Desc: string;
   infTier3: string;
   infTier3Desc: string;
+  fgTitle: string;
+  fgSub: string;
+  fgNotYet: string;
+  fgWaiting: string;
+  fgSummary: (names: string) => string;
+  fgNoGaps: string;
+  fgCount: (total: number, yours: number) => string;
+  fgFootnote: string;
+  fgNames: Record<PageFormat, string>;
+  dgTitle: string;
+  dgSub: string;
+  dgRun: string;
+  dgNotRun: (n: number, market: string) => string;
+  dgSummary: (withVolume: number, total: number) => string;
+  dgNoData: (market: string) => string;
   pageCheckUrlHint: string;
   high: string;
   medium: string;
@@ -655,6 +670,30 @@ const STR: Record<Lang, Strings> = {
     infTier2Desc: "Communities and platforms that need nobody's permission. Faster, and the models read them.",
     infTier3: "Tier 3 — yours already",
     infTier3Desc: "Your own pages. Nothing to influence: a model citing these is reading you directly.",
+    fgTitle: "What shape of page gets quoted here",
+    fgSub: "Every page a model cited in this audit, sorted into the kind of page it is. Classified from the title and the address, so the pages behind each row are shown with it.",
+    fgNotYet: "Run the source check under Influence first — this reads the same pages.",
+    fgWaiting: "Opening the pages…",
+    fgSummary: (names) => `Models quote these formats here and nothing of yours is in them: ${names}.`,
+    fgNoGaps: "You appear in every format a model quoted here.",
+    fgCount: (total, yours) =>
+      yours === 0
+        ? `${total} page${total === 1 ? "" : "s"} cited, none of them yours`
+        : `${total} page${total === 1 ? "" : "s"} cited, you are on ${yours}`,
+    fgFootnote: "The shape is read from the title and the address, not from the page itself, so treat a single row as a prompt to look rather than as a verdict.",
+    fgNames: {
+      listicle: "Lists and roundups", comparison: "Comparisons", review: "Reviews",
+      video: "Video", guide: "Guides and how-tos", discussion: "Discussion threads",
+      other: "Everything else",
+    },
+    dgTitle: "Branded searches nobody has answered",
+    dgSub: "What someone who already knows your name types next. These land on a page about you that is usually not yours, which is why they sit here and not under Build.",
+    dgRun: "Look up the volumes",
+    dgNotRun: (n, market) => `${n} phrases, checked against ${market}. This is a paid lookup, about ten cents.`,
+    dgSummary: (withVolume, total) =>
+      `${withVolume} of ${total} phrases have measurable demand behind them.`,
+    dgNoData: (market) =>
+      `No volume came back for any phrase in ${market}. That is a gap in the data source, not a finding about demand: Google stopped selling ads in Russia in March 2022, so Google Ads has no Russian location to report on. Treat this panel as unavailable for this market rather than as an answer.`,
     pageCheckUrlHint: "Usually the product page, not the homepage — a product competes as a page, so that is the page a model either cites or does not.",
     high: "High priority",
     medium: "Medium priority",
@@ -885,6 +924,30 @@ const STR: Record<Lang, Strings> = {
     infTier2Desc: "Сообщества и площадки, где не нужно ничьё разрешение. Быстрее, и модели их читают.",
     infTier3: "Tier 3 — уже ваше",
     infTier3Desc: "Ваши собственные страницы. Влиять не на что: модель здесь читает вас напрямую.",
+    fgTitle: "Какой формат страницы здесь цитируют",
+    fgSub: "Каждая страница, которую модель процитировала в этом прогоне, разложенная по типу. Тип определяется по заголовку и адресу, поэтому рядом с каждой строкой показаны сами страницы.",
+    fgNotYet: "Сначала запустите проверку источников в разделе «Повлиять» — здесь читаются те же страницы.",
+    fgWaiting: "Открываем страницы…",
+    fgSummary: (names) => `Модели цитируют здесь такие форматы, и ни в одном из них вас нет: ${names}.`,
+    fgNoGaps: "Вы присутствуете в каждом формате, который здесь цитировали.",
+    fgCount: (total, yours) =>
+      yours === 0
+        ? `Процитировано ${total} ${ruPlural(total, "страница", "страницы", "страниц")}, ваших среди них нет`
+        : `Процитировано ${total} ${ruPlural(total, "страница", "страницы", "страниц")}, вы есть на ${yours}`,
+    fgFootnote: "Формат определяется по заголовку и адресу, а не по самой странице, так что отдельная строка — это повод посмотреть, а не приговор.",
+    fgNames: {
+      listicle: "Подборки и топы", comparison: "Сравнения", review: "Отзывы",
+      video: "Видео", guide: "Гайды и инструкции", discussion: "Обсуждения",
+      other: "Всё остальное",
+    },
+    dgTitle: "Брендовые запросы, на которые никто не ответил",
+    dgSub: "Что набирает человек, который уже знает ваше имя. Такие запросы приводят на страницу о вас — обычно не вашу. Поэтому они здесь, а не в «Создать».",
+    dgRun: "Узнать объёмы",
+    dgNotRun: (n, market) => `${n} ${ruPlural(n, "фраза", "фразы", "фраз")}, проверка по рынку ${market}. Это платный запрос, около десяти центов.`,
+    dgSummary: (withVolume, total) =>
+      `У ${withVolume} из ${total} фраз есть измеримый спрос.`,
+    dgNoData: (market) =>
+      `Ни по одной фразе объём для рынка ${market} не вернулся. Это пробел в источнике данных, а не вывод о спросе: Google прекратил продажу рекламы в России в марте 2022, поэтому у Google Ads нет российской локации. Считайте, что для этого рынка панель недоступна, а не что она ответила.`,
     pageCheckUrlHint: "Обычно это страница продукта, а не главная: продукт конкурирует именно как страница — её модель либо цитирует, либо нет.",
     high: "Высокий приоритет",
     medium: "Средний приоритет",
@@ -1034,6 +1097,84 @@ function categorize(text: string): "mentions" | "technical" | "content" | "autho
   if (/topical authority|pillar page|comprehensive guide|content cluster|topic cluster/.test(t)) return "authority";
   if (/backlink|press|directory|review site|reddit|forum|off-page|listing|wikipedia|third-party/.test(t)) return "mentions";
   return "content";
+}
+
+/* ── What kind of page a model cited ──
+
+   Not every format gets quoted equally. A listicle naming ten products is
+   answering the question a model was asked; a press release is not. So the
+   useful gap is not "we have no video", it is "every page a model reads for
+   this question is a listicle, and you are in none of them".
+
+   Classified from the host, the path and the title, in that order of
+   confidence, and the order of the tests matters: "10 лучших систем:
+   сравнение" is a listicle that mentions comparing, not a comparison.
+
+   Honest about its own limits — a heuristic on a title cannot be sure, which
+   is why the finding is always shown with the pages it was derived from. */
+type PageFormat = "listicle" | "comparison" | "review" | "video" | "guide" | "discussion" | "other";
+
+/* Hosts where the host IS the format. Deliberately short: vc.ru and habr.com
+   are not here, because they carry articles of every shape and classifying
+   them by host would file a comparison review as a discussion. */
+const FORMAT_HOSTS: [string, PageFormat][] = [
+  ["youtube.com", "video"], ["youtu.be", "video"], ["rutube.ru", "video"], ["vimeo.com", "video"],
+  ["otzovik.com", "review"], ["irecommend.ru", "review"], ["g2.com", "review"],
+  ["capterra.com", "review"], ["trustpilot.com", "review"], ["startpack.ru", "review"],
+  ["reddit.com", "discussion"], ["quora.com", "discussion"], ["stackoverflow.com", "discussion"],
+];
+
+/* `\b` in JavaScript is defined on [A-Za-z0-9_], so `\bотзыв\b` matches
+   nothing: the edge between a Cyrillic letter and a space is not a word
+   boundary by that definition. Every Russian pattern written that way is dead
+   on arrival — and silently, since a dead pattern just files the page under
+   "everything else". For an audit in Russian that would have been the whole
+   panel. Boundaries are spelled out with \p{L} instead.
+
+   STEM carries a leading boundary only, because Russian inflects and the
+   ending is the part that varies: "сравнени" has to reach сравнение,
+   сравнения and сравнению. WORD closes both ends, for short English words
+   that otherwise appear inside longer ones — "vs" inside "Versatile". */
+const STEM = (alts: string) => new RegExp(`(^|[^\\p{L}])(${alts})`, "iu");
+const WORD = (alts: string) => new RegExp(`(^|[^\\p{L}])(${alts})(?![\\p{L}])`, "iu");
+
+const FORMAT_WORDS: [RegExp, PageFormat][] = [
+  /* A count is the strongest signal there is, and the one she found by hand:
+     competitors sat in four listicles out of four. Counted only where it is
+     actually a list — at the start of the title, or next to a top/лучшие
+     marker. "на 2 млн клиентов" is a number in a sentence, not a listicle. */
+  [/^\s*(top\s+|топ[\s-]*)?\d{1,2}\s+\p{L}/iu, "listicle"],
+  [/(^|[^\p{L}])(top|топ)[\s-]*\d{1,2}(?![\d])/iu, "listicle"],
+  [/\d{1,2}\s+(лучш|best)/iu, "listicle"],
+  [STEM("подборка|подборки|рейтинг\\s*\\d"), "listicle"],
+
+  [WORD("vs|versus"), "comparison"],
+  [STEM("сравнени|сравнить|сравнива|сопоставл|альтернатив|comparison|compared|alternative"), "comparison"],
+
+  [STEM("отзыв|рецензи|рейтинг|review"), "review"],
+
+  [WORD("как|how"), "guide"],
+  [STEM("how[-\\s]to|guide|гайд|инструкц|пошагов|чек[-\\s]?лист|checklist|tutorial"), "guide"],
+
+  [STEM("forum|форум|обсужден|thread"), "discussion"],
+];
+
+function formatOf(url: string, title: string): PageFormat {
+  let host = "", path = "";
+  try {
+    const u = new URL(url);
+    host = u.hostname.replace(/^www\./, "").toLowerCase();
+    path = decodeURIComponent(u.pathname).toLowerCase();
+  } catch { /* a malformed URL still has a title */ }
+
+  const byHost = FORMAT_HOSTS.find(([h]) => host === h || host.endsWith(`.${h}`));
+  if (byHost) return byHost[1];
+
+  // Title first, path second: a slug is abbreviated and a title is written for
+  // a reader, which is also what the model read.
+  const haystack = `${title} ${path.replace(/[-_/]+/g, " ")}`;
+  for (const [re, fmt] of FORMAT_WORDS) if (re.test(haystack)) return fmt;
+  return "other";
 }
 
 /* Russian has three plural forms and the naive `n < 5` test breaks at 21 —
@@ -2241,6 +2382,210 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
   );
 }
 
+/* ── Format gap: the shapes of page a model reads for this question ──
+
+   Build asks what does not exist yet. This answers it from the citations
+   rather than from a guess: these are the formats models actually quoted in
+   this category, and these are the ones with nothing of yours in them.
+
+   Shares the source-check run with Influence, because the verdict needed here
+   — "is any page of this shape yours, or does any of them name you" — is the
+   same verdict that screen already fetched. */
+function FormatGap({ src, t }: { src: SourceChecks; t: Strings }) {
+  const { checks, loading } = src;
+
+  const groups = useMemo(() => {
+    if (!checks?.length) return [];
+    const by = new Map<PageFormat, { total: number; yours: number; examples: SourceCheck[] }>();
+    for (const c of checks) {
+      // A page nobody could read has no title to classify and no verdict to
+      // report, so it is left out rather than filed under "other".
+      if (c.status === "unreadable") continue;
+      const fmt = formatOf(c.url, c.title || titleFromSlug(c.url) || "");
+      const g = by.get(fmt) || { total: 0, yours: 0, examples: [] };
+      g.total += 1;
+      if (c.status === "present") g.yours += 1;
+      if (g.examples.length < 3) g.examples.push(c);
+      by.set(fmt, g);
+    }
+    return Array.from(by, ([format, g]) => ({ format, ...g }))
+      // Gaps first, then by how much of the evidence is that shape. "other" is
+      // not a format anyone can act on, so it sinks regardless.
+      .sort((a, b) =>
+        Number(a.format === "other") - Number(b.format === "other") ||
+        Number(a.yours > 0) - Number(b.yours > 0) ||
+        b.total - a.total);
+  }, [checks]);
+
+  // Nothing to say until the shared run has produced verdicts. The button for
+  // it lives in Influence; duplicating it here would mean two ways to spend
+  // the same seconds.
+  if (!checks?.length) {
+    return <p className="mt-4 text-xs text-neutral-400">{loading ? t.fgWaiting : t.fgNotYet}</p>;
+  }
+
+  const gaps = groups.filter((g) => g.yours === 0 && g.format !== "other");
+
+  return (
+    <div className="mt-5 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
+      <h3 className="text-sm font-semibold">{t.fgTitle}</h3>
+      <p className="mt-1 max-w-2xl text-sm text-neutral-500">{t.fgSub}</p>
+      <p className="mt-4 max-w-2xl text-sm text-neutral-900">
+        {gaps.length ? t.fgSummary(gaps.map((g) => t.fgNames[g.format]).join(", ")) : t.fgNoGaps}
+      </p>
+
+      <div className="mt-5 space-y-2">
+        {groups.map((g) => {
+          const gap = g.yours === 0 && g.format !== "other";
+          /* "Everything else" is not a format anyone can go and make, so it
+             gets neither verdict. A green dot there would read as "you are
+             covered here", which is a claim about a bucket that means
+             nothing. */
+          const dot = g.format === "other" ? "bg-neutral-200" : gap ? "bg-red-500" : "bg-green-500";
+          return (
+            <div key={g.format} className="rounded-xl border border-neutral-100 bg-white p-4">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+                <p className="text-sm font-medium">{t.fgNames[g.format]}</p>
+                <p className="text-xs text-neutral-500">{t.fgCount(g.total, g.yours)}</p>
+              </div>
+              {/* The pages the verdict came from. A heuristic on a title is a
+                  guess, and a guess that cannot be checked is worse than one
+                  that can. */}
+              <div className="mt-2 space-y-1">
+                {g.examples.map((c) => (
+                  <a
+                    key={c.url}
+                    href={c.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={c.url}
+                    className="flex items-baseline gap-1.5 text-[11px] hover:underline"
+                  >
+                    <span className="shrink-0 text-neutral-400">{c.domain}</span>
+                    <span className="truncate text-neutral-600">{c.title || titleFromSlug(c.url) || c.url}</span>
+                  </a>
+                ))}
+                {g.total > g.examples.length && (
+                  <p className="text-[11px] text-neutral-300">{t.andMore(g.total - g.examples.length)}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-3 max-w-2xl text-[11px] leading-relaxed text-neutral-400">{t.fgFootnote}</p>
+    </div>
+  );
+}
+
+/* ── Demand gap: branded searches nobody has answered ──
+
+   Off-page by nature, which is why it sits in Influence: someone searching
+   "<brand> отзывы" is going to land on a page about you that is not yours.
+
+   Owner-gated and on demand, like the keyword panel, because every click is a
+   paid DataForSEO lookup. */
+function DemandGap({ data, t, lang }: { data: AuditData; t: Strings; lang: Lang }) {
+  const [rows, setRows] = useState<KeywordRow[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  /* The phrases somebody already knows your name to type. The rival is the
+     best-placed competitor, because "<you> vs <them>" is the comparison a
+     buyer at the end of the funnel actually searches for. */
+  const phrases = useMemo(() => {
+    const brand = (data.brand || "").trim();
+    if (!brand) return [];
+    const rival = data.competitor_ranking.find((c) => !c.is_your_brand)?.name || "";
+    const mods = lang === "ru"
+      ? ["отзывы", "цена", "стоимость", "альтернативы", "интеграция", "внедрение"]
+      : ["reviews", "pricing", "alternatives", "integration", "demo", "case study"];
+    const out = mods.map((m) => `${brand} ${m}`);
+    if (rival) out.push(lang === "ru" ? `${brand} или ${rival}` : `${brand} vs ${rival}`);
+    return out;
+  }, [data.brand, data.competitor_ranking, lang]);
+
+  const run = async () => {
+    if (!phrases.length) return;
+    setBusy(true); setError(""); setRows(null);
+    try {
+      const res = await apiFetch(`${API_URL}/keyword-research`, {
+        method: "POST",
+        body: JSON.stringify({ keywords: phrases, country: (data.country || "US").toUpperCase() }),
+      });
+      const out = await res.json();
+      if (!res.ok || (out?.error && !Array.isArray(out?.results))) {
+        setError(out?.detail || out?.error || t.kwFailed);
+      } else {
+        setRows(out.results || []);
+        if (out.error) setError(out.error);
+      }
+    } catch {
+      setError(t.kwFailed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!phrases.length) return null;
+
+  const withVolume = (rows || []).filter((r) => typeof r.search_volume === "number" && r.search_volume > 0);
+  // Every row blank is a statement about the data source, not about demand.
+  // Saying "no demand" here would be inventing a measurement from its absence.
+  const allBlank = Boolean(rows?.length) && withVolume.length === 0;
+
+  return (
+    <div className="mt-5 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
+      <h3 className="text-sm font-semibold">{t.dgTitle}</h3>
+      <p className="mt-1 max-w-2xl text-sm text-neutral-500">{t.dgSub}</p>
+
+      {!rows && !busy && (
+        <>
+          <p className="mt-3 text-xs text-neutral-400">{t.dgNotRun(phrases.length, (data.country || "US").toUpperCase())}</p>
+          <button onClick={run} className="mt-3 rounded-lg bg-neutral-900 px-4 py-2 text-xs font-medium text-white hover:bg-neutral-800">
+            {t.dgRun}
+          </button>
+        </>
+      )}
+      {busy && <p className="mt-3 text-xs text-neutral-400">{t.kwRunning}</p>}
+      {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
+
+      {allBlank && (
+        <p className="mt-4 max-w-2xl rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+          {t.dgNoData((data.country || "US").toUpperCase())}
+        </p>
+      )}
+
+      {rows && withVolume.length > 0 && (
+        <>
+          <p className="mt-4 max-w-2xl text-sm text-neutral-900">{t.dgSummary(withVolume.length, rows.length)}</p>
+          <table className="mt-4 w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-left text-xs text-neutral-400">
+                <th className="pb-2 font-medium">{t.kwColKeyword}</th>
+                <th className="pb-2 pl-4 text-right font-medium" title={t.volumeTitle}>{t.colVolume}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i} className="border-b border-neutral-100 last:border-0">
+                  <td className="py-2 pr-3 text-xs">{r.keyword}</td>
+                  <td className="py-2 pl-4 text-right text-xs tabular-nums">
+                    {typeof r.search_volume === "number"
+                      ? r.search_volume.toLocaleString(lang === "ru" ? "ru-RU" : "en-US")
+                      : <span className="text-neutral-300">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* Expandable row showing what each model actually answered for one prompt.
    This is the "why don't I appear / what did competitors get" view. */
 function PromptRow({ result, t, tab, ran, modelsUsed, runDate }: { result: AuditResult; t: Strings; tab: ModelKey; ran: ModelName[]; modelsUsed?: Record<string, string>; runDate: string }) {
@@ -2816,10 +3161,21 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           { key: "keywords", label: t.catKeywords },
         ],
       },
-      { id: "area-build", title: t.areaBuild, desc: t.areaBuildDesc, groups: [{ key: "authority" }] },
+      {
+        id: "area-build", title: t.areaBuild, desc: t.areaBuildDesc,
+        measured: <FormatGap src={sourceChecks} t={t} />,
+        groups: [{ key: "authority" }],
+      },
       {
         id: "area-influence", title: t.areaInfluence, desc: t.areaInfluenceDesc,
-        measured: <InfluenceSources src={sourceChecks} data={data} t={t} />,
+        measured: (
+          <>
+            <InfluenceSources src={sourceChecks} data={data} t={t} />
+            {/* Owner-gated with the keyword panel: every run is a paid lookup,
+                and the spend is the thing that has an owner. */}
+            {canKeywords && <DemandGap data={data} t={t} lang={lang} />}
+          </>
+        ),
         groups: [{ key: "mentions" }],
       },
     ];
