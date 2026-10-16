@@ -452,7 +452,7 @@ export default function App() {
   const [auditId, setAuditId] = useState<string | number | null>(null);
   const [showProjects, setShowProjects] = useState(false);
 
-  if (auditData) return <Dashboard data={auditData} auditId={auditId} onBack={() => setAuditData(null)} lang="en" brandName={BRAND} />;
+  if (auditData) return <Dashboard data={auditData} auditId={auditId} onBack={() => setAuditData(null)} onProjects={() => { setAuditData(null); setShowProjects(true); }} lang="en" brandName={BRAND} />;
   if (showProjects) return <Projects lang="en" onBack={() => setShowProjects(false)} onOpen={(d, id) => { setAuditData(d); setAuditId(id); setShowProjects(false); }} />;
 
   const handleStartAudit = () => {
