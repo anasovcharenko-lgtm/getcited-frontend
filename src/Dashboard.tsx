@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ChevronDown, ChevronRight, Lock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -406,6 +406,19 @@ interface Strings {
   menuFix: string;
   menuBuild: string;
   menuInfluence: string;
+  infTitle: string;
+  infSub: string;
+  infRun: string;
+  infNotChecked: (pages: number, domains: number) => string;
+  infSummary: (gaps: number, present: number, total: number) => string;
+  infYouHere: string;
+  infRivalsNotYou: (names: string) => string;
+  infTier1: string;
+  infTier1Desc: string;
+  infTier2: string;
+  infTier2Desc: string;
+  infTier3: string;
+  infTier3Desc: string;
   pageCheckUrlHint: string;
   high: string;
   medium: string;
@@ -623,6 +636,25 @@ const STR: Record<Lang, Strings> = {
     menuFix: "Fix",
     menuBuild: "Build",
     menuInfluence: "Influence",
+    infTitle: "Where the models actually look",
+    infSub: "The pages behind the answers in this audit, grouped by how much say you have over what is on them.",
+    infRun: "Open these pages and check",
+    infNotChecked: (pages, domains) =>
+      `${pages} page${pages === 1 ? "" : "s"} across ${domains} domain${domains === 1 ? "" : "s"}. We open each one and look for your name and your competitors'.`,
+    infSummary: (gaps, present, total) =>
+      gaps === 0
+        ? `No page we could read names a competitor without naming you. You are on ${present} of ${total}.`
+        : `Competitors are named on ${gaps} page${gaps === 1 ? "" : "s"} of ${total} where you are not. You are on ${present}.`,
+    infYouHere: "You are on this page already.",
+    /* The sentence the whole section exists for, so it gets said
+       plainly rather than reusing the overview's footnote. */
+    infRivalsNotYou: (names) => `Named here: ${names}. You are not.`,
+    infTier1: "Tier 1 — someone else decides",
+    infTier1Desc: "Press, directories and industry sites. Slowest to move, and the hardest thing here for a competitor to copy.",
+    infTier2: "Tier 2 — you can post there today",
+    infTier2Desc: "Communities and platforms that need nobody's permission. Faster, and the models read them.",
+    infTier3: "Tier 3 — yours already",
+    infTier3Desc: "Your own pages. Nothing to influence: a model citing these is reading you directly.",
     pageCheckUrlHint: "Usually the product page, not the homepage — a product competes as a page, so that is the page a model either cites or does not.",
     high: "High priority",
     medium: "Medium priority",
@@ -836,6 +868,23 @@ const STR: Record<Lang, Strings> = {
     menuFix: "Исправить",
     menuBuild: "Создать",
     menuInfluence: "Повлиять",
+    infTitle: "Куда модели смотрят на самом деле",
+    infSub: "Страницы, которые стоят за ответами в этом прогоне, сгруппированные по тому, насколько вы можете влиять на их содержимое.",
+    infRun: "Открыть эти страницы и проверить",
+    infNotChecked: (pages, domains) =>
+      `${pages} ${ruPlural(pages, "страница", "страницы", "страниц")} на ${domains} ${ruPlural(domains, "домене", "доменах", "доменах")}. Откроем каждую и поищем ваше имя и имена конкурентов.`,
+    infSummary: (gaps, present, total) =>
+      gaps === 0
+        ? `Ни на одной прочитанной странице конкурент не назван там, где не названы вы. Вы есть на ${present} из ${total}.`
+        : `Конкурентов называют на ${gaps} ${ruPlural(gaps, "странице", "страницах", "страницах")} из ${total}, где вас нет. Вы есть на ${present}.`,
+    infYouHere: "Вы на этой странице уже есть.",
+    infRivalsNotYou: (names) => `Здесь названы: ${names}. Вас — нет.`,
+    infTier1: "Tier 1 — решает кто-то другой",
+    infTier1Desc: "СМИ, каталоги и отраслевые сайты. Двигается медленнее всего — и конкуренту это скопировать тяжелее всего.",
+    infTier2: "Tier 2 — можно опубликовать самому сегодня",
+    infTier2Desc: "Сообщества и площадки, где не нужно ничьё разрешение. Быстрее, и модели их читают.",
+    infTier3: "Tier 3 — уже ваше",
+    infTier3Desc: "Ваши собственные страницы. Влиять не на что: модель здесь читает вас напрямую.",
     pageCheckUrlHint: "Обычно это страница продукта, а не главная: продукт конкурирует именно как страница — её модель либо цитирует, либо нет.",
     high: "Высокий приоритет",
     medium: "Средний приоритет",
@@ -985,6 +1034,48 @@ function categorize(text: string): "mentions" | "technical" | "content" | "autho
   if (/topical authority|pillar page|comprehensive guide|content cluster|topic cluster/.test(t)) return "authority";
   if (/backlink|press|directory|review site|reddit|forum|off-page|listing|wikipedia|third-party/.test(t)) return "mentions";
   return "content";
+}
+
+/* Russian has three plural forms and the naive `n < 5` test breaks at 21 —
+   it ships "21 страниц". Both the tens and the hundreds have to be looked at,
+   because 11–14 are the exception to the rule the tens digit implies. */
+const ruPlural = (n: number, one: string, few: string, many: string) => {
+  const ten = n % 10, hundred = n % 100;
+  if (ten === 1 && hundred !== 11) return one;
+  if (ten >= 2 && ten <= 4 && !(hundred >= 12 && hundred <= 14)) return few;
+  return many;
+};
+
+/* ── Where a cited page sits, and therefore what you can do about it ──
+
+   Three tiers, and the line between them is who decides what goes on the page:
+
+     1  someone else's editorial call — press, directories, industry sites.
+        Slowest to move and the hardest for a competitor to copy.
+     2  you can publish there today without anyone's permission.
+     3  your own domain. Nothing to influence; the model already reads you.
+
+   The membership test for tier 2 is that second sentence, which is why social
+   networks are in it and a trade magazine is not. The list is explicit rather
+   than clever: a heuristic on "forum" in the hostname would put every
+   `forum.vendor.com` support site in the wrong tier. */
+const TIER2_HOSTS = [
+  "reddit.com", "quora.com", "youtube.com", "youtu.be", "medium.com",
+  "substack.com", "stackoverflow.com", "stackexchange.com", "github.com",
+  "linkedin.com", "facebook.com", "instagram.com", "tiktok.com",
+  "x.com", "twitter.com", "t.me", "telegram.me",
+  // RU equivalents, because the market a run is scored in is usually RU here.
+  "habr.com", "vc.ru", "dzen.ru", "pikabu.ru", "livejournal.com",
+  "vk.com", "ok.ru", "dtf.ru", "yaplakal.com", "otzovik.com", "irecommend.ru",
+];
+
+function tierOf(domain: string, brandDomain: string): 1 | 2 | 3 {
+  const d = domain.replace(/^www\./, "").toLowerCase();
+  const mine = (brandDomain || "").replace(/^www\./, "").toLowerCase();
+  // Subdomains count as yours: docs.acme.com is still a page you control.
+  if (mine && (d === mine || d.endsWith(`.${mine}`))) return 3;
+  if (TIER2_HOSTS.some((h) => d === h || d.endsWith(`.${h}`))) return 2;
+  return 1;
 }
 
 /* The model is asked for four labelled fields per recommendation. Until now
@@ -1752,15 +1843,24 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
 
    Domains show immediately from the audit. Opening 10-20 pages to check for the
    brand takes 10-30 seconds, so that part runs only when asked. */
-function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
+/* The source check used to live inside SourceGap, which was fine while the
+   overview was the only screen that wanted it. Influence wants the same
+   verdicts, and running the same 10–25 page fetches a second time would be
+   both slow and, for the pages behind a rate limit, differently wrong. So one
+   run, held above both, shared by reference. */
+type SourceChecks = {
+  domains: { domain: string; urls: string[]; count: number }[];
+  urlCount: number;
+  checks: SourceCheck[] | null;
+  loading: boolean;
+  failed: boolean;
+  run: () => Promise<void>;
+};
+
+function useSourceChecks(data: AuditData): SourceChecks {
   const [checks, setChecks] = useState<SourceCheck[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  /* Which domain's pages are open. A domain is a bundle: mindbox.ru 4x is
-     four different pages, and which page the model read is the thing worth
-     seeing. The URLs were already here, folded away. */
-  const [openDomain, setOpenDomain] = useState<string | null>(null);
 
   const domains = useMemo(() => {
     const byDomain = new Map<string, { urls: string[]; count: number }>();
@@ -1774,10 +1874,12 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
       .sort((a, b) => b.count - a.count);
   }, [data.citations]);
 
-  /* Sent in small batches, all in flight at once, with the chips updating as
+  const urlCount = useMemo(() => domains.reduce((n, d) => n + d.urls.length, 0), [domains]);
+
+  /* Sent in small batches, all in flight at once, with the results appended as
      each lands. One request for everything took five seconds behind a greyed
-     out label, which reads as a hang; this way the domains light up one by one
-     and the waiting is visible instead of guessed at.
+     out label, which reads as a hang; this way the screen moves while the rest
+     is still running.
 
      Parallel rather than sequential on purpose — sequential batches would show
      progress and be slower overall, which is a bad trade. Total time stays the
@@ -1785,11 +1887,12 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
   const BATCH = 3;
 
   const run = async () => {
+    // Guarded, because two screens can now reach the same button.
+    if (loading || checks) return;
     const urls = domains.flatMap((d) => d.urls);
     setLoading(true);
     setFailed(false);
     setChecks([]);
-    setExpanded(true);
 
     const batches: string[][] = [];
     for (let i = 0; i < urls.length; i += BATCH) batches.push(urls.slice(i, i + BATCH));
@@ -1807,8 +1910,6 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
       });
       if (!res.ok) throw new Error(String(res.status));
       const json = await res.json();
-      // Appended as it arrives rather than collected at the end, which is the
-      // whole point: the screen moves while the rest is still running.
       setChecks((prev) => [...(prev || []), ...(json.results || [])]);
       return json.results || [];
     }));
@@ -1823,6 +1924,21 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
     setLoading(false);
   };
 
+  return { domains, urlCount, checks, loading, failed, run };
+}
+
+function SourceGap({ src, t }: { src: SourceChecks; t: Strings }) {
+  const { domains, urlCount, checks, loading, failed, run } = src;
+  const [expanded, setExpanded] = useState(false);
+  /* Which domain's pages are open. A domain is a bundle: mindbox.ru 4x is
+     four different pages, and which page the model read is the thing worth
+     seeing. The URLs were already here, folded away. */
+  const [openDomain, setOpenDomain] = useState<string | null>(null);
+
+  /* Opening the list is this screen's business, not the shared run's: the
+     recommendations screen shares the verdicts and has no chips to expand. */
+  const startRun = () => { setExpanded(true); return run(); };
+
   const statusFor = (domain: string) => {
     const mine = (checks || []).filter((c) => c.domain === domain);
     if (!mine.length) return null;
@@ -1836,7 +1952,9 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
 
   if (domains.length === 0) return null;
 
-  const visible = expanded ? domains : domains.slice(0, 3);
+  /* Expanded once checked, whichever screen did the checking — the chips are
+     only worth collapsing while they all still say the same nothing. */
+  const visible = expanded || checks ? domains : domains.slice(0, 3);
 
   return (
     <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
@@ -1846,7 +1964,7 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
             "Checked all 10" the moment the first three return would be a
             claim about pages nobody has opened yet. */}
         {loading && checks
-          ? t.sourcesProgress(checks.length, domains.flatMap((d) => d.urls).length)
+          ? t.sourcesProgress(checks.length, urlCount)
           : checks
             ? t.sourcesChecked(domains.length, presentCount)
             : t.sourcesSummary(domains.length)}
@@ -1943,13 +2061,133 @@ function SourceGap({ data, t }: { data: AuditData; t: Strings }) {
       )}
 
       {!checks && (
-        <button onClick={run} disabled={loading} className="mt-4 text-xs text-neutral-500 hover:text-neutral-900 disabled:opacity-50">
+        <button onClick={startRun} disabled={loading} className="mt-4 text-xs text-neutral-500 hover:text-neutral-900 disabled:opacity-50">
           {/* The count and a rough wait. Five seconds of a greyed-out 11px label
               that only says "opening pages" reads as a hang. */}
-          {loading ? t.sourcesRunningN(domains.flatMap((d) => d.urls).length) : t.sourcesRun}
+          {loading ? t.sourcesRunningN(urlCount) : t.sourcesRun}
         </button>
       )}
       {failed && <p className="mt-3 text-xs text-neutral-400">{t.sourcesFailed}</p>}
+    </div>
+  );
+}
+
+/* ── Influence: the measured half of the off-page story ──
+
+   Same verdicts as the overview's chips, read the other way round. There the
+   question is "which domains do models lean on"; here it is "which of those
+   pages names a competitor and not you, and what could you do about it".
+
+   Nothing new is fetched. The run is shared, so whichever screen starts it,
+   both have the answer. */
+function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData; t: Strings }) {
+  const { domains, urlCount, checks, loading, failed, run } = src;
+
+  const tiers = useMemo(() => {
+    const rows = (checks || []).map((c) => ({
+      ...c,
+      tier: tierOf(c.domain, data.brand_domain || ""),
+      /* The sharp gap first: a page a model reads, with a competitor on it and
+         not you. Then pages with nobody on them, then the ones you already
+         hold, then the ones we could not read — "no verdict" is not a finding
+         and should not sit above one. */
+      rank: c.status === "unreadable" ? 3
+        : c.status === "present" ? 2
+          : c.competitors_on_page.length ? 0 : 1,
+    }));
+    return [1, 2, 3].map((tier) => ({
+      tier: tier as 1 | 2 | 3,
+      rows: rows.filter((r) => r.tier === tier).sort((a, b) =>
+        a.rank - b.rank || b.competitors_on_page.length - a.competitors_on_page.length),
+    })).filter((g) => g.rows.length > 0);
+  }, [checks, data.brand_domain]);
+
+  const gaps = (checks || []).filter((c) => c.status === "absent" && c.competitors_on_page.length).length;
+  const present = (checks || []).filter((c) => c.status === "present").length;
+
+  if (domains.length === 0) return null;
+
+  const labels: Record<1 | 2 | 3, { name: string; desc: string }> = {
+    1: { name: t.infTier1, desc: t.infTier1Desc },
+    2: { name: t.infTier2, desc: t.infTier2Desc },
+    3: { name: t.infTier3, desc: t.infTier3Desc },
+  };
+
+  return (
+    <div className="mt-5 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
+      <h3 className="text-sm font-semibold">{t.infTitle}</h3>
+      <p className="mt-1 max-w-2xl text-sm text-neutral-500">{t.infSub}</p>
+
+      {!checks && !loading && (
+        <>
+          <p className="mt-3 text-xs text-neutral-400">{t.infNotChecked(urlCount, domains.length)}</p>
+          <button onClick={run} className="mt-3 rounded-lg bg-neutral-900 px-4 py-2 text-xs font-medium text-white hover:bg-neutral-800">
+            {t.infRun}
+          </button>
+        </>
+      )}
+      {loading && (
+        <p className="mt-3 text-xs text-neutral-400">
+          {checks ? t.sourcesProgress(checks.length, urlCount) : t.sourcesRunningN(urlCount)}
+        </p>
+      )}
+      {failed && <p className="mt-3 text-xs text-neutral-400">{t.sourcesFailed}</p>}
+
+      {/* The one line worth reading if you read nothing else here. Held back
+          until the run is done: a count of gaps out of three pages checked so
+          far is a different, smaller claim than the same count out of twenty. */}
+      {checks && !loading && checks.length > 0 && (
+        <p className="mt-4 max-w-2xl text-sm text-neutral-900">{t.infSummary(gaps, present, checks.length)}</p>
+      )}
+
+      {checks && checks.length > 0 && (
+        <div className="mt-5 space-y-6">
+          {tiers.map((g) => (
+            <div key={g.tier}>
+              <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{labels[g.tier].name}</p>
+              <p className="mt-0.5 max-w-2xl text-xs text-neutral-400">{labels[g.tier].desc}</p>
+              <div className="mt-2.5 space-y-2.5">
+                {g.rows.map((r) => {
+                  let path = r.url;
+                  try { const u = new URL(r.url); path = u.pathname + u.search; } catch { /* keep raw */ }
+                  return (
+                    <div key={r.url} className="flex gap-2.5">
+                      {/* Marked only where there is a gap with someone standing
+                          in it. A dot on every row is a dot on no row. */}
+                      <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                        r.status === "absent" && r.competitors_on_page.length ? "bg-red-500"
+                          : r.status === "present" ? "bg-green-500" : "bg-neutral-200"}`} />
+                      <div className="min-w-0">
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={r.url}
+                          className="flex items-baseline gap-1.5 text-xs hover:underline"
+                        >
+                          <span className="shrink-0 text-neutral-500">{r.domain}</span>
+                          <span className="truncate text-neutral-900">
+                            {r.title || titleFromSlug(r.url) || path}
+                          </span>
+                        </a>
+                        <p className="mt-0.5 text-[11px] leading-snug text-neutral-500">
+                          {r.status === "unreadable"
+                            ? (r.reason || t.pageUnreadable)
+                            : r.status === "present"
+                              ? t.infYouHere
+                              : r.competitors_on_page.length
+                                ? t.rivalsOnPage(r.competitors_on_page.join(", "))
+                                : t.noRivalsOnPage}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2077,6 +2315,12 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
   const [view, setView] = useState<View>("overview");
   const [tab, setTab] = useState<ModelKey>("all");
   const [showAllCitations, setShowAllCitations] = useState(false);
+
+  /* Held here rather than inside either screen, because both want the same
+     verdicts and the pages behind them cost real seconds to open. Start it on
+     the overview and Influence already has the answer, and the other way
+     round. */
+  const sourceChecks = useSourceChecks(data);
 
   /* ---- keyword research (POST /keyword-research) ----
 
@@ -2490,6 +2734,10 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
        they are not the same afternoon's work. */
     const areas: {
       id: string; title: string; desc: string;
+      /* Measured findings for this area, shown above the written items. Same
+         rule as the page check at the top of the screen: a fact outranks a
+         suggestion, so it goes first. */
+      measured?: ReactNode;
       groups: { key: keyof typeof recCategories; label?: string }[];
     }[] = [
       {
@@ -2501,7 +2749,11 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
         ],
       },
       { id: "area-build", title: t.areaBuild, desc: t.areaBuildDesc, groups: [{ key: "authority" }] },
-      { id: "area-influence", title: t.areaInfluence, desc: t.areaInfluenceDesc, groups: [{ key: "mentions" }] },
+      {
+        id: "area-influence", title: t.areaInfluence, desc: t.areaInfluenceDesc,
+        measured: <InfluenceSources src={sourceChecks} data={data} t={t} />,
+        groups: [{ key: "mentions" }],
+      },
     ];
 
     const navItems: NavItem[] = [
@@ -2768,7 +3020,12 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                     <p className="mt-1 max-w-2xl text-sm text-neutral-500">{area.desc}</p>
                   </div>
 
-                  {groups.length === 0 && (
+                  {area.measured}
+
+                  {/* Only when the area has nothing at all. An area carrying a
+                      measured block is not empty just because the model wrote
+                      no prose for it. */}
+                  {groups.length === 0 && !area.measured && (
                     <p className="mt-4 rounded-xl border border-dashed border-neutral-200 p-4 text-sm text-neutral-400">{t.noRecsYet}</p>
                   )}
 
@@ -3268,7 +3525,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           )}
         </div>
 
-        <div id="sec-sources" className="scroll-mt-24"><SourceGap data={data} t={t} /></div>
+        <div id="sec-sources" className="scroll-mt-24"><SourceGap src={sourceChecks} t={t} /></div>
 
         {/* Citations table */}
         {data.citations && data.citations.length > 0 && (
