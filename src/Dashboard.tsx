@@ -192,6 +192,16 @@ export type AuditData = {
      backend computed it has none, and the section hides rather than showing
      zeros that would read as "no demand anywhere". */
   clusters?: Cluster[];
+  /* Each brand's share of every naming event in the answers. Optional: runs
+     stored before it was computed have none, and the section hides rather than
+     showing a share of nothing. */
+  share_of_voice?: {
+    total: number;
+    /* null when nobody was named at all. A share of nothing is undefined, not
+       zero, and the two must not render the same. */
+    yours: number | null;
+    brands: { name: string; mentions: number; is_your_brand: boolean; share: number | null }[];
+  };
   citations: Citation[];
   sample_quote?: string;
   recommendations: string;
@@ -403,6 +413,11 @@ interface Strings {
      label only has to be recognisable once you are already on the page. */
   menuScore: string;
   menuRivals: string;
+  menuSov: string;
+  sovTitle: string;
+  sovNobody: string;
+  sovDenominator: string;
+  sovSub: (yours: number, total: number, brands: number) => string;
   menuCovered: string;
   menuSources: string;
   menuHistory: string;
@@ -600,6 +615,12 @@ const STR: Record<Lang, Strings> = {
     menuShow: "Show the menu",
     menuScore: "Score",
     menuRivals: "Competitors",
+    menuSov: "Share of voice",
+    sovTitle: "Share of voice",
+    sovSub: (yours, total, brands) =>
+      `${yours} of ${total} brand mentions across the answers, among ${brands} brands named`,
+    sovNobody: "No brand was named in any answer, so there is no share to divide.",
+    sovDenominator: "Counted over every brand the models named — your competitors and the ones they brought up unprompted. Counting only the competitors you track would give a higher number that measured your own form rather than the market.",
     menuCovered: "Covered topics",
     menuSources: "Sources",
     menuHistory: "History",
@@ -798,6 +819,12 @@ const STR: Record<Lang, Strings> = {
     menuShow: "Показать меню",
     menuScore: "Оценка",
     menuRivals: "Конкуренты",
+    menuSov: "Доля голоса",
+    sovTitle: "Доля голоса",
+    sovSub: (yours, total, brands) =>
+      `${yours} из ${total} упоминаний брендов в ответах, среди ${brands} названных брендов`,
+    sovNobody: "Ни один бренд не назван ни в одном ответе — делить нечего.",
+    sovDenominator: "Считается по всем брендам, которые назвали модели: и ваши конкуренты, и те, кого модели принесли сами. Если считать только отслеживаемых конкурентов, цифра будет выше — но она измеряла бы вашу форму, а не рынок.",
     menuCovered: "Покрытие",
     menuSources: "Источники",
     menuHistory: "История",
@@ -2732,6 +2759,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
             {navOpen && [
               ["sec-score", t.menuScore],
               ["sec-rivals", t.menuRivals],
+              ["sec-sov", t.menuSov],
               ["sec-covered", t.menuCovered],
               ["sec-sources", t.menuSources],
               ["sec-history", t.menuHistory],
@@ -2884,6 +2912,60 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           )}
           <button onClick={() => setView("recommendations")} className="mt-3 block w-full text-right text-xs text-neutral-400 hover:text-neutral-900">{t.howToFix}</button>
         </div>
+
+        {/* ── Share of voice. Visibility says how often this brand was
+              named; this says how much of the conversation it held. A brand
+              named in half the answers looks strong until the other half named
+              four rivals each. ── */}
+        {data.share_of_voice && data.share_of_voice.brands.length > 1 && (
+        <div id="sec-sov" className="mb-6 scroll-mt-24 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
+          <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.sovTitle}</p>
+
+          {data.share_of_voice.total === 0 ? (
+            /* Nobody was named at all. Printing 0% here would be a measurement
+               claim where there was no measurement. */
+            <p className="mt-3 text-sm text-neutral-400">{t.sovNobody}</p>
+          ) : (
+            <>
+              <p className="mt-2 text-4xl font-bold tracking-tight">
+                {data.share_of_voice.yours ?? 0}%
+              </p>
+              <p className="mt-1 text-xs text-neutral-500">
+                {t.sovSub(
+                  data.share_of_voice.brands.find((b) => b.is_your_brand)?.mentions ?? 0,
+                  data.share_of_voice.total,
+                  data.share_of_voice.brands.filter((b) => b.mentions > 0).length,
+                )}
+              </p>
+
+              <div className="mt-5 space-y-1.5">
+                {data.share_of_voice.brands.filter((b) => b.mentions > 0).slice(0, 8).map((b) => (
+                  <div key={b.name} className="grid grid-cols-[130px_1fr_auto] items-center gap-3">
+                    <p className={`truncate text-xs ${b.is_your_brand ? "font-medium text-neutral-900" : "text-neutral-500"}`}>
+                      {statLabel(b.name, b.is_your_brand, t.you)}
+                    </p>
+                    <div className="h-2 w-full rounded-full bg-neutral-100">
+                      <div
+                        className={`h-2 rounded-full ${b.is_your_brand ? "bg-neutral-900" : "bg-neutral-300"}`}
+                        style={{ width: `${b.share ?? 0}%` }}
+                      />
+                    </div>
+                    <p className="w-20 whitespace-nowrap text-right text-[11px] tabular-nums text-neutral-400">
+                      {b.share}% · {b.mentions}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* The denominator, said out loud. A share is meaningless without
+                  it, and this one deliberately counts brands nobody asked us to
+                  track — which is why it is lower than a tracked-only figure
+                  would be, and why it is the honest one. */}
+              <p className="mt-4 text-[11px] leading-relaxed text-neutral-400">{t.sovDenominator}</p>
+            </>
+          )}
+        </div>
+        )}
 
         {/* Competitive landscape */}
         {landscapeRows.length > 1 && (
