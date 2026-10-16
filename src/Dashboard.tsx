@@ -416,14 +416,10 @@ interface Strings {
   volumeExact: string;
   clTitle: string;
   clSub: string;
-  clColCluster: string;
-  clColDemand: string;
-  clColVisibility: string;
-  clColMissed: string;
-  clCoverage: (withVol: number, prompts: number) => string;
-  clPhrases: (n: number) => string;
   clNoData: string;
-  clMissedTitle: string;
+  clBarTitle: string;
+  clNoVolume: string;
+  clNamedShort: (named: number, answers: number) => string;
   clNames: Record<string, string>;
   kwColDifficulty: string;
   kwColCpc: string;
@@ -594,16 +590,12 @@ const STR: Record<Lang, Strings> = {
     kwFullTool: "Open the full tool",
     volumeDerived: "This figure is for the search phrase shown, not for the prompt. Nobody types the prompt into Google.",
     volumeExact: "This figure is for the prompt itself, which was short enough to ask about.",
-    clTitle: "Where demand meets invisibility",
-    clSub: "Questions grouped by what they are asking for. The cluster to work on first is the one with real demand behind it where you are not named — not simply the biggest one.",
-    clColCluster: "Cluster",
-    clColDemand: "Demand / mo",
-    clColVisibility: "You are named",
-    clColMissed: "Missed demand",
-    clCoverage: (w, p) => `volume for ${w} of ${p} prompts`,
-    clPhrases: (n) => `${n} distinct ${n === 1 ? "phrase" : "phrases"}`,
-    clNoData: "No volume data in this cluster — unknown demand, which is not the same as none.",
-    clMissedTitle: "Average monthly demand in this cluster that you are not currently named for. Only as complete as the volume coverage beside it.",
+    clTitle: "Demand by cluster",
+    clSub: "How much search demand sits behind each group of questions, relative to each other in this audit.",
+    clNoData: "No volume data for this cluster. Unknown demand, which is not the same as none.",
+    clBarTitle: "Relative to the busiest cluster in this audit. Based on the prompts short enough for the keyword API to answer.",
+    clNoVolume: "no data",
+    clNamedShort: (named, answers) => `named in ${named} of ${answers}`,
     clNames: {
       comparison: "Comparison", commercial: "Commercial", problem: "Problem",
       technical: "Technical", vertical: "Industry", tracked: "Tracked",
@@ -778,24 +770,12 @@ const STR: Record<Lang, Strings> = {
     kwFullTool: "Открыть полный инструмент",
     volumeDerived: "Цифра относится к показанной поисковой фразе, а не к промпту. Промпт в Google никто не набирает.",
     volumeExact: "Цифра относится к самому промпту — он оказался достаточно коротким, чтобы спросить.",
-    clTitle: "Где спрос совпадает с невидимостью",
-    clSub: "Вопросы, сгруппированные по тому, что в них спрашивают. Работать надо не с самым крупным кластером, а с тем, где есть реальный спрос и где вас не называют.",
-    clColCluster: "Кластер",
-    clColDemand: "Спрос / мес",
-    clColVisibility: "Вас называют",
-    clColMissed: "Упущенный спрос",
-    clCoverage: (w, p) => `частотность по ${w} из ${p} промптов`,
-    /* Russian has three plural forms, not two, and "2 разных фраз" is the
-       mistake an English-shaped ternary makes. 2–4 take their own ending. */
-    clPhrases: (n) => {
-      const ten = n % 10, hundred = n % 100;
-      const word = ten === 1 && hundred !== 11 ? "фраза"
-                 : ten >= 2 && ten <= 4 && !(hundred >= 12 && hundred <= 14) ? "фразы"
-                 : "фраз";
-      return `${n} ${word}`;
-    },
-    clNoData: "В этом кластере нет данных по частотности — спрос неизвестен, а это не то же самое, что его отсутствие.",
-    clMissedTitle: "Средний месячный спрос в этом кластере, по которому вас сейчас не называют. Полон ровно настолько, насколько полно покрытие рядом.",
+    clTitle: "Спрос по кластерам",
+    clSub: "Сколько поискового спроса стоит за каждой группой вопросов — относительно друг друга внутри этого прогона.",
+    clNoData: "По этому кластеру нет данных о частотности. Спрос неизвестен — это не то же самое, что его отсутствие.",
+    clBarTitle: "Относительно самого крупного кластера в этом прогоне. Считается по промптам, достаточно коротким для API частотности.",
+    clNoVolume: "нет данных",
+    clNamedShort: (named, answers) => `назвали в ${named} из ${answers}`,
     clNames: {
       comparison: "Сравнение", commercial: "Коммерческие", problem: "Проблемные",
       technical: "Технические", vertical: "Отраслевые", tracked: "Отслеживаемые",
@@ -2201,80 +2181,57 @@ export function Dashboard({ data: raw, onBack, lang: initialLang = "en", brandNa
             )}
           </section>
 
-          {/* ── Demand against visibility, per cluster. Placed above the
-                keyword panel because it answers the question the panel only
-                supplies parts of: not "what does this phrase cost" but "which
-                group of questions is worth the work at all". ── */}
+          {/* ── Cluster volume. Four columns of figures were here and they
+                buried the one thing worth seeing, so this is a bar: which
+                groups of questions have demand behind them, relative to each
+                other. A bar is also the honest shape — the underlying volume
+                covers only the prompts short enough for the keyword API, so a
+                precise number would promise an accuracy we do not have. ── */}
           {Array.isArray(data.clusters) && data.clusters.length > 0 && (
           <section className="mt-8 rounded-2xl border border-neutral-150 p-6">
             <h2 className="text-lg font-semibold">{t.clTitle}</h2>
             <p className="mt-1 max-w-2xl text-sm text-neutral-500">{t.clSub}</p>
 
-            <div className="mt-5 overflow-hidden rounded-xl border border-neutral-150">
-              <div className="grid grid-cols-[1.1fr_1fr_0.9fr_0.9fr] gap-2 bg-neutral-50 px-4 py-2.5 text-[10px] uppercase tracking-wide text-neutral-400">
-                <span>{t.clColCluster}</span>
-                <span>{t.clColDemand}</span>
-                <span>{t.clColVisibility}</span>
-                <span title={t.clMissedTitle}>{t.clColMissed}</span>
-              </div>
-              {data.clusters.map((c) => {
-                const loc = lang === "ru" ? "ru-RU" : "en-US";
-                return (
-                  <div key={c.cluster} className="grid grid-cols-[1.1fr_1fr_0.9fr_0.9fr] items-start gap-2 border-t border-neutral-100 px-4 py-3">
-                    <div>
-                      <p className="text-xs font-medium">{t.clNames[c.cluster] || c.cluster}</p>
-                      <p className="mt-0.5 text-[10px] text-neutral-400">
-                        {t.clCoverage(c.with_volume, c.prompts)}
+            <div className="mt-5 space-y-1">
+              {(() => {
+                /* The scale is the busiest cluster in this audit, not an
+                   absolute one: nobody publishes what a "high" volume is for a
+                   category, and inventing a threshold would be a number with
+                   no source. So five segments spread across what was measured
+                   here, and the comparison is between these clusters only. */
+                const vols = data.clusters
+                  .map((c) => c.search_volume_avg)
+                  .filter((v): v is number => typeof v === "number");
+                const peak = vols.length ? Math.max(...vols) : 0;
+                return data.clusters.map((c) => {
+                  const v = c.search_volume_avg;
+                  const filled = typeof v === "number" && peak > 0
+                    ? Math.max(1, Math.ceil((v / peak) * 5))
+                    : 0;
+                  return (
+                    <div key={c.cluster} className="flex items-center gap-4 rounded-lg px-3 py-2.5 hover:bg-neutral-50">
+                      <p className="w-40 shrink-0 text-xs font-medium">
+                        {t.clNames[c.cluster] || c.cluster}
                       </p>
+                      <div className="flex gap-1" title={filled ? t.clBarTitle : t.clNoData}>
+                        {[0, 1, 2, 3, 4].map((i) => (
+                          <span
+                            key={i}
+                            className={`h-3.5 w-2 rounded-[2px] ${i < filled ? "bg-neutral-900" : "bg-neutral-200"}`}
+                          />
+                        ))}
+                      </div>
+                      {/* Only when there is nothing to draw. A dash says the
+                          demand is unknown; an empty bar alone would read as
+                          "no demand", which is a different claim. */}
+                      {!filled && <span className="text-[11px] text-neutral-400">{t.clNoVolume}</span>}
+                      <span className="ml-auto text-[11px] text-neutral-400">
+                        {t.clNamedShort(c.named, c.answers)}
+                      </span>
                     </div>
-
-                    {/* Average, not sum, as the headline. A sum grows with how
-                        many prompts happened to fit the keyword API's length
-                        limits, so two clusters measured at different coverage
-                        would not be comparable at all. The sum stays as the
-                        smaller line, beside the number of distinct searches it
-                        covers — several prompts often share one phrase. */}
-                    <div>
-                      {typeof c.search_volume_avg === "number" ? (
-                        <>
-                          <p className="text-xs tabular-nums">{c.search_volume_avg.toLocaleString(loc)}</p>
-                          <p className="mt-0.5 text-[10px] text-neutral-400">
-                            {(c.search_volume_total ?? 0).toLocaleString(loc)} · {t.clPhrases(c.unique_phrases)}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-xs text-neutral-300" title={t.clNoData}>—</p>
-                      )}
-                    </div>
-
-                    <div>
-                      {typeof c.mention_rate === "number" ? (
-                        <>
-                          <p className="text-xs tabular-nums">{c.mention_rate}%</p>
-                          <p className="mt-0.5 text-[10px] text-neutral-400">{c.named} / {c.answers}</p>
-                        </>
-                      ) : (
-                        <p className="text-xs text-neutral-300">—</p>
-                      )}
-                    </div>
-
-                    {/* The one number worth sorting by, which is why the rows
-                        arrive already sorted by it. A cluster with no volume
-                        data shows nothing here rather than a zero: unknown
-                        demand is not absent demand, and a zero would bury it
-                        for the wrong reason. */}
-                    <div>
-                      {typeof c.missed_demand === "number" ? (
-                        <p className="text-xs font-medium tabular-nums">
-                          {c.missed_demand.toLocaleString(loc)}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-neutral-300" title={t.clNoData}>—</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </section>
           )}
