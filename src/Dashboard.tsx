@@ -380,17 +380,33 @@ interface Strings {
   pageCheckWrittenBelow: string;
   pageCheckNotChecked: string;
   backToDashboard: string;
-  catMentions: string;
-  catMentionsDesc: string;
+  /* Labels only. The descriptions that used to sit under each of these are
+     gone: the three areas below carry the explaining now, and a sub-label
+     inside an area only has to partition it. */
   catTechnical: string;
-  catTechnicalDesc: string;
   catContent: string;
-  catContentDesc: string;
-  catAuthority: string;
-  catAuthorityDesc: string;
   catKeywords: string;
-  catKeywordsDesc: string;
   noRecsYet: string;
+  /* The three things a recommendation can ask of you: change what is there,
+     make something that is not, or get named somewhere you do not control.
+     The five categories above still do the sorting — they are what the text is
+     matched against — but they are presented inside these. */
+  areaFix: string;
+  areaFixDesc: string;
+  areaBuild: string;
+  areaBuildDesc: string;
+  areaInfluence: string;
+  areaInfluenceDesc: string;
+  recWhy: string;
+  effortEasy: string;
+  effortMedium: string;
+  effortHard: string;
+  menuPageCheck: string;
+  menuKeywords: string;
+  menuFix: string;
+  menuBuild: string;
+  menuInfluence: string;
+  pageCheckUrlHint: string;
   high: string;
   medium: string;
   low: string;
@@ -584,19 +600,30 @@ const STR: Record<Lang, Strings> = {
     pageCheckAffects: (n: number) => `Should affect ${n} prompt${n === 1 ? "" : "s"} you were not named in`,
     pageCheckRivals: "Competitors already doing this",
     pageCheckWrittenBelow: "Written from the audit",
-    pageCheckNotChecked: "Enter the page you want checked. Usually the product page, not the homepage — a product competes as a page.",
+    /* The "which page" advice moved up next to the field, so this no longer
+       repeats it two lines below. */
+    pageCheckNotChecked: "Not checked yet.",
     backToDashboard: "Back to dashboard",
-    catMentions: "Mentions — off-page",
-    catMentionsDesc: "Close the gaps where AI models rely on outside sources to know about you.",
     catTechnical: "Technical",
-    catTechnicalDesc: "Fixes AI crawlers and search engines need to read your site correctly.",
     catContent: "Content improving",
-    catContentDesc: "Sharpen existing pages so AI models quote you more often.",
-    catAuthority: "Building topical authority",
-    catAuthorityDesc: "Create new content or pages for opportunities you're not covering.",
     catKeywords: "Keywords to add",
-    catKeywordsDesc: "Terms and phrases to work into your site so AI models associate you with them.",
-    noRecsYet: "No recommendations for this category yet.",
+    noRecsYet: "Nothing here from this audit.",
+    areaFix: "Fix",
+    areaFixDesc: "Changes to pages you already have. Cheapest to do and the fastest to show up in an answer.",
+    areaBuild: "Build",
+    areaBuildDesc: "Pages that do not exist yet, for questions you are losing because there is nothing to cite.",
+    areaInfluence: "Influence",
+    areaInfluenceDesc: "Places you do not own but models read anyway. Slowest to move and the hardest for a competitor to copy.",
+    recWhy: "Why",
+    effortEasy: "Easy",
+    effortMedium: "Medium effort",
+    effortHard: "Hard",
+    menuPageCheck: "Your page",
+    menuKeywords: "Keyword research",
+    menuFix: "Fix",
+    menuBuild: "Build",
+    menuInfluence: "Influence",
+    pageCheckUrlHint: "Usually the product page, not the homepage — a product competes as a page, so that is the page a model either cites or does not.",
     high: "High priority",
     medium: "Medium priority",
     low: "Low priority",
@@ -788,19 +815,28 @@ const STR: Record<Lang, Strings> = {
     pageCheckAffects: (n: number) => `Должно повлиять на ${n} ${n === 1 ? "запрос" : n < 5 ? "запроса" : "запросов"}, где вас не назвали`,
     pageCheckRivals: "Конкуренты, у которых это уже сделано",
     pageCheckWrittenBelow: "Составлено по результатам аудита",
-    pageCheckNotChecked: "Укажите страницу для проверки. Обычно это страница продукта, а не главная — продукт конкурирует страницей.",
+    pageCheckNotChecked: "Пока не проверяли.",
     backToDashboard: "Назад к дашборду",
-    catMentions: "Упоминания — вне сайта",
-    catMentionsDesc: "Закройте пробелы там, где AI полагается на внешние источники, чтобы узнать о вас.",
     catTechnical: "Техническое",
-    catTechnicalDesc: "Правки, которые нужны AI-краулерам и поисковикам, чтобы правильно читать сайт.",
     catContent: "Улучшение контента",
-    catContentDesc: "Доработайте существующие страницы, чтобы AI чаще их цитировал.",
-    catAuthority: "Тематический авторитет",
-    catAuthorityDesc: "Создайте новый контент или страницы под темы, которые вы пока не закрываете.",
     catKeywords: "Ключевые слова",
-    catKeywordsDesc: "Термины и формулировки, которые стоит добавить на сайт, чтобы AI ассоциировал их с вами.",
-    noRecsYet: "Пока нет рекомендаций в этой категории.",
+    noRecsYet: "По этому прогону здесь ничего нет.",
+    areaFix: "Исправить",
+    areaFixDesc: "Правки на страницах, которые у вас уже есть. Дешевле всего сделать и быстрее всего видно в ответах.",
+    areaBuild: "Создать",
+    areaBuildDesc: "Страниц пока нет — а вопросы есть, и вы их проигрываете просто потому, что цитировать нечего.",
+    areaInfluence: "Повлиять",
+    areaInfluenceDesc: "Площадки, которыми вы не владеете, но модели их читают. Двигается медленнее всего и хуже всего копируется конкурентом.",
+    recWhy: "Зачем",
+    effortEasy: "Легко",
+    effortMedium: "Средние трудозатраты",
+    effortHard: "Сложно",
+    menuPageCheck: "Ваша страница",
+    menuKeywords: "Исследование запросов",
+    menuFix: "Исправить",
+    menuBuild: "Создать",
+    menuInfluence: "Повлиять",
+    pageCheckUrlHint: "Обычно это страница продукта, а не главная: продукт конкурирует именно как страница — её модель либо цитирует, либо нет.",
     high: "Высокий приоритет",
     medium: "Средний приоритет",
     low: "Низкий приоритет",
@@ -951,9 +987,119 @@ function categorize(text: string): "mentions" | "technical" | "content" | "autho
   return "content";
 }
 
+/* The model is asked for four labelled fields per recommendation. Until now
+   only PRIORITY was pulled out and the rest was printed as it arrived, so a
+   recommendation read as a wall with "ACTION:" and "WHY:" buried inside it.
+
+   Parsing is deliberately forgiving. The labels come back bolded some runs and
+   bare others, a field sometimes wraps onto the next line, and occasionally the
+   format is ignored altogether — in which case the whole block is the action,
+   which is still the useful half. */
+/* Asterisks are allowed on both sides of the colon. The model bolds these as
+   `**ACTION:**` — the stars sit after the colon, not around the word — so a
+   pattern that only expected `**ACTION**:` left a `**` at the front of every
+   bolded line. Values get the same treatment, because a bolded value is the
+   next thing it does. */
+const REC_FIELD = /^\s*\**\s*(PRIORITY|ACTION|WHY|EFFORT)\s*\**\s*:\s*\**\s*/i;
+const unbold = (s: string) => s.replace(/\*\*/g, "").trim();
+
+type ParsedRec = { priority: string; action: string; why: string; effort: string };
+
+function parseRec(raw: string, t: Strings): ParsedRec {
+  const f: Record<string, string> = {};
+  let current = "";
+  for (const line of raw.split("\n")) {
+    const m = line.match(REC_FIELD);
+    if (m) {
+      current = m[1].toUpperCase();
+      f[current] = line.slice(m[0].length).trim();
+      continue;
+    }
+    const rest = line.trim();
+    if (!rest) continue;
+    // A wrapped field belongs to the label above it; text before any label at
+    // all is the model answering in prose, which is an action by default.
+    const target = current || "ACTION";
+    f[target] = `${f[target] || ""} ${rest}`.trim();
+  }
+
+  const pick = (value: string, map: Record<string, string>, fallback: string) => {
+    const key = (value || "").toLowerCase();
+    for (const [needle, label] of Object.entries(map)) {
+      if (key.includes(needle)) return label;
+    }
+    return fallback;
+  };
+
+  return {
+    priority: pick(f.PRIORITY, { high: t.high, medium: t.medium, low: t.low }, t.low),
+    action: unbold(f.ACTION || raw),
+    why: unbold(f.WHY || ""),
+    // No effort stated is left blank rather than guessed — an invented "Easy"
+    // is the kind of number that gets planned around.
+    effort: pick(f.EFFORT, { easy: t.effortEasy, hard: t.effortHard, medium: t.effortMedium }, ""),
+  };
+}
+
 /* ────────────────────────────────────────────────────────────────
    Small building blocks
    ──────────────────────────────────────────────────────────────── */
+
+/* One nav, two screens. The overview had this inline and the recommendations
+   page — the longer of the two — had no way to move around it at all. */
+type NavItem =
+  | { kind: "anchor"; id: string; label: string }
+  | { kind: "link"; href: string; label: string };
+
+function SideNav({ items, open, toggle, t, onProjects }: {
+  items: NavItem[]; open: boolean; toggle: () => void; t: Strings; onProjects?: () => void;
+}) {
+  return (
+    /* Hidden below lg — at phone width a fixed column would eat the page it is
+       meant to help you read. */
+    <nav className={`hidden shrink-0 lg:block ${open ? "w-44" : "w-8"}`}>
+      <div className="sticky top-24 space-y-0.5">
+        {/* Three lines, always in the same spot whether the nav is open or
+            shut, so closing it does not make the way back disappear. */}
+        <button
+          onClick={toggle}
+          aria-expanded={open}
+          aria-label={open ? t.menuHide : t.menuShow}
+          title={open ? t.menuHide : t.menuShow}
+          className="mb-2 flex h-7 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
+        >
+          <span className="flex flex-col gap-[3px]">
+            <span className="block h-[1.5px] w-3.5 rounded bg-current" />
+            <span className="block h-[1.5px] w-3.5 rounded bg-current" />
+            <span className="block h-[1.5px] w-3.5 rounded bg-current" />
+          </span>
+        </button>
+
+        {open && onProjects && (
+          <>
+            <button
+              onClick={onProjects}
+              className="block w-full rounded-lg px-3 py-1.5 text-left text-xs font-medium text-neutral-900 hover:bg-neutral-100"
+            >
+              {t.menuProjects}
+            </button>
+            <div className="!my-2 border-t border-neutral-100" />
+          </>
+        )}
+
+        {open && items.map((item) => (
+          <a
+            key={item.kind === "anchor" ? item.id : item.href}
+            href={item.kind === "anchor" ? `#${item.id}` : item.href}
+            className="block rounded-lg px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          >
+            {item.label}
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
 
 function ModelSwitcher({ tab, setTab, t, ran }: { tab: ModelKey; setTab: (m: ModelKey) => void; t: Strings; ran: ModelName[] }) {
   return (
@@ -2274,11 +2420,12 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
 
   const recCategories = useMemo(() => {
     const items = data.recommendations.split("\n\n").filter(Boolean);
-    const buckets: Record<string, { text: string; priority: string }[]> = { mentions: [], technical: [], content: [], authority: [], keywords: [] };
+    const buckets: Record<string, ParsedRec[]> = { mentions: [], technical: [], content: [], authority: [], keywords: [] };
     for (const raw of items) {
-      const priority = raw.includes("High") ? t.high : raw.includes("Medium") ? t.medium : t.low;
-      const text = raw.replace(/PRIORITY:.*\n/, "").trim();
-      buckets[categorize(raw)].push({ text, priority });
+      /* Sorted on the raw block, not on the parsed action: the words that place
+         a recommendation ("robots.txt", "reddit") turn up in the reasoning as
+         often as in the instruction. */
+      buckets[categorize(raw)].push(parseRec(raw, t));
     }
     return buckets;
   }, [data.recommendations, t]);
@@ -2337,35 +2484,66 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
      Recommendations view
      ──────────────────────────────────────────────────────────── */
   if (view === "recommendations") {
-    const cats: { key: keyof typeof recCategories; label: string; desc: string }[] = [
-      { key: "mentions", label: t.catMentions, desc: t.catMentionsDesc },
-      { key: "technical", label: t.catTechnical, desc: t.catTechnicalDesc },
-      { key: "content", label: t.catContent, desc: t.catContentDesc },
-      { key: "authority", label: t.catAuthority, desc: t.catAuthorityDesc },
-      { key: "keywords", label: t.catKeywords, desc: t.catKeywordsDesc },
+    /* Three things a recommendation can ask of you, and the five sorting
+       buckets live inside them. Fix keeps its three sub-labels: "add these
+       phrases" and "rewrite this page" are both edits to a page you own, but
+       they are not the same afternoon's work. */
+    const areas: {
+      id: string; title: string; desc: string;
+      groups: { key: keyof typeof recCategories; label?: string }[];
+    }[] = [
+      {
+        id: "area-fix", title: t.areaFix, desc: t.areaFixDesc,
+        groups: [
+          { key: "technical", label: t.catTechnical },
+          { key: "content", label: t.catContent },
+          { key: "keywords", label: t.catKeywords },
+        ],
+      },
+      { id: "area-build", title: t.areaBuild, desc: t.areaBuildDesc, groups: [{ key: "authority" }] },
+      { id: "area-influence", title: t.areaInfluence, desc: t.areaInfluenceDesc, groups: [{ key: "mentions" }] },
     ];
+
+    const navItems: NavItem[] = [
+      { kind: "anchor", id: "sec-page-check", label: t.menuPageCheck },
+      /* A link, not an anchor: the panel below belongs to this audit and opens
+         on its market, and the question "is this phrase worth going after"
+         usually arrives without an audit attached. */
+      ...(canKeywords ? [{ kind: "link" as const, href: lang === "ru" ? "/ru/keywords" : "/keywords", label: t.menuKeywords }] : []),
+      { kind: "anchor", id: "area-fix", label: t.menuFix },
+      { kind: "anchor", id: "area-build", label: t.menuBuild },
+      { kind: "anchor", id: "area-influence", label: t.menuInfluence },
+    ];
+
     return (
       <div className="min-h-screen bg-white text-neutral-900">
         <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
-          <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
             <button onClick={() => setView("overview")} className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900">
               <ArrowLeft className="h-4 w-4" /> {t.backToDashboard}
             </button>
             <LangSwitch lang={lang} setLang={setLang} />
           </div>
         </header>
-        <main className="mx-auto max-w-4xl px-6 py-10">
+        <div className="mx-auto flex max-w-6xl gap-8 px-6 py-10">
+        <SideNav items={navItems} open={navOpen} toggle={toggleNav} t={t} onProjects={onProjects} />
+        <main className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold">{t.recommendationsTitle}</h1>
           <p className="mt-1 text-sm text-neutral-500">{t.recommendationsSub}</p>
 
           {/* ── Measured from the page. Sits above the model-written items
                 because a fact about the markup outranks a suggestion. ── */}
-          <section className="mt-8 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
+          <section id="sec-page-check" className="mt-8 scroll-mt-24 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
             <h2 className="text-lg font-semibold">{t.pageCheckTitle}</h2>
             <p className="mt-1 text-sm text-neutral-500">{t.pageCheckSub}</p>
 
             <label className="mt-5 block">
               <span className="mb-1 block text-xs text-neutral-500">{t.pageCheckUrlLabel}</span>
+              {/* The field is prefilled with the homepage because that is the
+                  one URL the audit knows. Which is the opposite of the advice,
+                  so the advice is next to the field and not hidden in a state
+                  that disappears the moment anything has been checked. */}
+              <span className="mb-2 block max-w-xl text-xs leading-relaxed text-neutral-400">{t.pageCheckUrlHint}</span>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
                   value={pageUrl}
@@ -2467,65 +2645,16 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
             )}
           </section>
 
-          {/* ── Cluster volume. Four columns of figures were here and they
-                buried the one thing worth seeing, so this is a bar: which
-                groups of questions have demand behind them, relative to each
-                other. A bar is also the honest shape — the underlying volume
-                covers only the prompts short enough for the keyword API, so a
-                precise number would promise an accuracy we do not have. ── */}
-          {Array.isArray(data.clusters) && data.clusters.length > 0 && (
-          <section className="mt-8 rounded-2xl border border-neutral-150 p-6">
-            <h2 className="text-lg font-semibold">{t.clTitle}</h2>
-            <p className="mt-1 max-w-2xl text-sm text-neutral-500">{t.clSub}</p>
+          {/* The cluster volume bar stood here. Parked, not deleted: the
+                backend still computes `clusters` and the payload still carries
+                them, so it comes back as one line of JSX. It is coming back
+                inside Build, where "this group of questions has demand and you
+                have no page for it" is the recommendation rather than a chart
+                beside one. */}
 
-            <div className="mt-5 space-y-1">
-              {(() => {
-                /* The scale is the busiest cluster in this audit, not an
-                   absolute one: nobody publishes what a "high" volume is for a
-                   category, and inventing a threshold would be a number with
-                   no source. So five segments spread across what was measured
-                   here, and the comparison is between these clusters only. */
-                const vols = data.clusters
-                  .map((c) => c.search_volume_avg)
-                  .filter((v): v is number => typeof v === "number");
-                const peak = vols.length ? Math.max(...vols) : 0;
-                return data.clusters.map((c) => {
-                  const v = c.search_volume_avg;
-                  const filled = typeof v === "number" && peak > 0
-                    ? Math.max(1, Math.ceil((v / peak) * 5))
-                    : 0;
-                  return (
-                    <div key={c.cluster} className="flex items-center gap-4 rounded-lg px-3 py-2.5 hover:bg-neutral-50">
-                      <p className="w-40 shrink-0 text-xs font-medium">
-                        {t.clNames[c.cluster] || c.cluster}
-                      </p>
-                      <div className="flex gap-1" title={filled ? t.clBarTitle : t.clNoData}>
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <span
-                            key={i}
-                            className={`h-3.5 w-2 rounded-[2px] ${i < filled ? "bg-neutral-900" : "bg-neutral-200"}`}
-                          />
-                        ))}
-                      </div>
-                      {/* Only when there is nothing to draw. A dash says the
-                          demand is unknown; an empty bar alone would read as
-                          "no demand", which is a different claim. */}
-                      {!filled && <span className="text-[11px] text-neutral-400">{t.clNoVolume}</span>}
-                      <span className="ml-auto text-[11px] text-neutral-400">
-                        {t.clNamedShort(c.named, c.answers)}
-                      </span>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </section>
-          )}
-
-          {/* The clusters above are NOT behind this gate, deliberately. Their
-              volume figures were computed during an audit the customer already
-              paid for; the panel below fires fresh paid lookups on demand,
-              which is the thing that has an owner. */}
+          {/* Owner-only, because this panel fires fresh paid lookups on demand.
+              Figures computed during an audit the customer already paid for are
+              not gated — the spend, not the data, is what has an owner. */}
           {canKeywords && (<>
           {/* ── Keyword research. Deliberately next to the page check rather
                 than among the written recommendations: both are measured
@@ -2623,31 +2752,76 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           </section>
           </>)}
 
-          <p className="mt-10 text-xs font-medium uppercase tracking-widest text-neutral-400">{t.pageCheckWrittenBelow}</p>
-          <div className="mt-4 space-y-8">
-            {cats.map((c) => (
-              <div key={c.key}>
-                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{c.label}</p>
-                <p className="mt-1 text-sm text-neutral-500">{c.desc}</p>
-                <div className="mt-3 space-y-3">
-                  {recCategories[c.key].length === 0 && <p className="rounded-xl border border-dashed border-neutral-200 p-4 text-sm text-neutral-400">{t.noRecsYet}</p>}
-                  {recCategories[c.key].map((rec, i) => {
-                    const dot = rec.priority === t.high ? "bg-red-500" : rec.priority === t.medium ? "bg-amber-500" : "bg-green-500";
-                    return (
-                      <div key={i} className="rounded-xl border border-neutral-100 bg-white p-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-2 w-2 rounded-full ${dot}`} />
-                          <span className="text-xs font-medium text-neutral-500">{rec.priority}</span>
-                        </div>
-                        <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-800">{rec.text}</p>
+          <p className="mt-12 text-xs font-medium uppercase tracking-widest text-neutral-400">{t.pageCheckWrittenBelow}</p>
+          <div className="mt-4 space-y-10">
+            {areas.map((area) => {
+              /* Every bucket in the area, so an area with nothing in it says so
+                 once instead of three times. */
+              const groups = area.groups
+                .map((g) => ({ ...g, items: recCategories[g.key] }))
+                .filter((g) => g.items.length > 0);
+
+              return (
+                <section key={area.id} id={area.id} className="scroll-mt-24">
+                  <div className="border-b border-neutral-150 pb-3">
+                    <h2 className="text-lg font-semibold">{area.title}</h2>
+                    <p className="mt-1 max-w-2xl text-sm text-neutral-500">{area.desc}</p>
+                  </div>
+
+                  {groups.length === 0 && (
+                    <p className="mt-4 rounded-xl border border-dashed border-neutral-200 p-4 text-sm text-neutral-400">{t.noRecsYet}</p>
+                  )}
+
+                  {groups.map((g) => (
+                    <div key={g.key} className="mt-5">
+                      {/* The sub-label is dropped where an area holds a single
+                          bucket — a heading over its own only child is noise. */}
+                      {g.label && area.groups.length > 1 && (
+                        <p className="mb-2 text-xs font-medium uppercase tracking-widest text-neutral-400">{g.label}</p>
+                      )}
+                      <div className="space-y-3">
+                        {g.items.map((rec, i) => {
+                          const dot = rec.priority === t.high ? "bg-red-500" : rec.priority === t.medium ? "bg-amber-500" : "bg-green-500";
+                          return (
+                            <article key={i} className="rounded-xl border border-neutral-150 bg-white p-5">
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span className="flex items-center gap-2">
+                                  <span className={`h-2 w-2 rounded-full ${dot}`} />
+                                  <span className="text-xs font-medium text-neutral-500">{rec.priority}</span>
+                                </span>
+                                {/* Blank when the model did not say. An effort
+                                    nobody estimated is worse than none. */}
+                                {rec.effort && (
+                                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-500">{rec.effort}</span>
+                                )}
+                              </div>
+
+                              {/* The instruction carries the weight; the
+                                  reasoning sits under it where it can be
+                                  skipped. Both used to be one grey paragraph
+                                  with the field labels still inside it. */}
+                              {/* Capped rather than filling the card: these run
+                                  two or three sentences, and an 850px line is
+                                  where the eye loses the start of the next. */}
+                              <p className="mt-2.5 max-w-3xl text-sm font-medium leading-relaxed text-neutral-900">{rec.action}</p>
+                              {rec.why && (
+                                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-neutral-500">
+                                  <span className="text-xs uppercase tracking-wide text-neutral-400">{t.recWhy}</span>{" "}
+                                  {rec.why}
+                                </p>
+                              )}
+                            </article>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+                    </div>
+                  ))}
+                </section>
+              );
+            })}
           </div>
         </main>
+        </div>
       </div>
     );
   }
@@ -2722,60 +2896,24 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       {/* Everything on this page is one long column, and until now the only way
           to reach the bottom of it was to scroll past the top of it. The nav is
           a plain anchor list rather than routing: the sections are all already
-          rendered, so there is nothing to load and nothing to get out of sync.
-
-          Hidden below lg — at phone width a fixed column would eat the page it
-          is meant to help you read. */}
+          rendered, so there is nothing to load and nothing to get out of sync. */}
       <div className="mx-auto flex max-w-6xl gap-8 px-6 py-10">
-        <nav className={`hidden shrink-0 lg:block ${navOpen ? "w-44" : "w-8"}`}>
-          <div className="sticky top-24 space-y-0.5">
-            {/* Three lines, always in the same spot whether the nav is open or
-                shut, so closing it does not make the way back disappear. */}
-            <button
-              onClick={toggleNav}
-              aria-expanded={navOpen}
-              aria-label={navOpen ? t.menuHide : t.menuShow}
-              title={navOpen ? t.menuHide : t.menuShow}
-              className="mb-2 flex h-7 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
-            >
-              <span className="flex flex-col gap-[3px]">
-                <span className="block h-[1.5px] w-3.5 rounded bg-current" />
-                <span className="block h-[1.5px] w-3.5 rounded bg-current" />
-                <span className="block h-[1.5px] w-3.5 rounded bg-current" />
-              </span>
-            </button>
-
-            {navOpen && onProjects && (
-              <>
-                <button
-                  onClick={onProjects}
-                  className="block w-full rounded-lg px-3 py-1.5 text-left text-xs font-medium text-neutral-900 hover:bg-neutral-100"
-                >
-                  {t.menuProjects}
-                </button>
-                <div className="!my-2 border-t border-neutral-100" />
-              </>
-            )}
-            {navOpen && [
-              ["sec-score", t.menuScore],
-              ["sec-rivals", t.menuRivals],
-              ["sec-sov", t.menuSov],
-              ["sec-covered", t.menuCovered],
-              ["sec-sources", t.menuSources],
-              ["sec-history", t.menuHistory],
-              ["sec-citations", t.menuCitations],
-              ["sec-recs", t.menuRecs],
-            ].map(([id, label]) => (
-              <a
-                key={id}
-                href={`#${id}`}
-                className="block rounded-lg px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                {label}
-              </a>
-            ))}
-          </div>
-        </nav>
+        <SideNav
+          open={navOpen}
+          toggle={toggleNav}
+          t={t}
+          onProjects={onProjects}
+          items={[
+            { kind: "anchor", id: "sec-score", label: t.menuScore },
+            { kind: "anchor", id: "sec-rivals", label: t.menuRivals },
+            { kind: "anchor", id: "sec-sov", label: t.menuSov },
+            { kind: "anchor", id: "sec-covered", label: t.menuCovered },
+            { kind: "anchor", id: "sec-sources", label: t.menuSources },
+            { kind: "anchor", id: "sec-history", label: t.menuHistory },
+            { kind: "anchor", id: "sec-citations", label: t.menuCitations },
+            { kind: "anchor", id: "sec-recs", label: t.menuRecs },
+          ]}
+        />
 
         <main className="min-w-0 flex-1">
 
