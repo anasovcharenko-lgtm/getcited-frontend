@@ -47,7 +47,11 @@ export type ModelName = (typeof MODELS)[number]["key"];
 
 export type AuditResult = {
   prompt: string;
-  prompt_type?: "problem" | "comparison" | "brand";
+  /* The direction a prompt was written for — comparison, commercial, problem,
+     technical, vertical. Left as a string rather than a union: the list lives
+     in the backend's prompt mix, and a union here was already three values
+     behind it, which silently made two real types unreachable. */
+  prompt_type?: string;
   /* Google search volume for the prompt used verbatim as a search phrase.
      Absent when the phrase is too long for the API or Google has no data. */
   search_volume?: number;
@@ -505,7 +509,11 @@ interface Strings {
   clBarTitle: string;
   clNoVolume: string;
   clNamedShort: (named: number, answers: number) => string;
-  clNames: Record<string, string>;
+  promptTypes: Record<string, string>;
+  /* The stages each slow request actually goes through, named so the wait is
+     legible. Not a progress bar: see WaitingSteps. */
+  waitPageCheck: string[];
+  waitAddPrompts: (models: string) => string[];
   kwColDifficulty: string;
   kwColCpc: string;
   kwDifficultyTitle: string;
@@ -765,11 +773,23 @@ const STR: Record<Lang, Strings> = {
     clBarTitle: "Relative to the busiest cluster in this audit. Based on the prompts short enough for the keyword API to answer.",
     clNoVolume: "no data",
     clNamedShort: (named, answers) => `named in ${named} of ${answers}`,
-    clNames: {
+    promptTypes: {
       comparison: "Comparison", commercial: "Commercial", problem: "Problem",
       technical: "Technical", vertical: "Industry", tracked: "Tracked",
       custom: "Your own", other: "Other",
     },
+    waitPageCheck: [
+      "Opening your page",
+      "Reading robots.txt",
+      "Opening the competitors' pages",
+      "Comparing what each one declares",
+    ],
+    waitAddPrompts: (models) => [
+      "Sending the new prompts",
+      `Waiting on ${models}`,
+      "Looking for your name in each answer",
+      "Recounting the score",
+    ],
     kwColDifficulty: "Difficulty",
     kwColCpc: "CPC",
     kwDifficultyTitle: "0-100, the chance of reaching Google's organic top ten. Not the advertiser competition that comes with search volume — a different number that is often confused with this one.",
@@ -1033,11 +1053,23 @@ const STR: Record<Lang, Strings> = {
     clBarTitle: "Относительно самого крупного кластера в этом прогоне. Считается по промптам, достаточно коротким для API частотности.",
     clNoVolume: "нет данных",
     clNamedShort: (named, answers) => `назвали в ${named} из ${answers}`,
-    clNames: {
+    promptTypes: {
       comparison: "Сравнение", commercial: "Коммерческие", problem: "Проблемные",
       technical: "Технические", vertical: "Отраслевые", tracked: "Отслеживаемые",
       custom: "Свои", other: "Прочие",
     },
+    waitPageCheck: [
+      "Открываем вашу страницу",
+      "Читаем robots.txt",
+      "Открываем страницы конкурентов",
+      "Сверяем, что каждая из них о себе заявляет",
+    ],
+    waitAddPrompts: (models) => [
+      "Отправляем новые запросы",
+      `Ждём ответа: ${models}`,
+      "Ищем ваше имя в каждом ответе",
+      "Пересчитываем оценку",
+    ],
     kwColDifficulty: "Сложность",
     kwColCpc: "CPC",
     kwDifficultyTitle: "0-100, шанс попасть в органический топ-10 Google. Это не «конкуренция», которая приходит вместе с частотностью: та считает рекламодателей, и её постоянно путают с этой.",
@@ -1517,10 +1549,13 @@ const WHERE_RU: Record<string, string> = {
 /* The add-prompts control. Lives in a component because it is rendered on
    three screens, and three hand-copied versions is how the admin exemption and
    the audit-saving block drifted apart before. */
-function AddPromptsBox({ t, open, setOpen, text, setText, busy, error, onSubmit, note }: {
+function AddPromptsBox({ t, open, setOpen, text, setText, busy, error, onSubmit, note, models }: {
   t: Strings; open: boolean; setOpen: (v: boolean) => void;
   text: string; setText: (v: string) => void;
   busy: boolean; error: string; onSubmit: () => void; note: React.ReactNode;
+  // Named, because "waiting on the models" is a worse sentence than the
+  // list of which ones are actually being waited on.
+  models: string;
 }) {
   if (!open) {
     return (
@@ -1544,6 +1579,9 @@ function AddPromptsBox({ t, open, setOpen, text, setText, busy, error, onSubmit,
         className="mt-3 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-900"
       />
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {/* This one is genuinely slow — it is a real run against every model —
+          so the wait says what is happening rather than greying out a label. */}
+      {busy && <WaitingSteps steps={t.waitAddPrompts(models)} className="mt-4" />}
       <div className="mt-3 flex gap-2">
         <button onClick={onSubmit} disabled={busy || text.trim().length === 0}
           className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
@@ -2586,6 +2624,78 @@ function DemandGap({ data, t, lang }: { data: AuditData; t: Strings; lang: Lang 
   );
 }
 
+/* ── Something to watch while the work happens ──
+
+   A greyed-out label for five seconds reads as a hang; she said so about the
+   page check. This shows the stages the request actually goes through, one at
+   a time, so the wait is legible instead of guessed at.
+
+   The steps are real — they are the sequence the backend performs — but the
+   pace is an estimate, so this never claims a percentage and never says it is
+   finished. The last step holds for as long as the work takes: overrunning
+   the estimate makes the final line sit there a while, which is honest, where
+   a progress bar stuck at 90% is not.
+
+   Deliberately has no "real progress" mode. The one request that reports a
+   genuine count — the source check, which knows how many pages are done —
+   already prints that count, and a measurement should not be dressed up as
+   an estimate. If something else later has real numbers, it gets its own
+   component rather than a branch here that nothing exercises. */
+function WaitingSteps({ steps, className = "" }: { steps: string[]; className?: string }) {
+  const [at, setAt] = useState(0);
+
+  useEffect(() => {
+    setAt(0);
+    /* Roughly the shape of a page check: the first stages land quickly, the
+       one that opens other people's pages does not. Cumulative, so a step
+       cannot be skipped by a slow render. */
+    const gaps = [1100, 1400, 2600, 3200];
+    let elapsed = 0;
+    const timers = steps.slice(1).map((_, i) => {
+      elapsed += gaps[Math.min(i, gaps.length - 1)];
+      return setTimeout(() => setAt(i + 1), elapsed);
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [steps]);
+
+  const current = Math.min(at, steps.length - 1);
+
+  return (
+    <div className={`space-y-1.5 ${className}`} aria-live="polite">
+      {steps.map((label, i) => {
+        const state = i < current ? "done" : i === current ? "now" : "next";
+        return (
+          <div key={label} className="flex items-center gap-2.5">
+            <span className="flex h-3 w-3 shrink-0 items-center justify-center">
+              {state === "done" && (
+                <svg viewBox="0 0 12 12" className="h-3 w-3 text-neutral-400" aria-hidden="true">
+                  <path d="M2.5 6.2 4.8 8.5 9.5 3.8" fill="none" stroke="currentColor"
+                        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              {/* Two rings: one steady so the row never looks empty, one
+                  expanding outward. motion-reduce stops the movement and
+                  leaves the steady dot, which still marks the place. */}
+              {state === "now" && (
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-neutral-900 opacity-60 motion-reduce:hidden" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-neutral-900" />
+                </span>
+              )}
+              {state === "next" && <span className="h-1.5 w-1.5 rounded-full bg-neutral-200" />}
+            </span>
+            <span className={`text-xs transition-colors duration-500 ${
+              state === "now" ? "text-neutral-900" : state === "done" ? "text-neutral-400" : "text-neutral-300"
+            }`}>
+              {label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* Expandable row showing what each model actually answered for one prompt.
    This is the "why don't I appear / what did competitors get" view. */
 function PromptRow({ result, t, tab, ran, modelsUsed, runDate }: { result: AuditResult; t: Strings; tab: ModelKey; ran: ModelName[]; modelsUsed?: Record<string, string>; runDate: string }) {
@@ -2602,7 +2712,19 @@ function PromptRow({ result, t, tab, ran, modelsUsed, runDate }: { result: Audit
     <div className="bg-neutral-50/50">
       <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between gap-4 p-4 text-left transition-colors hover:bg-neutral-100/60">
         <div className="min-w-0">
-          <p className="text-sm">{result.prompt}</p>
+          <p className="flex items-baseline gap-2 text-sm">
+            {/* The direction this prompt was written for. Deliberately tiny and
+                grey: it is a label on the question, not a second heading, and
+                thirteen of them down a list is a lot of ink for one word.
+                Shown only where the backend actually assigned one — an
+                invented "Other" would be a category nobody chose. */}
+            {result.prompt_type && t.promptTypes[result.prompt_type] && (
+              <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500">
+                {t.promptTypes[result.prompt_type]}
+              </span>
+            )}
+            <span className="min-w-0">{result.prompt}</span>
+          </p>
           {competitors.length > 0 && (
             <p className="mt-1 truncate text-xs text-neutral-400">
               {competitors.map((c, i) => `${i + 1}. ${c}`).join("  ")}
@@ -3072,6 +3194,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     <AddPromptsBox
       t={t} open={addOpen} setOpen={setAddOpen} text={addText} setText={setAddText}
       busy={adding} error={addError} onSubmit={addPrompts} note={addNote}
+      models={ran.map((k) => MODELS.find((m) => m.key === k)?.label || k).join(", ")}
     />
   );
 
@@ -3241,6 +3364,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
             {!pageCheck && !pageChecking && !pageCheckError && (
               <p className="mt-3 text-xs text-neutral-400">{t.pageCheckNotChecked}</p>
             )}
+            {pageChecking && <WaitingSteps steps={t.waitPageCheck} className="mt-4" />}
             {pageCheckError && (
               <p className="mt-3 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">
                 {t.pageCheckFailed} — {pageCheckError}
