@@ -69,43 +69,7 @@ const MARKETS = [
    sourced: Adobe's current figure for AI-referred retail traffic is roughly
    double year on year rather than 9.7x, and no basis was found for a hundred
    million daily AI searchers. */
-const CLAIMS = [
-  {
-    figure: "23×",
-    claim: "Visitors arriving from AI answers converted 23 times better than organic search.",
-    detail: "They were 0.5% of visits and 12.1% of signups. One company, its own site, thirty days — small, and worth knowing.",
-    host: "ahrefs.com", path: "/blog/ai-search-traffic-conversions-ahrefs",
-    href: "https://ahrefs.com/blog/ai-search-traffic-conversions-ahrefs/",
-    source: "Ahrefs Web Analytics, measuring ahrefs.com",
-  },
-  {
-    figure: "~55%",
-    claim: "Around half of Google searches now return an AI Overview.",
-    detail: "Informational and longer questions most of all — and not the same half from one week to the next.",
-    host: "dataforseo.com", path: "/apis/serp-api",
-    href: "https://dataforseo.com/apis/serp-api",
-    source: "DataForSEO SERP data",
-  },
-  /* This one replaced a second-hand "AI traffic doubled" figure. That claim
-     argued for the category, which the hero line already does, and said
-     nothing about why anyone needs this product. This one is the measured
-     version of the section immediately below it — so the assertion that each
-     platform is its own ecosystem now arrives already evidenced.
 
-     Stated as a Jaccard index as well as a percentage because that is the
-     figure in the paper, and a reader who checks should find the same number
-     rather than a rounded restatement of it. */
-  {
-    figure: "20%",
-    claim: "Any two AI platforms share only about a fifth of the sources they cite most.",
-    detail: "Ten platforms — among them ChatGPT, Google AI, Perplexity and DeepSeek — 17,211 citations over 6,356 domains. Mean overlap between any pair's top-20 cited sources: a Jaccard index of 0.201. Being named by one is not evidence about any other.",
-    host: "arxiv.org", path: "/abs/2610.11932",
-    href: "https://arxiv.org/abs/2610.11932",
-    source: "Liu et al., Fudan University — measured March–April 2026",
-  },
-];
-
-const AI_LOGOS = ["ChatGPT", "Google AI Overviews", "Gemini", "Perplexity", "DeepSeek"];
 
 
 
@@ -465,7 +429,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white text-neutral-900">
-      <style>{`@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
       {showModal && <Modal onClose={() => setShowModal(false)} onAuditComplete={(data, id) => { setShowModal(false); setAuditData(data); setAuditId(id); }} />}
 
       {/* Nav */}
@@ -476,9 +439,10 @@ export default function App() {
             <span className="font-semibold">{BRAND}</span>
           </div>
           <nav className="hidden items-center gap-8 text-sm text-neutral-500 md:flex">
-            <a href="#how" className="hover:text-neutral-900">How it works</a>
+            <a href="#product" className="hover:text-neutral-900">Product</a>
             <a href="#pricing" className="hover:text-neutral-900">Pricing</a>
-            <a href="#blog" className="hover:text-neutral-900">Blog</a>
+            <a href="#trust" className="hover:text-neutral-900">How we count</a>
+            <a href="#faq" className="hover:text-neutral-900">FAQ</a>
           </nav>
           <div className="flex items-center gap-3">
             <div className="hidden items-center gap-1 text-xs text-neutral-400 sm:flex">
@@ -493,7 +457,7 @@ export default function App() {
             {user ? (
               <button onClick={handleStartAudit} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Start free</button>
             ) : (
-              <a href="#waitlist" className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Join waiting list</a>
+              <a href="#waitlist" className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800">Join the waitlist</a>
             )}
           </div>
         </div>
@@ -533,177 +497,278 @@ export default function App() {
         </Reveal>
       </section>
 
-      {/* Marquee */}
-      <section className="border-y border-neutral-100 py-5">
-        <p className="mb-3 text-center text-[10px] uppercase tracking-widest text-neutral-400">One feed · every major AI model</p>
-        <div className="relative overflow-hidden">
-          <div className="flex w-max animate-[marquee_25s_linear_infinite] gap-12 pr-12">
-            {[...AI_LOGOS, ...AI_LOGOS].map((logo, i) => (
-              <span key={i} className="whitespace-nowrap text-sm font-semibold text-neutral-300">{logo}</span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-
-      {/* One claim per screen, each presented the way the product presents a
-          model's answer: the statement, then its source as a numbered citation.
-          The dashboard puts a Sources list under every answer because a claim
-          without its provenance is the thing this product exists to catch — so
-          the homepage makes the same argument by obeying it rather than by
-          asserting it.
-
-          The three were a cramped row of one-line cards before, which gave the
-          evidence less room than the pricing table. */}
-      <section aria-label="Why AI visibility matters" className="border-y border-neutral-100">
-        {CLAIMS.map((c, i) => (
-          <article
-            key={c.figure}
-            className={`flex min-h-[78vh] items-center px-6 ${i > 0 ? "border-t border-neutral-100" : ""} ${i % 2 ? "bg-neutral-50/50" : ""}`}
-          >
-            <Reveal className="mx-auto w-full max-w-4xl">
-              <p className="text-[15vw] font-bold leading-[0.85] tracking-tighter sm:text-[11rem]">
-                {c.figure}
-              </p>
-              <p className="mt-8 max-w-2xl text-2xl leading-snug text-neutral-900 sm:text-3xl">
-                {c.claim}
-              </p>
-              <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-500">
-                {c.detail}
-              </p>
-              {/* The same shape as the Sources list under an answer in the
-                  product: an index, the host, the path in lighter type. */}
-              <a
-                href={c.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-10 inline-flex items-baseline gap-2 text-sm hover:underline"
-              >
-                <span className="text-neutral-300">1</span>
-                <span className="text-neutral-700">{c.host}</span>
-                <span className="text-neutral-400">{c.path}</span>
-              </a>
-              <p className="mt-1 text-xs text-neutral-400">{c.source}</p>
-            </Reveal>
-          </article>
-        ))}
-      </section>
-
-      {/* Each platform is its own ecosystem. This is the section that earns the
-          five-model claim: it says what differs between them, which is the
-          thing a buyer cannot find out without running all five. */}
-      <section id="how" className="mx-auto max-w-5xl px-6 py-24">
+      {/* ── 01 · Measure ──────────────────────────────────────────────
+          The pain is the headline. A buyer recognises a sentence about
+          themselves in two seconds and a feature list in none. */}
+      <section id="product" className="mx-auto max-w-5xl px-6 py-24">
         <Reveal>
-          <h2 className="max-w-2xl text-balance text-4xl font-bold tracking-tight md:text-5xl">
-            Each platform is its own ecosystem, with its own rules.
+          <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">01 · AI visibility</p>
+          <h2 className="mt-4 max-w-xl text-balance text-4xl font-bold leading-tight tracking-tight">
+            You don't know whether AI mentions you at all
           </h2>
-          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-neutral-500">
-            Being named by ChatGPT tells you nothing about Google AI Overviews. They read
-            different sources, answer different question shapes, and change independently.
-            Tracking one and calling it AI visibility is a guess —{" "}
-            {/* "Tells you nothing" was rhetoric until this paper measured it. The
-                link is here as well as in the claims band because this is the
-                sentence a sceptical buyer stops on. */}
-            <a
-              href="https://arxiv.org/abs/2610.11932"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-neutral-700 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
-            >
-              and a measured one
-            </a>
-            .
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-neutral-500">
+            Pick your brand. We write the questions your buyers ask, or you paste your own, and you watch it run.
+            Three minutes later every answer is on the screen.
           </p>
         </Reveal>
-        <div className="mt-14 overflow-hidden rounded-2xl border border-neutral-150">
-          {[
-            { name: "ChatGPT", note: "Searches live, cites a handful of pages. The one most buyers use by name." },
-            { name: "Google AI Overviews", note: "Appears on roughly half of searches, and not the same half every week. Reaches people who never open a chatbot." },
-            { name: "Gemini", note: "Grounded in Google Search, but picks differently from AI Overviews on the same query." },
-            { name: "Perplexity", note: "Cites far more sources than the others — usually ten or more, which is where the useful detail is." },
-            { name: "DeepSeek", note: "Matters where it is used, which is not where ChatGPT is used." },
-          ].map((m, i) => (
-            <div key={m.name} className={`grid gap-2 px-6 py-5 sm:grid-cols-[180px_1fr] ${i > 0 ? "border-t border-neutral-100" : ""}`}>
-              <p className="font-medium">{m.name}</p>
-              <p className="text-sm leading-relaxed text-neutral-500">{m.note}</p>
+
+        <Reveal className="mt-12">
+          {/* An illustration of the real screen, not a result: the fraction is
+              what the product shows under the percentage, because a score you
+              cannot check against the lists below it is a number to trust on
+              faith. */}
+          <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
+            <p className="text-[10px] uppercase tracking-widest text-neutral-400">Example screen</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-xl border border-neutral-150 bg-white p-5">
+                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">AI visibility score</p>
+                <div className="mt-2 text-4xl font-bold tracking-tight">23%</div>
+                <p className="mt-1 text-xs text-neutral-400">named in 3 of 13 answers that came back</p>
+                <p className="text-xs text-neutral-400">vs competitors avg 41%</p>
+              </div>
+              <div className="rounded-xl border border-neutral-150 bg-white p-5">
+                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Share of voice</p>
+                <div className="mt-2 text-4xl font-bold tracking-tight">9%</div>
+                <p className="mt-1 text-xs text-neutral-400">3 of 34 brand mentions, across 7 brands</p>
+              </div>
+              <div className="rounded-xl border border-neutral-150 bg-white p-5">
+                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Named, no link</p>
+                <div className="mt-2 text-4xl font-bold tracking-tight">8%</div>
+                <p className="mt-1 text-xs text-neutral-400">mentioned without a citation back</p>
+              </div>
             </div>
+          </div>
+        </Reveal>
+
+        <div className="mt-14 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            ["Score and share of voice", "Against every brand the models named — including ones you never listed."],
+            ["Covered and uncovered", "What you win, what you lose, what nobody wins. Each labelled by direction."],
+            ["Where you do better", "Per model, never averaged. ChatGPT and Gemini disagree about you more than you expect."],
+            ["Visibility history", "Every run kept with the exact model version, so two runs are comparable or marked as not."],
+            ["The model's own words", "The full answer, and the sentence naming you. How you are described, not just whether."],
+            ["Where AI looks", "The pages models cite in your category, by title, and which of them name you."],
+          ].map(([title, body]) => (
+            <Reveal key={title}>
+              <h3 className="text-base font-semibold">{title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-500">{body}</p>
+            </Reveal>
           ))}
         </div>
       </section>
 
-      {/* Friction */}
-      <section id="friction" className="mx-auto max-w-5xl px-6 py-24">
+      {/* ── Why a half-percent channel is worth measuring ──────────── */}
+      <section className="bg-neutral-900 py-24 text-white">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <Reveal>
+            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Why half a percent of traffic matters</p>
+            <p className="mx-auto mt-6 max-w-[30ch] text-balance text-3xl font-bold leading-snug tracking-tight">
+              Visitors who arrive from AI convert 23× better than organic search traffic
+            </p>
+            <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-neutral-400">
+              AI still sends a fraction of the visitors search does. Those visitors are the ones who sign up,
+              which is why being named in the answer is worth more than its share of traffic suggests.
+            </p>
+            <p className="mt-6 text-xs text-neutral-500">Industry research, 2026</p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── 02 · Diagnose ─────────────────────────────────────────────
+          Three bands rather than three bordered cards. Cards here read as a
+          pricing table, which is the one thing this section is not. */}
+      <section id="recommendations" className="mx-auto max-w-5xl px-6 py-24">
         <Reveal>
-          <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">The friction</p>
-          <h2 className="mt-3 max-w-2xl text-balance text-4xl font-bold tracking-tight md:text-5xl">
-            Your brand is invisible to AI.<br />And you don't know it yet.
+          <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">02 · Actionable recommendations</p>
+          <h2 className="mt-4 max-w-2xl text-balance text-4xl font-bold leading-tight tracking-tight">
+            Your competitor shows up and nobody can say why
           </h2>
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-neutral-500">
+            We sort what to do by what it asks of you, not by which chapter of SEO it belongs to.
+            One is a developer's afternoon, one an editor's week, one a quarter.
+          </p>
         </Reveal>
-        <div className="mt-12 space-y-4">
+
+        <div className="mt-12">
           {[
-            "Your competitors are recommended by ChatGPT. You are not.",
-            "You don't know which prompts your buyers are using.",
-            "You don't know which AI models mention you vs ignore you.",
-            "You don't know which pages on your site AI actually reads.",
-            "You get data. But no one tells you what to do with it.",
-          ].map((item, i) => (
-            <Reveal key={i}>
-              <div className="flex items-start gap-5 border-b border-neutral-100 pb-4">
-                <span className="shrink-0 font-mono text-sm text-neutral-300">0{i + 1}</span>
-                <p className="text-lg text-neutral-700">{item}</p>
+            {
+              title: "Fix",
+              body: "Pages you already have, and what is stopping a model from reading them.",
+              demo: (
+                <div className="rounded-xl border border-neutral-150 bg-white p-5">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-red-500" />
+                    <span className="text-xs font-medium text-neutral-500">High priority</span>
+                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-500">Easy</span>
+                  </div>
+                  <p className="mt-3 text-sm font-medium leading-relaxed">GPTBot is disallowed in your robots.txt — here are the three lines to add.</p>
+                  <div className="mt-4 rounded-lg border border-neutral-100 bg-neutral-50 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-neutral-400">Now</p>
+                    <p className="text-sm text-neutral-500 line-through decoration-neutral-300">User-agent: GPTBot · Disallow: /</p>
+                    <p className="mt-2 text-[10px] uppercase tracking-wide text-neutral-400">Instead</p>
+                    <p className="text-sm font-medium">User-agent: GPTBot · Allow: /</p>
+                  </div>
+                </div>
+              ),
+            },
+            {
+              title: "Build",
+              body: "Pages that do not exist yet, for the questions you keep losing.",
+              demo: (
+                <div className="rounded-xl border border-neutral-150 bg-white p-5">
+                  <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">What shape of page gets quoted here</p>
+                  <div className="mt-4 space-y-2.5">
+                    {[
+                      ["Lists and roundups", "4 pages cited, none of them yours", true],
+                      ["Comparisons", "2 pages cited, none of them yours", true],
+                      ["Video", "2 pages cited, you are on 1", false],
+                    ].map(([name, count, gap]) => (
+                      <div key={String(name)} className="flex items-baseline gap-3">
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${gap ? "bg-red-500" : "bg-emerald-500"}`} />
+                        <span className="text-sm font-medium">{name}</span>
+                        <span className="text-xs text-neutral-500">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ),
+            },
+            {
+              title: "Influence",
+              body: "Pages you do not own that models read anyway, sorted by who decides what goes on them.",
+              demo: (
+                <div className="rounded-xl border border-neutral-150 bg-white p-5">
+                  <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Tier 1 — someone else decides</p>
+                  <div className="mt-4 space-y-3">
+                    {[
+                      ["retail.ru", "10 best loyalty platforms for retail", "Named here: Mindbox, Loymax. You are not."],
+                      ["cossa.ru", "Loyalty programmes: what changed this year", "Nobody from your list is on this page"],
+                    ].map(([host, title, note], i) => (
+                      <div key={String(host)} className="flex gap-2.5">
+                        <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${i === 0 ? "bg-red-500" : "bg-neutral-200"}`} />
+                        <div className="min-w-0">
+                          <p className="flex items-baseline gap-1.5 text-xs">
+                            <span className="shrink-0 text-neutral-500">{host}</span>
+                            <span className="truncate text-neutral-900">{title}</span>
+                          </p>
+                          <p className="mt-0.5 text-[11px] leading-snug text-neutral-500">{note}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ),
+            },
+          ].map(({ title, body, demo }) => (
+            <Reveal key={title}>
+              <div className="grid items-center gap-10 border-t border-neutral-100 py-12 md:grid-cols-[320px_1fr]">
+                <div>
+                  <h3 className="text-2xl font-bold tracking-tight">{title}</h3>
+                  <p className="mt-3 text-base leading-relaxed text-neutral-500">{body}</p>
+                </div>
+                <div>{demo}</div>
               </div>
             </Reveal>
           ))}
         </div>
       </section>
 
-      {/* Product demo */}
+      {/* ── 03 · The agent. Future tense throughout, and no button: a button
+             invites someone to go looking for something that is not there. */}
       <section className="border-t border-neutral-100 bg-neutral-50/50 py-24">
         <div className="mx-auto max-w-5xl px-6">
           <Reveal>
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Product catalog · see it in motion</p>
-            <h2 className="mt-3 max-w-2xl text-balance text-4xl font-bold tracking-tight">
-              We run your AI visibility, end to end.
-            </h2>
+            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">03 · AI agent · on the roadmap</p>
+            <div className="mt-4 grid gap-12 md:grid-cols-2">
+              <div>
+                <h2 className="max-w-md text-balance text-4xl font-bold leading-tight tracking-tight">
+                  The list has been sitting there a month
+                </h2>
+                <p className="mt-4 text-base leading-relaxed text-neutral-600">
+                  Knowing what to change is not the same as having changed it. Between the two sits a sprint nobody planned.
+                </p>
+                <p className="mt-4 text-base leading-relaxed text-neutral-600">
+                  So we will open the pull request ourselves. You give access to your repository, the fix arrives as a diff
+                  with the finding attached, and you press merge. We never merge, and we never touch a repository nobody
+                  invited us into.
+                </p>
+              </div>
+              <div className="rounded-xl border border-neutral-150 bg-white p-5">
+                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">Pull request</p>
+                <p className="mt-3 text-sm font-medium">Allow GPTBot and PerplexityBot in robots.txt</p>
+                <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                  3 lines changed · linked to the audit finding that produced it
+                </p>
+                <div className="mt-4 space-y-1 rounded-lg bg-neutral-50 p-3 font-mono text-[11px]">
+                  <p className="text-red-600">- Disallow: /</p>
+                  <p className="text-emerald-700">+ Allow: /</p>
+                </div>
+              </div>
+            </div>
           </Reveal>
-          <div className="mt-16 space-y-20">
+        </div>
+      </section>
+
+      {/* ── 04 · Measurement. No numbers here on purpose: we have never run a
+             before-and-after with a customer, and inventing one is the thing
+             the section below this is against. */}
+      <section className="mx-auto max-w-5xl px-6 py-24">
+        <Reveal>
+          <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">04 · Measurement · on the roadmap</p>
+          <div className="mt-4 grid items-center gap-12 md:grid-cols-2">
+            <div>
+              <h2 className="max-w-md text-balance text-4xl font-bold leading-tight tracking-tight">
+                You can't show anyone that it worked
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-neutral-600">
+                Tick off what you did. The next audit compares itself to the last one and says what happened — tied to
+                the specific change, not to the month it fell in.
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-neutral-500">
+                We will not claim it caused the rise. Models move, competitors act. We will show you what you did and
+                what the number did.
+              </p>
+            </div>
+            <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 p-6">
+              <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">The screen, once it exists</p>
+              <p className="mt-3 text-sm leading-relaxed text-neutral-500">
+                One sentence comparing this audit to the last: how many items you ticked off, and where the figure moved.
+                No example numbers here — we have not run a before-and-after with a customer yet, and a made-up one would
+                undo everything the next section promises.
+              </p>
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* ── How we count. Aimed squarely at anyone who tried another tracker
+             and could not reconcile its figures. */}
+      <section id="trust" className="border-t border-neutral-100 py-24">
+        <div className="mx-auto max-w-5xl px-6">
+          <Reveal>
+            <h2 className="max-w-xl text-balance text-4xl font-bold leading-tight tracking-tight">
+              Every number here can be checked
+            </h2>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-neutral-500">
+              If you have ever tried to reconcile a visibility report and given up, this is the section to read.
+            </p>
+          </Reveal>
+          <div className="mt-12 grid gap-8 md:grid-cols-3">
             {[
-              {
-                num: "01", title: "Visibility Score", desc: "Track how often your brand appears across all major AI models. One number that tells the whole story.",
-                demo: <div className="rounded-xl border border-neutral-200 bg-white p-5"><p className="text-xs text-neutral-400 uppercase tracking-wider">Visibility Score</p><div className="mt-2 text-5xl font-bold">74%</div><div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-lg bg-neutral-50 p-3 text-center"><p className="text-xs text-neutral-400">Gemini</p><p className="text-2xl font-bold">80%</p></div><div className="rounded-lg bg-neutral-50 p-3 text-center"><p className="text-xs text-neutral-400">ChatGPT</p><p className="text-2xl font-bold">68%</p></div></div></div>
-              },
-              {
-                num: "02", title: "Brand Ranking", desc: "See exactly where your brand ranks vs competitors across every AI model. Know who is beating you and by how much.",
-                demo: <div className="rounded-xl border border-neutral-200 bg-white p-5"><p className="text-xs text-neutral-400 uppercase tracking-wider mb-3">Brand Ranking</p><div className="space-y-2">{[{n:"Your brand",r:74,you:true},{n:"Competitor A",r:61},{n:"Competitor B",r:45},{n:"Competitor C",r:22}].map((b,i)=><div key={i} className={`flex items-center justify-between rounded-lg px-3 py-2 ${b.you?"bg-neutral-900 text-white":"bg-neutral-50"}`}><span className="text-sm font-medium">{b.n}{b.you&&<span className="ml-2 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">You</span>}</span><span className="text-sm font-bold">{b.r}%</span></div>)}</div></div>
-              },
-              {
-                num: "03", title: "Top Prompts", desc: "Discover exactly which questions buyers ask AI in your category — and whether you appear in the answers.",
-                demo: <div className="rounded-xl border border-neutral-200 bg-white p-5"><p className="text-xs text-neutral-400 uppercase tracking-wider mb-3">Top Prompts</p><div className="space-y-2">{["Best CRM for remote teams","Salesforce alternatives 2026","How to track sales pipeline"].map((p,i)=><div key={i} className="flex items-center justify-between rounded-lg bg-neutral-50 px-3 py-2"><span className="text-xs text-neutral-700 truncate max-w-[200px]">{p}</span><span className={`text-xs font-bold ${i===0?"text-emerald-600":"text-neutral-400"}`}>{i===0?"Mentioned":"Not mentioned"}</span></div>)}</div></div>
-              },
-              {
-                num: "04", title: "Citations", desc: "See which URLs AI models cite most in your category. Know what content is driving AI recommendations.",
-                demo: <div className="rounded-xl border border-neutral-200 bg-white p-5"><p className="text-xs text-neutral-400 uppercase tracking-wider mb-3">Citations</p><div className="space-y-2">{["reddit.com","techradar.com","zapier.com"].map((d,i)=><div key={i} className="flex items-center justify-between rounded-lg bg-neutral-50 px-3 py-2"><span className="text-xs text-neutral-700">{d}</span><span className="text-xs font-bold text-neutral-500">{3-i} citations</span></div>)}</div></div>
-              },
-              {
-                num: "05", title: "Actionable Recommendations", desc: "Not generic SEO advice. Specific actions that work for each AI model, with priority and effort scores.",
-                demo: <div className="rounded-xl border border-neutral-200 bg-white p-5"><p className="text-xs text-neutral-400 uppercase tracking-wider mb-3">Recommendations</p><div className="space-y-2"><div className="rounded-lg border border-neutral-100 p-3"><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-red-500"/><span className="text-xs font-medium">High priority · Easy effort</span></div><p className="mt-1 text-xs text-neutral-700">Add a comparison table to /pricing — competitors cite theirs when ChatGPT is asked best alternatives.</p></div><div className="rounded-lg border border-neutral-100 p-3"><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500"/><span className="text-xs font-medium">Medium priority · Medium effort</span></div><p className="mt-1 text-xs text-neutral-700">Publish a vs page targeting the top 3 buyer prompts you are missing.</p></div></div></div>
-              },
-            ].map(({ num, title, desc, demo }) => (
-              <Reveal key={num}>
-                <div className="grid items-center gap-12 md:grid-cols-2">
-                  <div className={num === "02" || num === "04" ? "md:order-2" : ""}>
-                    <p className="font-mono text-sm text-neutral-300">{num}</p>
-                    <h3 className="mt-2 text-2xl font-bold tracking-tight">{title}</h3>
-                    <p className="mt-3 text-neutral-500">{desc}</p>
-                  </div>
-                  <div className={num === "02" || num === "04" ? "md:order-1" : ""}>{demo}</div>
+              ["We divide by answers, not questions", "A model that stayed silent is not a mark against you. Dividing by questions times models flatters everyone equally."],
+              ["Absent is not zero", "Where we have no figure you see a dash. A zero is a measurement, and somebody has to have made it."],
+              ["The source sits under the number", "Every percentage opens into the full answer, the date, and the exact model version that wrote it."],
+            ].map(([title, body]) => (
+              <Reveal key={title}>
+                <div className="border-t-2 border-neutral-900 pt-5">
+                  <h3 className="text-base font-semibold">{title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-500">{body}</p>
                 </div>
               </Reveal>
             ))}
           </div>
         </div>
       </section>
-
 
       {/* Comparison. A real table rather than three cards: the point is to read
           across a row, and cards make that the one thing you cannot do.
@@ -760,70 +825,6 @@ export default function App() {
         </div>
       </section>
 
-      {/* FAQ. Native disclosure elements, so it works without JavaScript, is
-          keyboard navigable for free, and one can be open while another is. */}
-      <section id="faq" className="mx-auto max-w-3xl px-6 py-24">
-        <Reveal>
-          <h2 className="text-balance text-4xl font-bold tracking-tight">
-            What a plan actually gets you.
-          </h2>
-        </Reveal>
-        <div className="mt-10 divide-y divide-neutral-150 border-y border-neutral-150">
-          {[
-            {
-              q: "What is in a plan, concretely?",
-              a: "Your prompts, run against all five platforms on a schedule, and the full answer each one gave with the pages it read. Plus a check of your own page against the competitors who do get named, Google search volume and ranking difficulty for the phrases you are considering, and the history so you can see whether a change worked.",
-            },
-            {
-              q: "How often do prompts re-run?",
-              a: "Weekly on every plan. One measurement is an anecdote — models give different answers to the same question on different days, so a single run tells you very little. Daily is available and quoted per case, because it multiplies the cost by seven.",
-            },
-            {
-              q: "Why does being named by ChatGPT not mean being named elsewhere?",
-              a: "The platforms read different sources and answer different question shapes. A page that ChatGPT quotes may never appear in a Google AI Overview, and AI Overviews do not appear for every query at all. Tracking one platform and calling it AI visibility is a guess.",
-            },
-            {
-              q: "Can you tell me why I was not named?",
-              a: "That is the part most tools skip. Every answer comes with the pages the model actually read, so you can see who was cited instead of you. The page check then reads your own page and compares it against the competitors who get named — whether it declares the category it competes in, whether it can be read without JavaScript, whether crawlers are allowed in.",
-            },
-            {
-              q: "Do you improve the visibility, or only measure it?",
-              a: "Measurement, plus the specific change to make — the exact title, heading and description to use, not advice to improve your content. Running the change is yours, or ours as consulting. Then re-measure, which is the only way to know whether it worked.",
-            },
-            {
-              q: "How many prompts do I need?",
-              a: "Fewer than people expect. Twenty-five well chosen buyer questions tell you more than a hundred variations of the same one. Google volume is in the tool to help you pick, and you can add prompts to a run after seeing the results.",
-            },
-          ].map((f) => (
-            <details key={f.q} className="group py-5">
-              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-base font-medium marker:content-none">
-                {f.q}
-                <span className="mt-1 shrink-0 text-neutral-300 transition-transform group-open:rotate-45" aria-hidden>+</span>
-              </summary>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-neutral-500">{f.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
-
-      {/* Blog. The nav has linked to #blog since launch with nothing behind it,
-          which is a broken promise on the first click. An honest empty state
-          beats a dead anchor. */}
-      <section id="blog" className="border-t border-neutral-100 bg-neutral-50/40 py-20">
-        <div className="mx-auto max-w-5xl px-6 sm:flex sm:items-center sm:justify-between">
-          <div className="max-w-xl">
-            <h2 className="text-2xl font-bold tracking-tight">Notes on what actually moves AI visibility</h2>
-            <p className="mt-2 text-neutral-500">
-              What we find running real audits: which changes moved a brand into an answer, and which did nothing.
-              First pieces are being written now — join the list and they land in your inbox.
-            </p>
-          </div>
-          <a href="#waitlist" className="mt-5 inline-block shrink-0 rounded-lg border border-neutral-300 px-5 py-2.5 text-sm font-medium hover:border-neutral-900 sm:mt-0">
-            Get them by email
-          </a>
-        </div>
-      </section>
-
       {/* Pricing */}
       <section id="pricing" className="mx-auto max-w-5xl px-6 py-24">
         <Reveal>
@@ -856,7 +857,7 @@ export default function App() {
               {/* Was setShowModal(true), which opened the audit for a signed-out
                   visitor and skipped the sign-in that every other entry point
                   goes through. handleStartAudit is that one path. */}
-              <button onClick={user ? handleStartAudit : () => { window.location.hash = "waitlist"; }} className={`mt-6 rounded-lg py-2.5 text-sm font-medium ${"highlight" in plan && plan.highlight ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{user ? plan.cta : "Join waiting list"}</button>
+              <button onClick={user ? handleStartAudit : () => { window.location.hash = "waitlist"; }} className={`mt-6 rounded-lg py-2.5 text-sm font-medium ${"highlight" in plan && plan.highlight ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800"}`}>{user ? plan.cta : "Join the waitlist"}</button>
             </div>
           ))}
         </div>
@@ -867,13 +868,90 @@ export default function App() {
               5 brands, 50 prompts each, all 5 models, weekly. For running GEO work on clients rather than one brand of your own.
             </p>
           </div>
-          <a href="#waitlist" className="mt-4 inline-block rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 sm:mt-0">Join waiting list</a>
+          <a href="#waitlist" className="mt-4 inline-block rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 sm:mt-0">Join the waitlist</a>
         </div>
         <p className="mt-4 text-xs leading-relaxed text-neutral-400">
           Extra prompts $1.50 each per month. Daily instead of weekly multiplies every number by seven, so it is quoted per case rather than listed here.
           Prompts are re-run on a schedule — a figure from one measurement is an anecdote, not a trend.
         </p>
 
+      </section>
+
+      {/* FAQ. Native disclosure elements, so it works without JavaScript, is
+          keyboard navigable for free, and one can be open while another is. */}
+      <section id="faq" className="mx-auto max-w-3xl px-6 pb-24">
+        <Reveal>
+          <h2 className="text-balance text-3xl font-bold tracking-tight">Questions people ask first</h2>
+        </Reveal>
+        <div className="mt-10 divide-y divide-neutral-150 border-y border-neutral-150">
+          {[
+            {
+              q: "Is this just SEO with a new name?",
+              a: "No. SEO asks where you rank on a results page. This asks whether a model names you in a sentence, and which page it read to decide. The overlap is real, the measurement is not, and neither is most of the fix list.",
+            },
+            {
+              q: "Which models do you ask?",
+              a: "ChatGPT, Gemini, Perplexity, DeepSeek and Google AI Overview. We name them because \u201call the major models\u201d is not a measurement. Each run records the exact version that answered.",
+            },
+            {
+              q: "Why does being named by ChatGPT not mean being named elsewhere?",
+              a: "The platforms read different sources and answer different question shapes. A page ChatGPT quotes may never appear in a Google AI Overview, and AI Overviews do not appear for every query at all. That was rhetoric until it was measured.",
+              href: "https://arxiv.org/abs/2610.11932",
+              hrefLabel: "The paper that measured it",
+            },
+            {
+              q: "Where do the questions come from?",
+              a: "We write a set from your category, split across comparison, commercial, problem, technical and industry questions. You can paste your own at any point and they join the same run.",
+            },
+            {
+              q: "Do you work outside English?",
+              a: "Yes. The product runs in English and Russian and audits any market in its own language. One thing to know: search-volume data is unavailable for the Russian market, so that one panel stays empty and says why.",
+            },
+            {
+              q: "Will my visibility go up?",
+              a: "We will not put a number on that. Models change, competitors act, and one run is a small sample. What we will do is show the gap, the exact change, and whether the figure moved afterwards.",
+            },
+            {
+              q: "How long does the first audit take?",
+              a: "About three minutes, and you watch it run \u2014 the questions going out, the models answering, your name being looked for in each one.",
+            },
+          ].map((f) => (
+            <details key={f.q} className="group py-5">
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-base font-medium marker:content-none">
+                {f.q}
+                <span className="mt-1 shrink-0 text-neutral-300 transition-transform group-open:rotate-45" aria-hidden>+</span>
+              </summary>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-neutral-500">{f.a}</p>
+              {"href" in f && f.href && (
+                <a href={f.href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-neutral-700 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700">
+                  {f.hrefLabel}
+                </a>
+              )}
+            </details>
+          ))}
+        </div>
+      </section>
+
+      {/* The close. Black, the way the page ends as one block with the footer
+          rather than two. The form is the same waitlist as the hero. */}
+      <section className="bg-neutral-900 py-24 text-white">
+        <div className="mx-auto max-w-2xl px-6 text-center">
+          <Reveal>
+            <h2 className="text-balance text-4xl font-bold leading-tight tracking-tight">Find out what AI says about you</h2>
+            <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-neutral-400">
+              One domain, three minutes, every answer in full. Free to start, no credit card.
+            </p>
+            <div className="mt-8 flex justify-center">
+              {user ? (
+                <button onClick={handleStartAudit} className="flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-medium text-neutral-900 hover:bg-neutral-100">
+                  Start free audit <ArrowRight className="h-4 w-4" />
+                </button>
+              ) : (
+                <WaitlistForm lang="en" source="home_close_en" className="w-full max-w-md text-left" />
+              )}
+            </div>
+          </Reveal>
+        </div>
       </section>
 
       {/* Footer */}
@@ -885,10 +963,9 @@ export default function App() {
               <span className="font-semibold">{BRAND}</span>
             </div>
             <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-neutral-400">
-              <a href="#how" className="hover:text-neutral-900">How it works</a>
+              <a href="#product" className="hover:text-neutral-900">Product</a>
               <a href="#pricing" className="hover:text-neutral-900">Pricing</a>
-              <a href="#blog" className="hover:text-neutral-900">Blog</a>
-              <a href="/legal/privacy" className="hover:text-neutral-900">Privacy</a>
+                <a href="/legal/privacy" className="hover:text-neutral-900">Privacy</a>
               <a href="/legal/terms" className="hover:text-neutral-900">Terms</a>
               <a href="/legal/cookies" className="hover:text-neutral-900">Cookies</a>
             </nav>
