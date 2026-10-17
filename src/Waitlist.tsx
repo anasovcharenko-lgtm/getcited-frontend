@@ -20,7 +20,7 @@ const T = {
   en: {
     cta: "Add me to the waiting list",
     placeholder: "you@company.com",
-    join: "Add me to waitlist",
+    join: "Join the waitlist",
     done: "You're on the list.",
     doneSub: "We'll write when your invite is ready. No newsletter.",
     already: "You're already on the list.",
