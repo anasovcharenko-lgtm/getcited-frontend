@@ -46,9 +46,7 @@ const COPY = {
     run: "Look up",
     running: "Looking up…",
     failed: "The lookup failed.",
-    signedOut: "Sign in to look up keyword data.",
-    notYours: "Keyword research is not open yet.",
-    notYoursWhy: "Each lookup is a paid request to a data vendor, so it is limited to the account that pays for it until it becomes part of a plan.",
+    signedOut: "Sign in to continue.",
     signIn: "Sign in with Google",
     counts: (total: number, ok: number, skip: number) =>
       skip > 0
@@ -81,9 +79,7 @@ const COPY = {
     run: "Проверить",
     running: "Проверяю…",
     failed: "Запрос не прошёл.",
-    signedOut: "Войдите, чтобы смотреть данные по ключевым словам.",
-    notYours: "Исследование ключевых слов пока закрыто.",
-    notYoursWhy: "Каждый запрос платный и уходит к поставщику данных, поэтому доступ есть только у аккаунта, который за него платит — пока это не станет частью тарифа.",
+    signedOut: "Войдите, чтобы продолжить.",
     signIn: "Войти через Google",
     counts: (total: number, ok: number, skip: number) =>
       skip > 0
@@ -124,6 +120,18 @@ export default function Keywords({ lang = "en" }: { lang?: "en" | "ru" }) {
 
   const signedIn = email === undefined ? null : !!email;
   const allowed = isAdmin(email);
+
+  /* A signed-in stranger is sent to the homepage, not shown a page explaining
+     what they cannot have. The API refuses them regardless — this is about not
+     advertising a metered tool to people who are not paying for it, and about
+     the URL giving nothing away to anyone who finds it.
+
+     Signed-OUT visitors are not redirected: the owner arrives here signed out
+     too, and bouncing them would lock out the one account meant to get in. */
+  useEffect(() => {
+    if (email === undefined) return;
+    if (email && !allowed) window.location.replace(lang === "ru" ? "/ru" : "/");
+  }, [email, allowed, lang]);
 
   const [text, setText] = useState("");
   const [market, setMarket] = useState(lang === "ru" ? "RU" : "US");
@@ -202,6 +210,9 @@ export default function Keywords({ lang = "en" }: { lang?: "en" | "ru" }) {
     typeof v === "number" ? (fmt ? fmt(v) : v.toLocaleString(lang === "ru" ? "ru-RU" : "en-US"))
                           : <span className="text-neutral-300">—</span>;
 
+  if (email === undefined) return null;
+  if (email && !allowed) return null;
+
   return (
     <div className="min-h-screen bg-white text-neutral-900">
       <header className="border-b border-neutral-100">
@@ -216,8 +227,12 @@ export default function Keywords({ lang = "en" }: { lang?: "en" | "ru" }) {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-12">
-        <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
-        <p className="mt-2 max-w-2xl text-neutral-500">{t.sub}</p>
+        {allowed && (
+          <>
+            <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
+            <p className="mt-2 max-w-2xl text-neutral-500">{t.sub}</p>
+          </>
+        )}
 
         {signedIn === false && (
           <div className="mt-8 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
@@ -228,13 +243,6 @@ export default function Keywords({ lang = "en" }: { lang?: "en" | "ru" }) {
             >
               {t.signIn}
             </button>
-          </div>
-        )}
-
-        {signedIn && !allowed && (
-          <div className="mt-8 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
-            <p className="text-sm text-neutral-600">{t.notYours}</p>
-            <p className="mt-2 text-xs text-neutral-400">{t.notYoursWhy}</p>
           </div>
         )}
 
