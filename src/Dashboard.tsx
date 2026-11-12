@@ -171,7 +171,8 @@ export type AuditData = {
   extended_at?: string;
   added_prompts?: string[];
   models_used?: Record<string, string>;
-  model_status?: Record<string, { ok: boolean; enabled?: boolean; selected?: boolean; error?: string | null }>;
+  model_status?: Record<string, { ok: boolean; enabled?: boolean; selected?: boolean;
+    answered?: number; asked?: number; error?: string | null }>;
   visibility_score: number;
   gemini_score: number;
   chatgpt_score: number;
@@ -451,6 +452,7 @@ interface Strings {
   covered: string;
   notCovered: string;
   modelFailed: (names: string) => string;
+  modelPartial: (items: string) => string;
   sourcesTitle: string;
   menuProjects: string;
   menuHide: string;
@@ -715,6 +717,7 @@ const STR: Record<Lang, Strings> = {
     covered: "Covered",
     notCovered: "Not covered",
     modelFailed: (names: string) => `${names} didn't respond during this audit — the numbers below are incomplete.`,
+    modelPartial: (items: string) => `Answered some prompts but not all: ${items}. The score divides by answers received, so it is not skewed — the sample behind those models is simply smaller.`,
     sourcesTitle: "Where AI looks for answers",
     menuProjects: "← My projects",
     menuHide: "Hide the menu",
@@ -981,6 +984,7 @@ const STR: Record<Lang, Strings> = {
     covered: "Покрыто",
     notCovered: "Не покрыто",
     modelFailed: (names: string) => `${names} не ответил(а) во время аудита — цифры ниже неполные.`,
+    modelPartial: (items: string) => `Ответили не на все промпты: ${items}. Score считается от полученных ответов, так что он не искажён — просто выборка по этим моделям меньше.`,
     sourcesTitle: "Откуда AI берёт ответы",
     menuProjects: "← Мои проекты",
     menuHide: "Скрыть меню",
@@ -3130,6 +3134,22 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       .map(([k, v]) => ({ label: labels[k] ?? k, reason: (v.error || "").trim() }));
   }, [data.model_status]);
 
+  /* Answered some prompts and not others — a fourth state, between the three
+     above. Not a failure: the score divides by answers received, so the figure
+     is sound. But the sample behind that one model is smaller than behind the
+     others, and a reader comparing per-model numbers would otherwise assume
+     every model was asked the same number of times. */
+  const partialModels = useMemo(() => {
+    const status = data.model_status;
+    if (!status) return [];
+    const labels = Object.fromEntries(MODELS.map((m) => [m.key, m.label]));
+    return Object.entries(status)
+      .filter(([, v]) => v.ok && v.selected !== false
+        && typeof v.answered === "number" && typeof v.asked === "number"
+        && v.asked > 0 && v.answered < v.asked)
+      .map(([k, v]) => `${labels[k] ?? k} — ${v.answered}/${v.asked}`);
+  }, [data.model_status]);
+
   /* ---- recommendations, categorised ---- */
   const addPrompts = async () => {
     const lines = Array.from(new Set(
@@ -3746,6 +3766,15 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                 {f.label}: {f.reason.slice(0, 300)}
               </p>
             ))}
+          </div>
+        )}
+
+        {/* Deliberately quieter than the amber box above: a smaller sample is
+            worth saying, but it is not the same event as a model going silent,
+            and two identical warnings would teach the reader to skim both. */}
+        {partialModels.length > 0 && (
+          <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-sm text-slate-700">{t.modelPartial(partialModels.join(", "))}</p>
           </div>
         )}
 
