@@ -3,7 +3,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, Lock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "./supabase";
-import { saveAddedPrompts, activeModels } from "./saveAudit";
+import { saveAddedPrompts, saveAddedModels, activeModels } from "./saveAudit";
 import { apiFetch } from "./api";
 import { isAdmin } from "./admins";
 
@@ -453,6 +453,10 @@ interface Strings {
   notCovered: string;
   modelFailed: (names: string) => string;
   modelPartial: (items: string) => string;
+  retryModels: string;
+  retryModelsBusy: string;
+  retryModelsHint: string;
+  retryModelsFailed: string;
   sourcesTitle: string;
   menuProjects: string;
   menuHide: string;
@@ -718,6 +722,10 @@ const STR: Record<Lang, Strings> = {
     notCovered: "Not covered",
     modelFailed: (names: string) => `${names} didn't respond during this audit — the numbers below are incomplete.`,
     modelPartial: (items: string) => `Answered some prompts but not all: ${items}. The score divides by answers received, so it is not skewed — the sample behind those models is simply smaller.`,
+    retryModels: "Ask them again",
+    retryModelsBusy: "Asking…",
+    retryModelsHint: "Only the unanswered prompts are asked again. Everything already measured stays as it is.",
+    retryModelsFailed: "Could not reach them this time. The audit is unchanged.",
     sourcesTitle: "Where AI looks for answers",
     menuProjects: "← My projects",
     menuHide: "Hide the menu",
@@ -985,6 +993,10 @@ const STR: Record<Lang, Strings> = {
     notCovered: "Не покрыто",
     modelFailed: (names: string) => `${names} не ответил(а) во время аудита — цифры ниже неполные.`,
     modelPartial: (items: string) => `Ответили не на все промпты: ${items}. Score считается от полученных ответов, так что он не искажён — просто выборка по этим моделям меньше.`,
+    retryModels: "Спросить заново",
+    retryModelsBusy: "Спрашиваем…",
+    retryModelsHint: "Заново спрашиваются только промпты без ответа. Всё уже измеренное остаётся как есть.",
+    retryModelsFailed: "В этот раз достучаться не вышло. Аудит не изменился.",
     sourcesTitle: "Откуда AI берёт ответы",
     menuProjects: "← Мои проекты",
     menuHide: "Скрыть меню",
@@ -2822,6 +2834,8 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
   const [addText, setAddText] = useState("");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState("");
 
   const data = useMemo(() => {
     const base = extendedData ?? raw;
@@ -3131,7 +3145,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
        when they were exactly as complete as asked for. */
     return Object.entries(status)
       .filter(([, v]) => !v.ok && v.enabled !== false && v.selected !== false)
-      .map(([k, v]) => ({ label: labels[k] ?? k, reason: (v.error || "").trim() }));
+      .map(([k, v]) => ({ key: k, label: labels[k] ?? k, reason: (v.error || "").trim() }));
   }, [data.model_status]);
 
   /* Answered some prompts and not others — a fourth state, between the three
@@ -3151,6 +3165,52 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
   }, [data.model_status]);
 
   /* ---- recommendations, categorised ---- */
+  /* Measure the models that came back empty, on the prompts already asked.
+     The server only buys the gaps, so a model that answered most of them costs
+     the remainder and a model that answered all of them is refused outright. */
+  const retryModels = async () => {
+    const want = failedModels.map((f) => f.key);
+    if (want.length === 0) return;
+    setRetrying(true);
+    setRetryError("");
+    try {
+      const res = await apiFetch(`${API_URL}/audit/add-models`, {
+        method: "POST",
+        body: JSON.stringify({
+          brand: data.brand,
+          website: data.brand_domain ? `https://${data.brand_domain}` : "",
+          competitor_list: data.competitor_ranking
+            .filter((c) => !c.is_your_brand)
+            .map((c) => ({ name: c.name, website: c.domain ? `https://${c.domain}` : "" })),
+          country: data.country || "US",
+          language: data.language || "",
+          add_models: want,
+          previous_results: data.results,
+          previous_citations: data.citations,
+        }),
+      });
+      const next = await res.json();
+      if (!res.ok || next?.error || !Array.isArray(next?.results)) {
+        setRetryError(next?.detail || next?.error || t.retryModelsFailed);
+        return;
+      }
+      const merged: AuditData = { ...data, ...next, recommendations: data.recommendations };
+      setExtendedData(merged);
+
+      if (auditId && Array.isArray(next.added_models) && next.added_models.length) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await saveAddedModels({ auditId, userId: user.id,
+                                  models: next.added_models, data: merged });
+        }
+      }
+    } catch {
+      setRetryError(t.retryModelsFailed);
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   const addPrompts = async () => {
     const lines = Array.from(new Set(
       addText.split("\n").map((l) => l.trim()).filter(Boolean)));
@@ -3766,6 +3826,24 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                 {f.label}: {f.reason.slice(0, 300)}
               </p>
             ))}
+            {/* The retry belongs here rather than in a menu: this box is where
+                someone finds out a model is missing, and it is the moment they
+                want it back. Most of these failures are the provider having a
+                bad minute, so the second ask often simply works. */}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                onClick={retryModels}
+                disabled={retrying}
+                className="rounded-lg bg-amber-800 px-3 py-1.5 text-xs font-medium text-white
+                           transition hover:bg-amber-900 disabled:opacity-60"
+              >
+                {retrying ? t.retryModelsBusy : t.retryModels}
+              </button>
+              <span className="text-xs text-amber-700/90">{t.retryModelsHint}</span>
+            </div>
+            {retryError && (
+              <p className="mt-2 text-xs text-amber-900">{retryError}</p>
+            )}
           </div>
         )}
 
