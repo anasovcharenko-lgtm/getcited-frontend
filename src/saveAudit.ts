@@ -114,6 +114,74 @@ export async function saveAuditRun(opts: {
 /* Prompts added to a run that already exists. The rows carry their own
    created_at, so the fact that the figure now mixes two measurement moments
    stays visible in the data rather than only on screen. */
+/* A model filled in after the fact, across prompts the audit already had.
+   The sibling of saveAddedPrompts: that one stores new rows of the grid, this
+   one stores a new column of it.
+
+   It deletes before inserting because the original run may already have
+   written rows for this model — a model that was asked and stayed silent still
+   produced `mentioned: false` for every prompt. Inserting on top of those
+   would leave the audit holding two answers per prompt, one of them the
+   failure we just replaced, and every count built on the table would read
+   high. Deleting first makes running this twice mean the same as running it
+   once. */
+export async function saveAddedModels(opts: {
+  auditId: string | number;
+  userId: string;
+  models: string[];
+  data: AuditPayload;
+}): Promise<void> {
+  const { auditId, userId, models, data } = opts;
+  if (!models.length) return;
+
+  const { error: delErr } = await supabase
+    .from("audit_prompts")
+    .delete()
+    .eq("audit_id", auditId)
+    .in("model", models);
+  if (delErr) {
+    // Stop rather than insert: adding to rows that should have gone is the one
+    // outcome worse than not saving at all, because it inflates the counts and
+    // nothing on screen would show it.
+    console.error("old model rows not cleared, skipping insert", delErr);
+    return;
+  }
+
+  const rows = (data.results || []).flatMap((r) =>
+    models.map((m) => {
+      const info = (r[m] || {}) as ModelInfo;
+      return {
+        audit_id: auditId,
+        user_id: userId,
+        prompt: r.prompt,
+        prompt_type: r.prompt_type ?? null,
+        model: m,
+        mentioned: !!info.mentioned,
+        mentioned_with_link: !!info.mentioned_with_link,
+        competitors_found: info.competitors_found ?? [],
+      };
+    }));
+
+  if (rows.length) {
+    const { error } = await supabase.from("audit_prompts").insert(rows);
+    if (error) console.error("added model rows not saved", error);
+  }
+
+  const { error: updErr } = await supabase
+    .from("audits")
+    .update({
+      payload: data,
+      visibility_score: data.visibility_score,
+      gemini_score: data.gemini_score,
+      chatgpt_score: data.chatgpt_score,
+      total_prompts: data.total_prompts,
+      mentions_score: data.mentions_score,
+      citations_score: data.citations_score,
+    })
+    .eq("id", auditId);
+  if (updErr) console.error("audit totals not updated", updErr);
+}
+
 export async function saveAddedPrompts(opts: {
   auditId: string | number;
   userId: string;
