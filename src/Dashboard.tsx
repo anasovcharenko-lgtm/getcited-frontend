@@ -4,6 +4,17 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "./supabase";
 import { saveAddedPrompts, saveAddedModels, activeModels } from "./saveAudit";
+
+/* Prompts a model was asked and came back from with neither an answer nor a
+   reason there could not be one. The part of the silence worth retrying, and
+   the only part worth warning about.
+
+   Older payloads carry no counts. There a model is either fine or it is not,
+   `ok` is the whole story, and one unexplained gap is the honest guess. */
+function gapOf(v: { ok?: boolean; answered?: number; asked?: number; absent?: number }): number {
+  if (typeof v.asked !== "number" || typeof v.answered !== "number") return v.ok ? 0 : 1;
+  return Math.max(0, v.asked - v.answered - (v.absent ?? 0));
+}
 import { apiFetch } from "./api";
 import { isAdmin } from "./admins";
 
@@ -172,7 +183,7 @@ export type AuditData = {
   added_prompts?: string[];
   models_used?: Record<string, string>;
   model_status?: Record<string, { ok: boolean; enabled?: boolean; selected?: boolean;
-    answered?: number; asked?: number; error?: string | null }>;
+    answered?: number; asked?: number; absent?: number; error?: string | null }>;
   visibility_score: number;
   gemini_score: number;
   chatgpt_score: number;
@@ -453,6 +464,7 @@ interface Strings {
   notCovered: string;
   modelFailed: (names: string) => string;
   modelPartial: (items: string) => string;
+  modelAbsent: (items: string) => string;
   retryModels: string;
   retryModelsBusy: string;
   retryModelsHint: string;
@@ -721,7 +733,8 @@ const STR: Record<Lang, Strings> = {
     covered: "Covered",
     notCovered: "Not covered",
     modelFailed: (names: string) => `${names} didn't respond during this audit — the numbers below are incomplete.`,
-    modelPartial: (items: string) => `Answered some prompts but not all: ${items}. The score divides by answers received, so it is not skewed — the sample behind those models is simply smaller.`,
+    modelPartial: (items: string) => `Some prompts went unanswered: ${items}. The score divides by answers received, so it is not skewed — the sample behind those models is simply smaller.`,
+    modelAbsent: (items: string) => `Nothing to measure on some queries: ${items}. Google doesn't draw an AI Overview for every search, and where there is none nobody is cited — not you, not a competitor. Those queries stay out of the score rather than counting against you.`,
     retryModels: "Ask them again",
     retryModelsBusy: "Asking…",
     retryModelsHint: "Only the unanswered prompts are asked again. Everything already measured stays as it is.",
@@ -992,7 +1005,8 @@ const STR: Record<Lang, Strings> = {
     covered: "Покрыто",
     notCovered: "Не покрыто",
     modelFailed: (names: string) => `${names} не ответил(а) во время аудита — цифры ниже неполные.`,
-    modelPartial: (items: string) => `Ответили не на все промпты: ${items}. Score считается от полученных ответов, так что он не искажён — просто выборка по этим моделям меньше.`,
+    modelPartial: (items: string) => `Часть промптов осталась без ответа: ${items}. Score считается от полученных ответов, так что он не искажён — просто выборка по этим моделям меньше.`,
+    modelAbsent: (items: string) => `Измерять нечего: ${items}. Google рисует AI Overview не на каждый запрос, а где его нет — там не цитируют никого, ни тебя, ни конкурентов. Такие запросы не идут в знаменатель, а не записываются тебе в минус.`,
     retryModels: "Спросить заново",
     retryModelsBusy: "Спрашиваем…",
     retryModelsHint: "Заново спрашиваются только промпты без ответа. Всё уже измеренное остаётся как есть.",
@@ -3144,7 +3158,8 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
        announced as having not responded, with the numbers called incomplete
        when they were exactly as complete as asked for. */
     return Object.entries(status)
-      .filter(([, v]) => !v.ok && v.enabled !== false && v.selected !== false)
+      .filter(([, v]) => !v.ok && v.enabled !== false && v.selected !== false
+        && gapOf(v) > 0)
       .map(([k, v]) => ({ key: k, label: labels[k] ?? k, reason: (v.error || "").trim() }));
   }, [data.model_status]);
 
@@ -3158,10 +3173,25 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     if (!status) return [];
     const labels = Object.fromEntries(MODELS.map((m) => [m.key, m.label]));
     return Object.entries(status)
-      .filter(([, v]) => v.ok && v.selected !== false
-        && typeof v.answered === "number" && typeof v.asked === "number"
-        && v.asked > 0 && v.answered < v.asked)
-      .map(([k, v]) => `${labels[k] ?? k} — ${v.answered}/${v.asked}`);
+      .filter(([, v]) => v.ok && v.selected !== false && gapOf(v) > 0)
+      .map(([k, v]) => `${labels[k] ?? k} — ${gapOf(v)}/${v.asked}`);
+  }, [data.model_status]);
+
+  /* Queries where the thing being measured does not exist.
+     AI Overviews is the only entry that can report this, because it is not a
+     model: it is a block on a Google results page, and Google draws it for
+     some queries and not others. A local query gets a map, a navigational one
+     gets the site. Nobody is cited on those — not this brand, not a rival —
+     so they stay out of the denominator rather than counting as "not named".
+     Which makes this a finding about the market, and it reads as one here
+     rather than sharing a box with the failures. */
+  const absentModels = useMemo(() => {
+    const status = data.model_status;
+    if (!status) return [];
+    const labels = Object.fromEntries(MODELS.map((m) => [m.key, m.label]));
+    return Object.entries(status)
+      .filter(([, v]) => v.selected !== false && (v.absent ?? 0) > 0)
+      .map(([k, v]) => `${labels[k] ?? k} — ${v.absent}/${v.asked}`);
   }, [data.model_status]);
 
   /* ---- recommendations, categorised ---- */
@@ -3850,9 +3880,17 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
         {/* Deliberately quieter than the amber box above: a smaller sample is
             worth saying, but it is not the same event as a model going silent,
             and two identical warnings would teach the reader to skim both. */}
-        {partialModels.length > 0 && (
-          <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-sm text-slate-700">{t.modelPartial(partialModels.join(", "))}</p>
+        {(partialModels.length > 0 || absentModels.length > 0) && (
+          <div className="mb-6 space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            {/* The finding first, the caveat second. "No overview exists here"
+                tells the reader something about their market; "we got fewer
+                answers than we asked for" only tells them about the run. */}
+            {absentModels.length > 0 && (
+              <p className="text-sm text-slate-700">{t.modelAbsent(absentModels.join(", "))}</p>
+            )}
+            {partialModels.length > 0 && (
+              <p className="text-sm text-slate-700">{t.modelPartial(partialModels.join(", "))}</p>
+            )}
           </div>
         )}
 
