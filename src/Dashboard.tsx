@@ -469,6 +469,7 @@ interface Strings {
   retryModelsBusy: string;
   retryModelsHint: string;
   retryModelsFailed: string;
+  retryNotSaved: string;
   sourcesTitle: string;
   menuProjects: string;
   menuHide: string;
@@ -739,6 +740,7 @@ const STR: Record<Lang, Strings> = {
     retryModelsBusy: "Asking…",
     retryModelsHint: "Only the unanswered prompts are asked again. Everything already measured stays as it is.",
     retryModelsFailed: "Could not reach them this time. The audit is unchanged.",
+    retryNotSaved: "The new answers are on screen but could not be saved to this audit — reloading the page will lose them.",
     sourcesTitle: "Where AI looks for answers",
     menuProjects: "← My projects",
     menuHide: "Hide the menu",
@@ -1011,6 +1013,7 @@ const STR: Record<Lang, Strings> = {
     retryModelsBusy: "Спрашиваем…",
     retryModelsHint: "Заново спрашиваются только промпты без ответа. Всё уже измеренное остаётся как есть.",
     retryModelsFailed: "В этот раз достучаться не вышло. Аудит не изменился.",
+    retryNotSaved: "Новые ответы на экране, но сохранить их в аудит не удалось — после перезагрузки страницы они пропадут.",
     sourcesTitle: "Откуда AI берёт ответы",
     menuProjects: "← Мои проекты",
     menuHide: "Скрыть меню",
@@ -3227,11 +3230,22 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       const merged: AuditData = { ...data, ...next, recommendations: data.recommendations };
       setExtendedData(merged);
 
-      if (auditId && Array.isArray(next.added_models) && next.added_models.length) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await saveAddedModels({ auditId, userId: user.id,
-                                  models: next.added_models, data: merged });
+      /* Say so when the new numbers cannot be stored. They are on screen
+         either way, and the first version let that difference pass in
+         silence: the score moved, the page was reloaded, and the answers
+         that had just been paid for were simply gone. */
+      if (Array.isArray(next.added_models) && next.added_models.length) {
+        if (!auditId) {
+          setRetryError(t.retryNotSaved);
+        } else {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            setRetryError(t.retryNotSaved);
+          } else {
+            const saved = await saveAddedModels({ auditId, userId: user.id,
+                                                  models: next.added_models, data: merged });
+            if (!saved.ok) setRetryError(t.retryNotSaved);
+          }
         }
       }
     } catch {

@@ -130,21 +130,48 @@ export async function saveAddedModels(opts: {
   userId: string;
   models: string[];
   data: AuditPayload;
-}): Promise<void> {
+}): Promise<{ ok: boolean; reason?: string }> {
   const { auditId, userId, models, data } = opts;
-  if (!models.length) return;
+  if (!models.length) return { ok: true };
 
+  /* The run row goes first, and that ordering is the whole lesson here.
+     It carries the payload the report is rebuilt from on reload, so it is
+     what a refresh actually reads. The first version wrote the per-prompt
+     rows first and abandoned everything if clearing them failed — which left
+     the recalculated score on screen, nowhere on disk, and gone the moment
+     the page reloaded, with only a console line to say so. */
+  const { error: updErr } = await supabase
+    .from("audits")
+    .update({
+      payload: data,
+      visibility_score: data.visibility_score,
+      gemini_score: data.gemini_score,
+      chatgpt_score: data.chatgpt_score,
+      total_prompts: data.total_prompts,
+      mentions_score: data.mentions_score,
+      citations_score: data.citations_score,
+    })
+    .eq("id", auditId);
+  if (updErr) {
+    console.error("audit totals not updated", updErr);
+    return { ok: false, reason: updErr.message };
+  }
+
+  /* The per-prompt rows are the secondary copy, read by aggregations rather
+     than by the report. Clearing before inserting because the original run
+     may already hold rows for this model — a model that was asked and stayed
+     silent still wrote `mentioned: false` for every prompt, and inserting on
+     top would leave two rows per prompt with the failure still among them.
+     If the clear fails the insert is skipped, but the report is already
+     saved: a stale secondary copy beats a lost primary one. */
   const { error: delErr } = await supabase
     .from("audit_prompts")
     .delete()
     .eq("audit_id", auditId)
     .in("model", models);
   if (delErr) {
-    // Stop rather than insert: adding to rows that should have gone is the one
-    // outcome worse than not saving at all, because it inflates the counts and
-    // nothing on screen would show it.
     console.error("old model rows not cleared, skipping insert", delErr);
-    return;
+    return { ok: true, reason: "prompt rows left as they were" };
   }
 
   const rows = (data.results || []).flatMap((r) =>
@@ -166,20 +193,7 @@ export async function saveAddedModels(opts: {
     const { error } = await supabase.from("audit_prompts").insert(rows);
     if (error) console.error("added model rows not saved", error);
   }
-
-  const { error: updErr } = await supabase
-    .from("audits")
-    .update({
-      payload: data,
-      visibility_score: data.visibility_score,
-      gemini_score: data.gemini_score,
-      chatgpt_score: data.chatgpt_score,
-      total_prompts: data.total_prompts,
-      mentions_score: data.mentions_score,
-      citations_score: data.citations_score,
-    })
-    .eq("id", auditId);
-  if (updErr) console.error("audit totals not updated", updErr);
+  return { ok: true };
 }
 
 export async function saveAddedPrompts(opts: {
