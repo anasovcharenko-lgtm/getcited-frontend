@@ -3353,6 +3353,52 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
   const modelsForTab = (r: AuditResult) =>
     (tab === "all" ? ran : ran.filter((k) => k === tab)).map((k) => infoFor(r, k));
 
+  /* The competitor table, counted for whichever tab is open.
+
+     `competitor_ranking` arrives totalled across every model, and the card
+     above it switched its denominator with the tab while these numbers did
+     not. On a single-model tab that produced "Sandbox VR — 12 of 10": twelve
+     mentions across four models, over the ten answers one model gave. An
+     impossible number, which is the useful kind of bug — it cannot be read as
+     a surprising result.
+
+     The rows carry per-model detail already, so the counts are rebuilt from
+     them rather than from the two legacy per-model fields on the stat, which
+     only ever named gemini and chatgpt. The combined tab keeps using the
+     backend's own totals: the headline should not drift from what was stored
+     because the browser re-added it slightly differently. */
+  const rankingForTab = useMemo(() => {
+    if (tab === "all") return data.competitor_ranking;
+    const key = tab as ModelName;
+    const answered = data.results.filter((r) => (infoFor(r, key).answer || "").trim()).length;
+    const count = (pick: (i: ModelMentionInfo) => boolean) =>
+      data.results.filter((r) => pick(infoFor(r, key))).length;
+
+    return data.competitor_ranking
+      .map((c) => {
+        /* Your own row goes through modelNamedCount rather than counting the
+           rows again. That function prefers the stored per-model score and
+           only falls back to the rows, and the card above this bar uses it —
+           so recounting here would let the two disagree whenever a stored
+           score and the rows it came from have drifted apart. */
+        const total = c.is_your_brand
+          ? modelNamedCount(data, key)
+          : count((i) => (i.competitors_found || []).includes(c.name));
+        return {
+          ...c,
+          total_mentions: total,
+          mentions_with_link: c.is_your_brand
+            ? count((i) => i.mentioned_with_link)
+            : count((i) => (i.competitors_with_link || []).includes(c.name)),
+          mentions_without_link: c.is_your_brand
+            ? count((i) => i.mentioned_without_link)
+            : count((i) => (i.competitors_without_link || []).includes(c.name)),
+          mention_rate: answered ? Math.round((total / answered) * 100) : 0,
+        };
+      })
+      .sort((a, b) => b.total_mentions - a.total_mentions);
+  }, [data.competitor_ranking, data.results, tab]);
+
   /* ---- metrics for the selected model tab ---- */
   const metrics = useMemo(() => {
     let citationCount = 0;
@@ -3399,7 +3445,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       scorePct = data.total_prompts ? Math.round((named / data.total_prompts) * 100) : 0;
     }
 
-    const others = data.competitor_ranking.filter((c) => !c.is_your_brand);
+    const others = rankingForTab.filter((c) => !c.is_your_brand);
     const competitorAvg = others.length ? Math.round(others.reduce((s, c) => s + c.mention_rate, 0) / others.length) : 0;
     const topRivalsByCitations = [...others].sort((a, b) => b.mentions_with_link - a.mentions_with_link).slice(0, 2);
     const topRivalsByBareMentions = [...others].sort((a, b) => b.mentions_without_link - a.mentions_without_link).slice(0, 2);
@@ -3409,7 +3455,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     return { citationCount, bareMentionCount, scorePct, competitorAvg,
              topRivalsByCitations, topRivalsByBareMentions,
              answers, named, withLinkPct: pct(citationCount), noLinkPct: pct(bareMentionCount) };
-  }, [tab, data]);
+  }, [tab, data, rankingForTab]);
 
   /* ---- uncovered / best-covered prompts ---- */
   const uncoveredPrompts = useMemo(() => {
@@ -3675,12 +3721,15 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
      different outcomes — and says it at any sample size. Labels sit in their
      own column, so they cannot collide however close the values are. */
   const landscapeRows = useMemo(() => {
-    const all = data.competitor_ranking;
+    // Follows the tab for the same reason the bars above it do: a share of
+    // answers has to be a share of the answers being looked at.
+    const all = rankingForTab;
     /* Widths are a share of answers received, the denominator both counts come
        out of, so a bar length means the same thing on every row and between two
        audits. The observed maximum is the fallback for a run stored before
        `answers` was returned. */
-    const denom = data.answers
+    const denom = metrics.answers
+      || data.answers
       || Math.max(...all.map((c) => c.total_mentions), 0)
       || 1;
     return all
@@ -3692,7 +3741,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       .sort((a, b) =>
         (b.mentions_with_link - a.mentions_with_link) ||
         (b.mentions_without_link - a.mentions_without_link));
-  }, [data.competitor_ranking, data.answers]);
+  }, [rankingForTab, data.answers, metrics.answers]);
 
   /* ---- history chart geometry ---- */
   const historyGeom = useMemo(() => {
@@ -4305,7 +4354,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
             </div>
           </div>
           <div className="space-y-2">
-            {data.competitor_ranking.slice(0, 5).map((stat) => {
+            {rankingForTab.slice(0, 5).map((stat) => {
               // Counts, not percentages: "0 of 18" gives the gap a size you can
               // aim at, where "0%" is just a score you are losing.
               /* The count itself, against the same denominator as the cards.
@@ -4317,7 +4366,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                  each other on the same screen. */
               const total = metrics.answers || data.total_prompts || 1;
               const covered = stat.total_mentions;
-              const max = Math.max(...data.competitor_ranking.map((s) => s.mention_rate), 1);
+              const max = Math.max(...rankingForTab.map((s) => s.mention_rate), 1);
               const empty = covered === 0;
               return (
                 <div key={stat.name} className="flex items-center gap-3">
