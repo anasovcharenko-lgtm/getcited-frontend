@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ChevronDown, ChevronRight, Lock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -427,6 +427,10 @@ interface Strings {
   infRun: string;
   infNotChecked: (pages: number, domains: number) => string;
   infSummary: (gaps: number, present: number, total: number) => string;
+  citedShort: (n: number) => string;
+  oppTitle: string;
+  oppSub: string;
+  oppLine: (cited: number, names: string) => string;
   infYouHere: string;
   infRivalsNotYou: (names: string) => string;
   infTier1: string;
@@ -690,6 +694,13 @@ const STR: Record<Lang, Strings> = {
     /* The sentence the whole section exists for, so it gets said
        plainly rather than reusing the overview's footnote. */
     infRivalsNotYou: (names) => `Named here: ${names}. You are not.`,
+    /* The short form of citedTimes above. That one is a sentence and reads
+       well on its own; this sits inline after a page title, where the count
+       has to be taken in at a glance rather than read out. */
+    citedShort: (n) => `${n}×`,
+    oppTitle: "Where a mention would do the most work",
+    oppSub: "Pages the models read to answer these questions, with a competitor named on them and you absent — most-cited first. Whether a mention can actually be had on any of them is a separate question this audit cannot answer: the order is what the models lean on, not what is easy to get.",
+    oppLine: (cited, names) => `cited ${cited}× · named here: ${names}. You are not.`,
     infTier1: "Tier 1 — someone else decides",
     infTier1Desc: "Press, directories and industry sites. Slowest to move, and the hardest thing here for a competitor to copy.",
     infTier2: "Tier 2 — you can post there today",
@@ -757,10 +768,14 @@ const STR: Record<Lang, Strings> = {
     menuCitations: "Sources by question",
     menuRecs: "Recommendations",
     sourcesSummary: (n) => `${n} source${n === 1 ? "" : "s"} shaped these answers.`,
+    /* No longer "all". Only the most-cited pages are opened, so the count is
+       of what was checked — saying "all" of a number smaller than the list
+       beside it is the kind of small lie that costs a reader their trust in
+       the big numbers too. */
     sourcesChecked: (n, present) =>
       present === 0
-        ? `Checked all ${n}. None of them mention you.`
-        : `Checked all ${n}. ${present} mention${present === 1 ? "s" : ""} you.`,
+        ? `Checked ${n} site${n === 1 ? "" : "s"}. None of them mention you.`
+        : `Checked ${n} site${n === 1 ? "" : "s"}. ${present} mention${present === 1 ? "s" : ""} you.`,
     sourcesRun: "Check which of them mention you →",
     sourcesRunning: "Opening pages…",
     sourcesRunningN: (n) => `Opening ${n} page${n === 1 ? "" : "s"}, about ${Math.max(3, Math.round(n * 0.6))}s…`,
@@ -962,6 +977,10 @@ const STR: Record<Lang, Strings> = {
         : `Конкурентов называют на ${gaps} ${ruPlural(gaps, "странице", "страницах", "страницах")} из ${total}, где вас нет. Вы есть на ${present}.`,
     infYouHere: "Вы на этой странице уже есть.",
     infRivalsNotYou: (names) => `Здесь названы: ${names}. Вас — нет.`,
+    citedShort: (n) => `${n}×`,
+    oppTitle: "Где упоминание даст больше всего",
+    oppSub: "Страницы, которые модели читают, отвечая на эти вопросы: конкурент на них назван, вас — нет. Сверху те, куда модели ходят чаще. Удастся ли там разместиться — отдельный вопрос, на который этот аудит ответить не может: порядок здесь по тому, на что опираются модели, а не по тому, что легче получить.",
+    oppLine: (cited, names) => `цитируется ${cited}× · здесь названы: ${names}. Вас — нет.`,
     infTier1: "Tier 1 — решает кто-то другой",
     infTier1Desc: "СМИ, каталоги и отраслевые сайты. Двигается медленнее всего — и конкуренту это скопировать тяжелее всего.",
     infTier2: "Tier 2 — можно опубликовать самому сегодня",
@@ -1031,8 +1050,8 @@ const STR: Record<Lang, Strings> = {
     sourcesSummary: (n) => `${n} источник(ов) сформировали эти ответы.`,
     sourcesChecked: (n, present) =>
       present === 0
-        ? `Проверили все ${n}. Ни один вас не упоминает.`
-        : `Проверили все ${n}. Вас упоминают: ${present}.`,
+        ? `Проверили ${n} ${ruPlural(n, "сайт", "сайта", "сайтов")}. Ни один вас не упоминает.`
+        : `Проверили ${n} ${ruPlural(n, "сайт", "сайта", "сайтов")}. Вас упоминают: ${present}.`,
     sourcesRun: "Проверить, кто из них вас упоминает →",
     sourcesRunning: "Открываем страницы…",
     /* Three plural forms, and the naive "n < 5" test breaks at 21: it would
@@ -2113,7 +2132,18 @@ type SourceChecks = {
   loading: boolean;
   failed: boolean;
   run: () => Promise<void>;
+  /* How many answers cited a page. Free — it is already in the payload — and
+     it is the number that decides which source is worth the work, so it
+     travels with the verdicts rather than being looked up beside them. */
+  citedCount: (url: string) => number;
 };
+
+/* Ranking is free and reading is not. The audit now stores every cited page
+   rather than one per site, which is what makes a suggestion able to name a
+   place; but each check opens that page and waits for it. So all of them are
+   counted and ordered, and only the most-cited are opened. Twenty is roughly
+   half a minute, which is a wait someone will sit through. */
+const CHECK_PAGES = 20;
 
 function useSourceChecks(data: AuditData): SourceChecks {
   const [checks, setChecks] = useState<SourceCheck[] | null>(null);
@@ -2132,7 +2162,23 @@ function useSourceChecks(data: AuditData): SourceChecks {
       .sort((a, b) => b.count - a.count);
   }, [data.citations]);
 
-  const urlCount = useMemo(() => domains.reduce((n, d) => n + d.urls.length, 0), [domains]);
+  /* Every cited page, most-cited first. The audit's own order already is this,
+     but it is restated rather than relied on: a stored payload from before the
+     per-page change, or one merged by a retry, can arrive in any order. */
+  const pages = useMemo(
+    () => [...data.citations]
+      .map((c) => ({ url: c.url, domain: c.domain, count: c.total || 1 }))
+      .sort((a, b) => b.count - a.count),
+    [data.citations]);
+
+  const counts = useMemo(
+    () => new Map(pages.map((p) => [p.url, p.count])), [pages]);
+  const citedCount = useCallback((url: string) => counts.get(url) ?? 0, [counts]);
+
+  /* What the run will actually open, not what exists. The label beside the
+     button promises this number and then the progress line counts up to it. */
+  const urlCount = useMemo(
+    () => Math.min(pages.length, CHECK_PAGES), [pages]);
 
   /* Sent in small batches, all in flight at once, with the results appended as
      each lands. One request for everything took five seconds behind a greyed
@@ -2147,7 +2193,7 @@ function useSourceChecks(data: AuditData): SourceChecks {
   const run = async () => {
     // Guarded, because two screens can now reach the same button.
     if (loading || checks) return;
-    const urls = domains.flatMap((d) => d.urls);
+    const urls = pages.slice(0, CHECK_PAGES).map((p) => p.url);
     setLoading(true);
     setFailed(false);
     setChecks([]);
@@ -2182,7 +2228,7 @@ function useSourceChecks(data: AuditData): SourceChecks {
     setLoading(false);
   };
 
-  return { domains, urlCount, checks, loading, failed, run };
+  return { domains, urlCount, checks, loading, failed, run, citedCount };
 }
 
 function SourceGap({ src, t }: { src: SourceChecks; t: Strings }) {
@@ -2206,7 +2252,15 @@ function SourceGap({ src, t }: { src: SourceChecks; t: Strings }) {
     return { status: "unreadable" as const, foundIn: "", reason: mine[0].reason };
   };
 
-  const presentCount = (checks || []).filter((c) => c.status === "present").length;
+  /* Counted in sites, because the line beside them is about sites and the
+     chips are one per site. Counting checks instead would say "4 mention you"
+     where 4 is pages and the number next to it is domains — and now that a
+     site can contribute several pages, those two drift apart. */
+  const checkedDomains = useMemo(
+    () => new Set((checks || []).map((c) => c.domain)).size, [checks]);
+  const presentCount = useMemo(
+    () => new Set((checks || []).filter((c) => c.status === "present").map((c) => c.domain)).size,
+    [checks]);
 
   if (domains.length === 0) return null;
 
@@ -2224,7 +2278,7 @@ function SourceGap({ src, t }: { src: SourceChecks; t: Strings }) {
         {loading && checks
           ? t.sourcesProgress(checks.length, urlCount)
           : checks
-            ? t.sourcesChecked(domains.length, presentCount)
+            ? t.sourcesChecked(checkedDomains, presentCount)
             : t.sourcesSummary(domains.length)}
       </p>
 
@@ -2339,7 +2393,27 @@ function SourceGap({ src, t }: { src: SourceChecks; t: Strings }) {
    Nothing new is fetched. The run is shared, so whichever screen starts it,
    both have the answer. */
 function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData; t: Strings }) {
-  const { domains, urlCount, checks, loading, failed, run } = src;
+  const { domains, urlCount, checks, loading, failed, run, citedCount } = src;
+
+  /* Where a mention would do the most work: pages the models actually read to
+     answer these questions, with a competitor named on them and not this
+     brand, heaviest-cited first.
+
+     Everything here was measured. Whether a mention can be had on any given
+     page is a different question that nothing in this audit can answer, so the
+     list stops at stating the gap — the ranking is of what models lean on,
+     not of what is easy to get. Tier 3 is excluded because it is this brand's
+     own site, where there is no one to persuade. */
+  const opportunities = useMemo(() => {
+    const brandDomain = data.brand_domain || "";
+    return (checks || [])
+      .filter((c) => c.status === "absent"
+        && c.competitors_on_page.length > 0
+        && tierOf(c.domain, brandDomain) !== 3)
+      .map((c) => ({ ...c, cited: citedCount(c.url) }))
+      .sort((a, b) => b.cited - a.cited || b.competitors_on_page.length - a.competitors_on_page.length)
+      .slice(0, 10);
+  }, [checks, data.brand_domain, citedCount]);
 
   const tiers = useMemo(() => {
     const rows = (checks || []).map((c) => ({
@@ -2398,6 +2472,42 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
         <p className="mt-4 max-w-2xl text-sm text-neutral-900">{t.infSummary(gaps, present, checks.length)}</p>
       )}
 
+      {/* Above the tier groups, because this is the part that tells someone
+          what to do on Monday. The groups below are the full reading; this is
+          the short list drawn from it. */}
+      {opportunities.length > 0 && (
+        <div className="mt-5 rounded-xl border border-neutral-200 bg-white p-5">
+          <h4 className="text-sm font-semibold">{t.oppTitle}</h4>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-neutral-500">{t.oppSub}</p>
+          <ol className="mt-4 space-y-3">
+            {opportunities.map((o, i) => (
+              <li key={o.url} className="flex gap-3">
+                <span className="mt-0.5 w-4 shrink-0 text-right text-xs tabular-nums text-neutral-400">
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <a
+                    href={o.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={o.url}
+                    className="flex items-baseline gap-1.5 text-xs hover:underline"
+                  >
+                    <span className="shrink-0 text-neutral-500">{o.domain}</span>
+                    <span className="truncate text-neutral-900">
+                      {o.title || titleFromSlug(o.url) || o.url}
+                    </span>
+                  </a>
+                  <p className="mt-0.5 text-[11px] leading-snug text-neutral-500">
+                    {t.oppLine(o.cited, o.competitors_on_page.join(", "))}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       {checks && checks.length > 0 && (
         <div className="mt-5 space-y-6">
           {tiers.map((g) => (
@@ -2427,6 +2537,15 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
                           <span className="truncate text-neutral-900">
                             {r.title || titleFromSlug(r.url) || path}
                           </span>
+                          {/* How often the models went here. Without it a page
+                              they lean on constantly and one they touched once
+                              read identically, and the whole list sorts by a
+                              number nobody can see. */}
+                          {citedCount(r.url) > 0 && (
+                            <span className="shrink-0 tabular-nums text-neutral-400">
+                              {t.citedShort(citedCount(r.url))}
+                            </span>
+                          )}
                         </a>
                         <p className="mt-0.5 text-[11px] leading-snug text-neutral-500">
                           {r.status === "unreadable"
