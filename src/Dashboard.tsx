@@ -150,7 +150,13 @@ export type Citation = {
   gemini_count: number;
   chatgpt_count: number;
   total: number;
+  /* The first prompt that cited this page. Superseded by `prompts` and kept
+     because audits stored before that still carry only this one. */
   prompt: string;
+  prompts?: string[];
+  /* One per registered model, named at runtime — perplexity_count and the
+     rest — which an index signature is the only way to type. */
+  [k: string]: unknown;
 };
 
 export type SourceCheck = {
@@ -164,6 +170,8 @@ export type SourceCheck = {
      slug fallback has to carry it. */
   title?: string;
   found_in?: "post" | "comment" | "";
+  /* What the page's own schema.org markup says it is, when it says anything. */
+  declared_kind?: string;
 };
 
 export type AuditData = {
@@ -428,6 +436,11 @@ interface Strings {
   infNotChecked: (pages: number, domains: number) => string;
   infSummary: (gaps: number, present: number, total: number) => string;
   citedShort: (n: number) => string;
+  csvSources: (n: number) => string;
+  csvYes: string;
+  csvNo: string;
+  csvUnreadable: string;
+  csvNotChecked: string;
   oppTitle: string;
   oppSub: string;
   oppLine: (cited: number, names: string) => string;
@@ -698,6 +711,13 @@ const STR: Record<Lang, Strings> = {
        well on its own; this sits inline after a page title, where the count
        has to be taken in at a glance rather than read out. */
     citedShort: (n) => `${n}×`,
+    csvSources: (n) => `Download all ${n} sources (CSV)`,
+    csvYes: "yes",
+    csvNo: "no",
+    csvUnreadable: "page could not be read",
+    /* Not "no". Only the most-cited pages are opened, and a blank or a "no"
+       on the rest would be a claim about pages nobody looked at. */
+    csvNotChecked: "not checked",
     oppTitle: "Where a mention would do the most work",
     oppSub: "Pages the models read to answer these questions, with a competitor named on them and you absent — most-cited first. Whether a mention can actually be had on any of them is a separate question this audit cannot answer: the order is what the models lean on, not what is easy to get.",
     oppLine: (cited, names) => `cited ${cited}× · named here: ${names}. You are not.`,
@@ -721,6 +741,8 @@ const STR: Record<Lang, Strings> = {
     fgNames: {
       listicle: "Lists and roundups", comparison: "Comparisons", review: "Reviews",
       video: "Video", guide: "Guides and how-tos", discussion: "Discussion threads",
+      media: "Press and articles", directory: "Directories and catalogues",
+      competitor: "A competitor's own site",
       other: "Everything else",
     },
     dgTitle: "Branded searches nobody has answered",
@@ -978,6 +1000,11 @@ const STR: Record<Lang, Strings> = {
     infYouHere: "Вы на этой странице уже есть.",
     infRivalsNotYou: (names) => `Здесь названы: ${names}. Вас — нет.`,
     citedShort: (n) => `${n}×`,
+    csvSources: (n) => `Скачать все ${n} ${ruPlural(n, "источник", "источника", "источников")} (CSV)`,
+    csvYes: "да",
+    csvNo: "нет",
+    csvUnreadable: "страницу не удалось прочитать",
+    csvNotChecked: "не проверялась",
     oppTitle: "Где упоминание даст больше всего",
     oppSub: "Страницы, которые модели читают, отвечая на эти вопросы: конкурент на них назван, вас — нет. Сверху те, куда модели ходят чаще. Удастся ли там разместиться — отдельный вопрос, на который этот аудит ответить не может: порядок здесь по тому, на что опираются модели, а не по тому, что легче получить.",
     oppLine: (cited, names) => `цитируется ${cited}× · здесь названы: ${names}. Вас — нет.`,
@@ -1001,6 +1028,8 @@ const STR: Record<Lang, Strings> = {
     fgNames: {
       listicle: "Подборки и топы", comparison: "Сравнения", review: "Отзывы",
       video: "Видео", guide: "Гайды и инструкции", discussion: "Обсуждения",
+      media: "СМИ и статьи", directory: "Каталоги и справочники",
+      competitor: "Сайт конкурента",
       other: "Всё остальное",
     },
     dgTitle: "Брендовые запросы, на которые никто не ответил",
@@ -1193,7 +1222,29 @@ function categorize(text: string): "mentions" | "technical" | "content" | "autho
 
    Honest about its own limits — a heuristic on a title cannot be sure, which
    is why the finding is always shown with the pages it was derived from. */
-type PageFormat = "listicle" | "comparison" | "review" | "video" | "guide" | "discussion" | "other";
+type PageFormat = "listicle" | "comparison" | "review" | "video" | "guide" | "discussion"
+  | "media" | "directory" | "competitor" | "other";
+
+/* What the page said it was, in schema.org markup the site publishes for
+   Google, mapped onto the shapes this screen talks in.
+
+   It is a stronger signal than anything guessable from a URL, and it is the
+   only honest way to call something press: a list of publications would be
+   wrong about every one not on it, and wrong in silence. */
+const DECLARED_FORMAT: Record<string, PageFormat> = {
+  article: "media",
+  list: "listicle",
+  video: "video",
+  discussion: "discussion",
+  faq: "guide",
+  listing: "directory",
+};
+
+/* Words that mark a catalogue rather than an article about one. Kept narrow:
+   "directory" and "каталог" are unambiguous, while "listing" alone appears in
+   half the property and job pages on the web. */
+const DIRECTORY_WORDS = new RegExp(
+  "(^|[^\\p{L}])(directory|catalogue|catalog|listings|каталог|справочник|реестр)", "iu");
 
 /* Hosts where the host IS the format. Deliberately short: vc.ru and habr.com
    are not here, because they carry articles of every shape and classifying
@@ -1240,7 +1291,8 @@ const FORMAT_WORDS: [RegExp, PageFormat][] = [
   [STEM("forum|форум|обсужден|thread"), "discussion"],
 ];
 
-function formatOf(url: string, title: string): PageFormat {
+function formatOf(url: string, title: string,
+                  declared = "", rivalDomains: string[] = []): PageFormat {
   let host = "", path = "";
   try {
     const u = new URL(url);
@@ -1248,13 +1300,29 @@ function formatOf(url: string, title: string): PageFormat {
     path = decodeURIComponent(u.pathname).toLowerCase();
   } catch { /* a malformed URL still has a title */ }
 
+  /* First, because it outranks everything else about the page. A competitor's
+     own site being cited is not a place to go and get mentioned — it is the
+     competitor winning — and filing it as a "guide" because the title says
+     "how to" would put it in a list of opportunities it does not belong in. */
+  if (host && rivalDomains.some((d) => d && (host === d || host.endsWith(`.${d}`)))) {
+    return "competitor";
+  }
+
   const byHost = FORMAT_HOSTS.find(([h]) => host === h || host.endsWith(`.${h}`));
   if (byHost) return byHost[1];
 
   // Title first, path second: a slug is abbreviated and a title is written for
   // a reader, which is also what the model read.
   const haystack = `${title} ${path.replace(/[-_/]+/g, " ")}`;
+
+  /* Before the declared type, not after. A page can declare ItemList and be a
+     "top 10" article, and the words say which of the two a reader would call
+     it; schema.org is the better witness to what a page IS, and these words
+     are the better witness to what it is FOR. */
   for (const [re, fmt] of FORMAT_WORDS) if (re.test(haystack)) return fmt;
+
+  if (declared && DECLARED_FORMAT[declared]) return DECLARED_FORMAT[declared];
+  if (DIRECTORY_WORDS.test(haystack)) return "directory";
   return "other";
 }
 
@@ -2136,6 +2204,10 @@ type SourceChecks = {
      it is the number that decides which source is worth the work, so it
      travels with the verdicts rather than being looked up beside them. */
   citedCount: (url: string) => number;
+  /* Which questions sent a model to a page. */
+  promptsFor: (url: string) => string[];
+  /* Competitors' domains, so a page can be recognised as one of theirs. */
+  rivalDomains: string[];
 };
 
 /* Ranking is free and reading is not. The audit now stores every cited page
@@ -2174,6 +2246,19 @@ function useSourceChecks(data: AuditData): SourceChecks {
   const counts = useMemo(
     () => new Map(pages.map((p) => [p.url, p.count])), [pages]);
   const citedCount = useCallback((url: string) => counts.get(url) ?? 0, [counts]);
+
+  const prompts = useMemo(() => new Map(data.citations.map((c) =>
+    // `prompt` is what an audit stored before the list existed; falling back to
+    // it means an older report exports one question rather than none.
+    [c.url, c.prompts?.length ? c.prompts : (c.prompt ? [c.prompt] : [])])),
+    [data.citations]);
+  const promptsFor = useCallback((url: string) => prompts.get(url) ?? [], [prompts]);
+
+  const rivalDomains = useMemo(
+    () => data.competitor_ranking.filter((c) => !c.is_your_brand)
+      .map((c) => (c.domain || "").replace(/^www\./, "").toLowerCase())
+      .filter(Boolean),
+    [data.competitor_ranking]);
 
   /* What the run will actually open, not what exists. The label beside the
      button promises this number and then the progress line counts up to it. */
@@ -2228,7 +2313,8 @@ function useSourceChecks(data: AuditData): SourceChecks {
     setLoading(false);
   };
 
-  return { domains, urlCount, checks, loading, failed, run, citedCount };
+  return { domains, urlCount, checks, loading, failed, run,
+           citedCount, promptsFor, rivalDomains };
 }
 
 function SourceGap({ src, t }: { src: SourceChecks; t: Strings }) {
@@ -2393,7 +2479,8 @@ function SourceGap({ src, t }: { src: SourceChecks; t: Strings }) {
    Nothing new is fetched. The run is shared, so whichever screen starts it,
    both have the answer. */
 function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData; t: Strings }) {
-  const { domains, urlCount, checks, loading, failed, run, citedCount } = src;
+  const { domains, urlCount, checks, loading, failed, run,
+          citedCount, promptsFor, rivalDomains } = src;
 
   /* Where a mention would do the most work: pages the models actually read to
      answer these questions, with a competitor named on them and not this
@@ -2437,6 +2524,66 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
   const gaps = (checks || []).filter((c) => c.status === "absent" && c.competitors_on_page.length).length;
   const present = (checks || []).filter((c) => c.status === "present").length;
 
+  /* One row per cited page, every page — not only the twenty that were
+     opened. The unopened ones still carry everything the audit itself
+     measured (who cited them, for which questions, how often); what they lack
+     is the page verdict, and the column says so rather than leaving a blank
+     that reads like "no competitors here".
+
+     Spreadsheet rather than screen, so the columns are the ones you sort and
+     filter by, and the multi-valued ones are joined with a pipe: a comma
+     inside a quoted CSV field is legal and survives the round trip, but it
+     stops a human skimming the file in a text editor. */
+  const downloadCsv = () => {
+    const checkFor = new Map((checks || []).map((c) => [c.url, c]));
+    const verdict = (c?: SourceCheck) =>
+      !c ? t.csvNotChecked
+        : c.status === "present" ? t.csvYes
+          : c.status === "absent" ? t.csvNo
+            : t.csvUnreadable;
+
+    const head = ["domain", "url", "title", "type", "cited_in_answers", "models",
+                  "prompts", "competitors_on_page", "brand_present",
+                  "country", "language"];
+    const esc = (v: unknown) =>
+      v === null || v === undefined ? "" : `"${String(v).replace(/"/g, '""')}"`;
+
+    const rows = [...data.citations]
+      .sort((a, b) => (b.total || 0) - (a.total || 0))
+      .map((cit) => {
+        const chk = checkFor.get(cit.url);
+        const title = chk?.title || titleFromSlug(cit.url) || "";
+        const models = MODELS
+          .filter((m) => Number(cit[`${m.key}_count`] ?? 0) > 0)
+          .map((m) => m.label);
+        return [
+          cit.domain,
+          cit.url,
+          title,
+          t.fgNames[formatOf(cit.url, title, chk?.declared_kind || "", rivalDomains)],
+          cit.total ?? 0,
+          models.join(" | "),
+          promptsFor(cit.url).join(" | "),
+          (chk?.competitors_on_page || []).join(" | "),
+          verdict(chk),
+          data.country || "",
+          data.language || "",
+        ].map(esc).join(",");
+      });
+
+    /* A byte-order mark, because Excel on Windows reads a CSV as the local
+       codepage without one and turns every Cyrillic title into mojibake. The
+       keyword export has the same gap and the same fix is worth making there. */
+    const csv = "﻿" + [head.join(","), ...rows].join("\n");
+    const href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `sources-${(data.brand || "audit").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+      + `-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(href);
+  };
+
   if (domains.length === 0) return null;
 
   const labels: Record<1 | 2 | 3, { name: string; desc: string }> = {
@@ -2470,6 +2617,20 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
           far is a different, smaller claim than the same count out of twenty. */}
       {checks && !loading && checks.length > 0 && (
         <p className="mt-4 max-w-2xl text-sm text-neutral-900">{t.infSummary(gaps, present, checks.length)}</p>
+      )}
+
+      {/* Offered once there are verdicts to put in it. The file is worth
+          having before then — the citations alone are most of it — but a
+          download with an empty brand_present column teaches people the
+          column is empty rather than that they skipped a step. */}
+      {checks && !loading && checks.length > 0 && (
+        <button
+          onClick={downloadCsv}
+          className="mt-3 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium
+                     text-neutral-700 transition hover:border-neutral-500 hover:text-neutral-900"
+        >
+          {t.csvSources(data.citations.length)}
+        </button>
       )}
 
       {/* Above the tier groups, because this is the part that tells someone
@@ -2579,7 +2740,7 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
    — "is any page of this shape yours, or does any of them name you" — is the
    same verdict that screen already fetched. */
 function FormatGap({ src, t }: { src: SourceChecks; t: Strings }) {
-  const { checks, loading } = src;
+  const { checks, loading, rivalDomains } = src;
 
   const groups = useMemo(() => {
     if (!checks?.length) return [];
@@ -2588,7 +2749,8 @@ function FormatGap({ src, t }: { src: SourceChecks; t: Strings }) {
       // A page nobody could read has no title to classify and no verdict to
       // report, so it is left out rather than filed under "other".
       if (c.status === "unreadable") continue;
-      const fmt = formatOf(c.url, c.title || titleFromSlug(c.url) || "");
+      const fmt = formatOf(c.url, c.title || titleFromSlug(c.url) || "",
+                           c.declared_kind || "", rivalDomains);
       const g = by.get(fmt) || { total: 0, yours: 0, examples: [] };
       g.total += 1;
       if (c.status === "present") g.yours += 1;
@@ -2602,7 +2764,7 @@ function FormatGap({ src, t }: { src: SourceChecks; t: Strings }) {
         Number(a.format === "other") - Number(b.format === "other") ||
         Number(a.yours > 0) - Number(b.yours > 0) ||
         b.total - a.total);
-  }, [checks]);
+  }, [checks, rivalDomains]);
 
   // Nothing to say until the shared run has produced verdicts. The button for
   // it lives in Influence; duplicating it here would mean two ways to spend
