@@ -3458,21 +3458,32 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
   }, [tab, data, rankingForTab]);
 
   /* ---- uncovered / best-covered prompts ---- */
+  /* Somebody was named and it was not you.
+
+     "Somebody" includes the brands the models raised unprompted, not only the
+     rivals on your list. Counting the list alone put a prompt won by a brand
+     you had not thought to track into "nobody has won" — a label that says
+     the opposite of what happened, about exactly the prompt most worth
+     reading, since an unfamiliar name taking your question is news twice
+     over. Share of voice has named seventeen brands in a run where the list
+     held four, so this is the common case rather than the edge. */
   const uncoveredPrompts = useMemo(() => {
     return data.results
       .map((r) => {
         const ms = modelsForTab(r);
         const youMentioned = ms.some((m) => m.mentioned);
         const competitors = Array.from(new Set(ms.flatMap((m) => m.competitors_found)));
-        return { prompt: r.prompt, competitors, youMentioned, result: r };
+        const discovered = Array.from(new Set(ms.flatMap((m) => m.discovered_brands || [])));
+        return { prompt: r.prompt, competitors, discovered, youMentioned, result: r };
       })
-      .filter((r) => !r.youMentioned && r.competitors.length > 0);
+      .filter((r) => !r.youMentioned && (r.competitors.length > 0 || r.discovered.length > 0));
   }, [tab, data.results]);
 
-  /* Neither you nor any competitor you listed. These used to appear nowhere:
-     "covered" needs you named, "uncovered" needs a rival named, and a prompt
-     that named nobody satisfies neither — while being the cheapest to win,
-     since there is no incumbent to displace. */
+  /* Nobody at all — not you, not a rival you listed, not a brand the models
+     brought up themselves. These used to appear nowhere: "covered" needs you
+     named and "uncovered" needs a rival named, and a prompt that named nobody
+     satisfies neither, while being the cheapest to win since there is no
+     incumbent to displace. */
   const openPrompts = useMemo(() => {
     return data.results
       .map((r) => {
@@ -3481,10 +3492,11 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           prompt: r.prompt,
           youMentioned: ms.some((m) => m.mentioned),
           competitors: Array.from(new Set(ms.flatMap((m) => m.competitors_found))),
+          discovered: Array.from(new Set(ms.flatMap((m) => m.discovered_brands || []))),
           result: r,
         };
       })
-      .filter((r) => !r.youMentioned && r.competitors.length === 0);
+      .filter((r) => !r.youMentioned && r.competitors.length === 0 && r.discovered.length === 0);
   }, [tab, data.results]);
 
   const bestCoveredPrompts = useMemo(() => {
