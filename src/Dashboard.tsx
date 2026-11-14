@@ -436,6 +436,13 @@ interface Strings {
   infNotChecked: (pages: number, domains: number) => string;
   infSummary: (gaps: number, present: number, total: number) => string;
   citedShort: (n: number) => string;
+  grpNamed: string;
+  grpNamedDesc: string;
+  grpPassed: string;
+  grpPassedDesc: string;
+  tierShort: Record<1 | 2 | 3, string>;
+  youAndRivals: (names: string) => string;
+  askedFor: (n: number) => string;
   csvSources: (n: number) => string;
   csvYes: string;
   csvNo: string;
@@ -711,6 +718,15 @@ const STR: Record<Lang, Strings> = {
        well on its own; this sits inline after a page title, where the count
        has to be taken in at a glance rather than read out. */
     citedShort: (n) => `${n}×`,
+    grpNamed: "Pages that name you or a rival",
+    grpNamedDesc: "Someone from your list is on these. This is where the answers come from, and where a gap is worth closing.",
+    grpPassed: "Pages the model read on the way",
+    /* Not "background". The group collects the pages where we found nobody,
+       which includes the pages where we looked badly. */
+    grpPassedDesc: "Nobody from your list was found here. Either the model drew on them for context, or the name is there in a form we did not match.",
+    tierShort: { 1: "someone else decides", 2: "you can post here", 3: "yours" },
+    youAndRivals: (names) => `You are here. So are: ${names}.`,
+    askedFor: (n) => `Cited for ${n === 1 ? "the question" : `${n} questions`}:`,
     csvSources: (n) => `Download all ${n} sources (CSV)`,
     csvYes: "yes",
     csvNo: "no",
@@ -1000,6 +1016,13 @@ const STR: Record<Lang, Strings> = {
     infYouHere: "Вы на этой странице уже есть.",
     infRivalsNotYou: (names) => `Здесь названы: ${names}. Вас — нет.`,
     citedShort: (n) => `${n}×`,
+    grpNamed: "Страницы, где названы вы или конкурент",
+    grpNamedDesc: "На этих есть кто-то из вашего списка. Отсюда и берутся ответы, и здесь пробел имеет смысл закрывать.",
+    grpPassed: "Страницы, которые модель прочла по дороге",
+    grpPassedDesc: "Никого из вашего списка здесь не нашлось. Либо модель читала их для контекста, либо имя есть, но в форме, которую мы не распознали.",
+    tierShort: { 1: "решает кто-то другой", 2: "можно опубликовать самому", 3: "ваша" },
+    youAndRivals: (names) => `Вы здесь есть. И они: ${names}.`,
+    askedFor: (n) => `Процитирована по ${n} ${ruPlural(n, "вопросу", "вопросам", "вопросам")}:`,
     csvSources: (n) => `Скачать все ${n} ${ruPlural(n, "источник", "источника", "источников")} (CSV)`,
     csvYes: "да",
     csvNo: "нет",
@@ -2502,24 +2525,32 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
       .slice(0, 10);
   }, [checks, data.brand_domain, citedCount]);
 
-  const tiers = useMemo(() => {
-    const rows = (checks || []).map((c) => ({
-      ...c,
-      tier: tierOf(c.domain, data.brand_domain || ""),
-      /* The sharp gap first: a page a model reads, with a competitor on it and
-         not you. Then pages with nobody on them, then the ones you already
-         hold, then the ones we could not read — "no verdict" is not a finding
-         and should not sit above one. */
-      rank: c.status === "unreadable" ? 3
-        : c.status === "present" ? 2
-          : c.competitors_on_page.length ? 0 : 1,
-    }));
-    return [1, 2, 3].map((tier) => ({
-      tier: tier as 1 | 2 | 3,
-      rows: rows.filter((r) => r.tier === tier).sort((a, b) =>
-        a.rank - b.rank || b.competitors_on_page.length - a.competitors_on_page.length),
-    })).filter((g) => g.rows.length > 0);
-  }, [checks, data.brand_domain]);
+  /* Two groups, split on the only question that changes what you do about a
+     page: is anyone from your list on it.
+
+     This replaces a grouping by tier — who decides what goes on the page.
+     That is a real distinction and it is still on each row, but it was the
+     wrong thing to sort by, because it put a competitor's own franchise site
+     under "press and directories" and asked the reader to wonder why they
+     were not on it.
+
+     The second group is deliberately not called background. It is the pages
+     where we found nobody, which includes the pages where we looked badly —
+     an unreadable page, a name spelled differently. A residual group collects
+     our failures as well as the genuine passers-by, and labelling it
+     "context" would quietly promote one to the other. */
+  const groups = useMemo(() => {
+    const withSomeone: SourceCheck[] = [];
+    const passedThrough: SourceCheck[] = [];
+    for (const c of checks || []) {
+      (c.status === "present" || c.competitors_on_page.length
+        ? withSomeone : passedThrough).push(c);
+    }
+    const byUse = (a: SourceCheck, b: SourceCheck) =>
+      citedCount(b.url) - citedCount(a.url)
+      || b.competitors_on_page.length - a.competitors_on_page.length;
+    return { withSomeone: withSomeone.sort(byUse), passedThrough: passedThrough.sort(byUse) };
+  }, [checks, citedCount]);
 
   const gaps = (checks || []).filter((c) => c.status === "absent" && c.competitors_on_page.length).length;
   const present = (checks || []).filter((c) => c.status === "present").length;
@@ -2542,8 +2573,12 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
           : c.status === "absent" ? t.csvNo
             : t.csvUnreadable;
 
-    const head = ["domain", "url", "title", "type", "cited_in_answers", "models",
-                  "prompts", "competitors_on_page", "brand_present",
+    /* `group` repeats what brand_present and competitors_on_page already
+       imply, and earns its place anyway: it is the split the screen is
+       organised by, and a file that needs a formula to reproduce the screen's
+       first distinction is a file nobody sorts correctly. */
+    const head = ["group", "domain", "url", "title", "type", "cited_in_answers",
+                  "models", "prompts", "competitors_on_page", "brand_present",
                   "country", "language"];
     const esc = (v: unknown) =>
       v === null || v === undefined ? "" : `"${String(v).replace(/"/g, '""')}"`;
@@ -2556,7 +2591,9 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
         const models = MODELS
           .filter((m) => Number(cit[`${m.key}_count`] ?? 0) > 0)
           .map((m) => m.label);
+        const named = chk && (chk.status === "present" || chk.competitors_on_page.length > 0);
         return [
+          !chk ? t.csvNotChecked : named ? t.grpNamed : t.grpPassed,
           cit.domain,
           cit.url,
           title,
@@ -2586,11 +2623,12 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
 
   if (domains.length === 0) return null;
 
-  const labels: Record<1 | 2 | 3, { name: string; desc: string }> = {
-    1: { name: t.infTier1, desc: t.infTier1Desc },
-    2: { name: t.infTier2, desc: t.infTier2Desc },
-    3: { name: t.infTier3, desc: t.infTier3Desc },
-  };
+  /* The tier headings and their paragraphs are gone with the grouping they
+     titled; the tier itself survives as one word at the end of each row, from
+     t.tierShort. The long-form strings are left in the dictionary rather than
+     deleted — they are the better explanation of what the tiers mean, and the
+     place for them is a definition, not a heading over a list sorted by
+     something else. */
 
   return (
     <div className="mt-5 rounded-2xl border border-neutral-150 bg-neutral-50/60 p-6">
@@ -2671,14 +2709,18 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
 
       {checks && checks.length > 0 && (
         <div className="mt-5 space-y-6">
-          {tiers.map((g) => (
-            <div key={g.tier}>
-              <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{labels[g.tier].name}</p>
-              <p className="mt-0.5 max-w-2xl text-xs text-neutral-400">{labels[g.tier].desc}</p>
-              <div className="mt-2.5 space-y-2.5">
+          {([
+            { key: "with", rows: groups.withSomeone, name: t.grpNamed, desc: t.grpNamedDesc },
+            { key: "past", rows: groups.passedThrough, name: t.grpPassed, desc: t.grpPassedDesc },
+          ] as const).filter((g) => g.rows.length > 0).map((g) => (
+            <div key={g.key}>
+              <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{g.name}</p>
+              <p className="mt-0.5 max-w-2xl text-xs text-neutral-400">{g.desc}</p>
+              <div className="mt-2.5 space-y-3">
                 {g.rows.map((r) => {
                   let path = r.url;
                   try { const u = new URL(r.url); path = u.pathname + u.search; } catch { /* keep raw */ }
+                  const asked = promptsFor(r.url);
                   return (
                     <div key={r.url} className="flex gap-2.5">
                       {/* Marked only where there is a gap with someone standing
@@ -2707,16 +2749,35 @@ function InfluenceSources({ src, data, t }: { src: SourceChecks; data: AuditData
                               {t.citedShort(citedCount(r.url))}
                             </span>
                           )}
+                          {/* Who decides what goes on the page. Demoted from
+                              the heading it used to be to a word at the end of
+                              a line: still worth knowing before you plan an
+                              approach, no longer the first thing sorted by. */}
+                          <span className="shrink-0 text-neutral-300">
+                            {t.tierShort[tierOf(r.domain, data.brand_domain || "")]}
+                          </span>
                         </a>
                         <p className="mt-0.5 text-[11px] leading-snug text-neutral-500">
                           {r.status === "unreadable"
                             ? (r.reason || t.pageUnreadable)
                             : r.status === "present"
-                              ? t.infYouHere
+                              ? (r.competitors_on_page.length
+                                ? t.youAndRivals(r.competitors_on_page.join(", "))
+                                : t.infYouHere)
                               : r.competitors_on_page.length
                                 ? t.rivalsOnPage(r.competitors_on_page.join(", "))
                                 : t.noRivalsOnPage}
                         </p>
+                        {/* Which questions sent a model here. The page matters
+                            because of them — a source cited for the one prompt
+                            you do not care about is not the same find as one
+                            cited for four that you do. */}
+                        {asked.length > 0 && (
+                          <p className="mt-0.5 text-[11px] leading-snug text-neutral-400">
+                            {t.askedFor(asked.length)} {asked.slice(0, 3).join(" · ")}
+                            {asked.length > 3 ? ` · +${asked.length - 3}` : ""}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
