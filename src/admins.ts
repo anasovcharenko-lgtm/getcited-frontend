@@ -8,6 +8,7 @@
 export const ADMIN_EMAILS = [
   "anas.ovcharenko@gmail.com",
   "anaovcharenko11@gmail.com",
+  "ovcharenko.working@gmail.com",
 ];
 
 // Google returns the address as the user typed it at sign-up, so compare
