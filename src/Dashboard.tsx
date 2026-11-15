@@ -52,6 +52,7 @@ export const MODELS = [
   { key: "perplexity", label: "Perplexity" },
   { key: "deepseek", label: "DeepSeek" },
   { key: "ai_overview", label: "AI Overview" },
+  { key: "copilot", label: "Copilot" },
 ] as const;
 
 export type ModelName = (typeof MODELS)[number]["key"];
@@ -78,6 +79,7 @@ export type AuditResult = {
   perplexity?: ModelMentionInfo;
   deepseek?: ModelMentionInfo;
   ai_overview?: ModelMentionInfo;
+  copilot?: ModelMentionInfo;
 };
 
 const NO_ANSWER: ModelMentionInfo = {
@@ -333,7 +335,7 @@ export type PageCheckResult = {
   detail?: string;
 };
 
-type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "deepseek" | "ai_overview" | "claude";
+type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "deepseek" | "ai_overview" | "copilot" | "claude";
 type Lang = "en" | "ru";
 type View = "overview" | "recommendations" | "uncovered" | "covered" | "competitors" | "open";
 
@@ -1242,6 +1244,20 @@ const MODEL_TABS: { key: ModelKey; label: string }[] = [
   { key: "claude", label: "Claude" },
 ];
 
+/* What a tab actually measures, where the name alone would overstate it.
+
+   Two of these are search-engine features rather than assistants, and the
+   distinction decides how the number should be read: a summary that did not
+   appear for a query is not a brand that went unmentioned. Copilot carries the
+   sharper caveat — the Copilot app has no public API, so what is measured is
+   the Copilot summary on a Bing results page. Same engine, same grounding,
+   different surface. Saying so in a tooltip costs nothing and means the first
+   customer who asks gets an answer instead of a discovery. */
+const MODEL_NOTES: Partial<Record<ModelKey, string>> = {
+  ai_overview: "Google's AI Overview, read from the live results page. Google shows one for only some queries.",
+  copilot: "Copilot's summary on the Bing results page, not the Copilot app — Microsoft publishes no API for the app. Bing shows a summary for only some queries.",
+};
+
 function categorize(text: string): "mentions" | "technical" | "content" | "authority" | "keywords" {
   const t = text.toLowerCase();
   if (/keyword/.test(t)) return "keywords";
@@ -1541,7 +1557,7 @@ function ModelSwitcher({ tab, setTab, t, ran }: { tab: ModelKey; setTab: (m: Mod
           );
         }
         return (
-          <button key={m.key} type="button" onClick={() => setTab(m.key)} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${active ? "bg-neutral-900 text-white" : "text-neutral-500 hover:text-neutral-900"}`}>
+          <button key={m.key} type="button" onClick={() => setTab(m.key)} title={MODEL_NOTES[m.key]} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${active ? "bg-neutral-900 text-white" : "text-neutral-500 hover:text-neutral-900"}`}>
             {m.label}
           </button>
         );

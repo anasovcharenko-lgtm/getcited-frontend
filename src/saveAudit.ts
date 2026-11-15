@@ -35,7 +35,7 @@ export type AuditPayload = {
    before-and-after built on top of it. */
 export function activeModels(data: AuditPayload): string[] {
   const status = data.model_status;
-  const candidates = ["chatgpt", "gemini", "perplexity", "claude", "ai_overview"];
+  const candidates = ["chatgpt", "gemini", "perplexity", "claude", "ai_overview", "copilot"];
   const present = candidates.filter((m) =>
     (data.results || []).some((r) => r[m] && typeof r[m] === "object"));
   if (!status) return present;
