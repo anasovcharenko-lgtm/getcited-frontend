@@ -11,6 +11,7 @@ import { saveAuditRun } from "./saveAudit";
 import { Projects } from "./Projects";
 import { apiFetch } from "./api";
 import { WaitlistForm } from "./Waitlist";
+import { useMarketChoice, LANGUAGES } from "./markets";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -18,42 +19,9 @@ const API_URL = "https://web-production-b2168.up.railway.app";
 // Every prompt costs money, so the hand-written list has a ceiling too.
 const MAX_PROMPTS = 20;
 
-const LANGUAGES = [
-  "English", "Russian", "German", "French", "Spanish", "Italian",
-  "Portuguese", "Dutch", "Polish", "Turkish", "Ukrainian",
-  "Japanese", "Korean", "Chinese", "Swedish", "Norwegian", "Danish",
-];
-
-// Default language for a market. Editable, because country and language are
-// different questions: a UK-targeted brand can have a Russian-speaking audience.
-const COUNTRY_LANGUAGE: Record<string, string> = {
-  US: "English", GB: "English", CA: "English", AU: "English", IN: "English",
-  RU: "Russian", KZ: "Russian", UA: "Ukrainian",
-  DE: "German", FR: "French", ES: "Spanish", IT: "Italian",
-  NL: "Dutch", PL: "Polish", TR: "Turkish",
-  BR: "Portuguese", MX: "Spanish", JP: "Japanese",
-};
-
-const MARKETS = [
-  { code: "US", label: "United States" },
-  { code: "GB", label: "United Kingdom" },
-  { code: "RU", label: "Russia" },
-  { code: "DE", label: "Germany" },
-  { code: "FR", label: "France" },
-  { code: "ES", label: "Spain" },
-  { code: "IT", label: "Italy" },
-  { code: "NL", label: "Netherlands" },
-  { code: "PL", label: "Poland" },
-  { code: "CA", label: "Canada" },
-  { code: "AU", label: "Australia" },
-  { code: "IN", label: "India" },
-  { code: "BR", label: "Brazil" },
-  { code: "MX", label: "Mexico" },
-  { code: "JP", label: "Japan" },
-  { code: "UA", label: "Ukraine" },
-  { code: "KZ", label: "Kazakhstan" },
-  { code: "TR", label: "Turkey" },
-];
+/* Markets and languages come from `markets.ts`, which reads the server's list.
+   See the note in App.tsx: this file held the second of three hand-written
+   copies, and the three had drifted apart. */
 
 
 const AI_LOGOS = ["ChatGPT", "Claude", "Gemini", "Perplexity", "YandexGPT", "AI Overview", "Copilot", "Mistral", "Grok"];
@@ -75,8 +43,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   const [brand, setBrand] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
-  const [country, setCountry] = useState("RU");
-  const [language, setLanguage] = useState(COUNTRY_LANGUAGE["RU"]);
+  const { markets, country, language, chooseCountry, chooseLanguage } = useMarketChoice("RU");
   // Определяет, как запросы делятся между широкими и узкими. Средний бренд не
   // выигрывает широкий сравнительный запрос, каким бы хорошим ни был его сайт.
   const [brandSize, setBrandSize] = useState("mid");
@@ -255,13 +222,13 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           </label>
           <label className="block">
             <span className="mb-1 block text-xs text-neutral-500">Страна для результатов AI</span>
-            <select value={country} onChange={(e) => { setCountry(e.target.value); setLanguage(COUNTRY_LANGUAGE[e.target.value] || "English"); }} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
-              {MARKETS.map((m) => (<option key={m.code} value={m.code}>{m.label}</option>))}
+            <select value={country} onChange={(e) => chooseCountry(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
+              {markets.map((m) => (<option key={m.code} value={m.code}>{m.name}</option>))}
             </select>
           </label>
           <label className="block">
             <span className="mb-1 block text-xs text-neutral-500">Язык результатов AI</span>
-            <select value={language} onChange={(e) => setLanguage(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
+            <select value={language} onChange={(e) => chooseLanguage(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-200 bg-white px-4 text-sm outline-none focus:border-neutral-900">
               {LANGUAGES.map((l) => (<option key={l} value={l}>{l}</option>))}
             </select>
           </label>
