@@ -53,6 +53,7 @@ export const MODELS = [
   { key: "deepseek", label: "DeepSeek" },
   { key: "ai_overview", label: "AI Overview" },
   { key: "copilot", label: "Copilot" },
+  { key: "ai_mode", label: "Google AI Mode" },
 ] as const;
 
 export type ModelName = (typeof MODELS)[number]["key"];
@@ -84,6 +85,7 @@ export type AuditResult = {
   deepseek?: ModelMentionInfo;
   ai_overview?: ModelMentionInfo;
   copilot?: ModelMentionInfo;
+  ai_mode?: ModelMentionInfo;
 };
 
 const NO_ANSWER: ModelMentionInfo = {
@@ -365,7 +367,7 @@ export type PageCheckResult = {
   detail?: string;
 };
 
-type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "deepseek" | "ai_overview" | "copilot" | "claude";
+type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "deepseek" | "ai_overview" | "copilot" | "ai_mode" | "claude";
 type Lang = "en" | "ru";
 type View = "overview" | "recommendations" | "uncovered" | "covered" | "competitors" | "open";
 
@@ -1312,6 +1314,7 @@ const MODEL_TABS: { key: ModelKey; label: string }[] = [
 const MODEL_NOTES: Partial<Record<ModelKey, string>> = {
   ai_overview: "Google's AI Overview, read from the live results page. Google shows one for only some queries.",
   copilot: "Copilot's summary on the Bing results page, not the Copilot app — Microsoft publishes no API for the app. Bing shows a summary for only some queries.",
+  ai_mode: "Google's AI Mode — its conversational search, a separate product from the AI Overview block, asked the prompt as written.",
 };
 
 function categorize(text: string): "mentions" | "technical" | "content" | "authority" | "keywords" {
