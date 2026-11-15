@@ -360,6 +360,7 @@ interface Strings {
   mentionsNoLinkSub: (pct: number) => string;
   proOnly: string;
   proTooltip: string;
+  modelSilentTooltip: string;
   comparedTo: string;
   seeUncovered: string;
   you: string;
@@ -630,6 +631,7 @@ const STR: Record<Lang, Strings> = {
     mentionsNoLinkSub: (pct) => `named, but nothing links back · ${pct}% of answers`,
     proOnly: "Pro",
     proTooltip: "Available on paid plans",
+    modelSilentTooltip: "Asked on every prompt in this run, and returned nothing to measure.",
     comparedTo: "Where you stand vs competitors",
     seeUncovered: "See uncovered prompts",
     you: "you",
@@ -804,7 +806,11 @@ const STR: Record<Lang, Strings> = {
     notCovered: "Not covered",
     modelFailed: (names: string) => `${names} didn't respond during this audit — the numbers below are incomplete.`,
     modelPartial: (items: string) => `Some prompts went unanswered: ${items}. The score divides by answers received, so it is not skewed — the sample behind those models is simply smaller.`,
-    modelAbsent: (items: string) => `Nothing to measure on some queries: ${items}. Google doesn't draw an AI Overview for every search, and where there is none nobody is cited — not you, not a competitor. Those queries stay out of the score rather than counting against you.`,
+    /* Named no engine until now, except Google's — written when AI Overview
+       was the only model that could come back with nothing to read. Copilot
+       can too, and the sentence then explained a Bing result by describing
+       what Google does. */
+    modelAbsent: (items: string) => `Nothing to measure on some queries: ${items}. Search engines don't draw a summary for every query, and where there is none nobody is cited — not you, not a competitor. Those queries stay out of the score rather than counting against you.`,
     retryModels: "Ask them again",
     retryModelsBusy: "Asking…",
     retryModelsHint: "Only the unanswered prompts are asked again. Everything already measured stays as it is.",
@@ -941,6 +947,7 @@ const STR: Record<Lang, Strings> = {
     mentionsNoLinkSub: (pct) => `назвали, но ссылки на вас нет · ${pct}% ответов`,
     proOnly: "Pro",
     proTooltip: "Доступно на платных тарифах",
+    modelSilentTooltip: "Спросили по всем промптам этого прогона — измерять оказалось нечего.",
     comparedTo: "Как вы выглядите на фоне конкурентов",
     seeUncovered: "Смотреть непокрытые промпты",
     you: "вы",
@@ -1098,7 +1105,7 @@ const STR: Record<Lang, Strings> = {
     notCovered: "Не покрыто",
     modelFailed: (names: string) => `${names} не ответил(а) во время аудита — цифры ниже неполные.`,
     modelPartial: (items: string) => `Часть промптов осталась без ответа: ${items}. Score считается от полученных ответов, так что он не искажён — просто выборка по этим моделям меньше.`,
-    modelAbsent: (items: string) => `Измерять нечего: ${items}. Google рисует AI Overview не на каждый запрос, а где его нет — там не цитируют никого, ни тебя, ни конкурентов. Такие запросы не идут в знаменатель, а не записываются тебе в минус.`,
+    modelAbsent: (items: string) => `Измерять нечего: ${items}. Поисковики рисуют сводку не на каждый запрос, а где её нет — там не цитируют никого, ни тебя, ни конкурентов. Такие запросы не идут в знаменатель, а не записываются тебе в минус.`,
     retryModels: "Спросить заново",
     retryModelsBusy: "Спрашиваем…",
     retryModelsHint: "Заново спрашиваются только промпты без ответа. Всё уже измеренное остаётся как есть.",
@@ -1540,7 +1547,7 @@ function SideNav({ items, open, toggle, t, onProjects }: {
   );
 }
 
-function ModelSwitcher({ tab, setTab, t, ran }: { tab: ModelKey; setTab: (m: ModelKey) => void; t: Strings; ran: ModelName[] }) {
+function ModelSwitcher({ tab, setTab, t, ran, silent }: { tab: ModelKey; setTab: (m: ModelKey) => void; t: Strings; ran: ModelName[]; silent: ModelName[] }) {
   return (
     <div className="flex flex-wrap gap-1 rounded-xl border border-neutral-150 bg-neutral-50/60 p-1">
       {MODEL_TABS.map((m) => {
@@ -1549,10 +1556,17 @@ function ModelSwitcher({ tab, setTab, t, ran }: { tab: ModelKey; setTab: (m: Mod
         // started running would otherwise still show as locked.
         const available = m.key === "all" || ran.includes(m.key as ModelName);
         if (!available) {
+          /* A model that ran and came back with nothing is not a model behind
+             a paywall, and a padlock says the second. Copilot ran on this
+             account, was asked all ten prompts, and drew a summary for none —
+             the tab offered to upgrade. Greyed out either way, because there
+             is nothing to show inside it, but the reason has to be the true
+             one. */
+          const wasAsked = silent.includes(m.key as ModelName);
           return (
-            <button key={m.key} type="button" title={t.proTooltip} disabled className="flex cursor-not-allowed items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-300">
+            <button key={m.key} type="button" title={wasAsked ? t.modelSilentTooltip : t.proTooltip} disabled className="flex cursor-not-allowed items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-300">
               {m.label}
-              <Lock className="h-3 w-3" />
+              {!wasAsked && <Lock className="h-3 w-3" />}
             </button>
           );
         }
@@ -3363,6 +3377,15 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
 
   const ran = useMemo(() => modelsIn(data), [data]);
 
+  /* Asked on this run and silent throughout — distinct from never asked.
+     Reads model_status rather than guessing from the results, because that is
+     where the backend records what it selected as opposed to what replied. */
+  const silent = useMemo<ModelName[]>(() => {
+    const st = data.model_status || {};
+    return MODELS.map((m) => m.key).filter(
+      (k) => st[k]?.selected && !(st[k]?.answered) && !ran.includes(k));
+  }, [data, ran]);
+
   /* Per-model counts, sent with the page check so a fact about the markup can
      be put next to the answers it explains — "GPTBot is blocked, and ChatGPT
      names you in 2 of 8 while Gemini names you in 5". Neither half is worth
@@ -4289,7 +4312,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
               {data.country ? ` · ${data.country}` : ""}
             </p>
           </div>
-          <ModelSwitcher tab={tab} setTab={setTab} t={t} ran={ran} />
+          <ModelSwitcher tab={tab} setTab={setTab} t={t} ran={ran} silent={silent} />
         </div>
 
         {failedModels.length > 0 && (
