@@ -64,6 +64,10 @@ export type AuditResult = {
      in the backend's prompt mix, and a union here was already three values
      behind it, which silently made two real types unreachable. */
   prompt_type?: string;
+  /* What was actually typed into Bing, when that was not the prompt. Shown
+     beside Copilot's answer: a result displayed under a question it was not
+     asked is the small lie this audit exists to avoid. */
+  search_query?: string;
   /* Google search volume for the prompt used verbatim as a search phrase.
      Absent when the phrase is too long for the API or Google has no data. */
   search_volume?: number;
@@ -127,6 +131,24 @@ export function modelNamedCount(
    Answers, not prompts, is the right denominator: a model that stayed silent
    was not asked and found wanting, and scoring the silence as absence hands a
    worse number to whoever answered least. */
+/* The models a combined view may add together.
+
+   Copilot is asked the search phrase behind a prompt rather than the prompt,
+   so it answers a different question and the backend leaves it out of
+   `answers` and `visibility_score`. Anywhere the screen sums across models —
+   a headline numerator, "were you named for this prompt", which rivals showed
+   up — it has to sum over the same set, or the two halves of a fraction come
+   from different populations. That is how "Sandbox VR — 9 of 7" happened, and
+   it would happen again one layer up.
+
+   A run stored before `separate_scores` existed keeps every model, which is
+   what it was scored as. */
+export function scoredOnly<T extends string>(
+  data: { separate_scores?: Record<string, unknown> }, models: T[]): T[] {
+  const apart = data.separate_scores || {};
+  return models.filter((k) => !(k in apart));
+}
+
 export function answeredFor(
   data: { results?: AuditResult[] }, key: ModelName): number {
   return (data.results || []).filter(
@@ -223,6 +245,14 @@ export type AuditData = {
      A model can be in models_run and absent here: selected, called, silent. */
   answers?: number;
   models_answered?: string[];
+  /* Models measured on a different question, each with its own denominator.
+     Copilot is asked the search phrase behind a prompt rather than the prompt,
+     because the summary on a Bing results page answers search phrases and drew
+     nothing at all for conversational ones. Kept out of the headline, since a
+     score is only meaningful over one question — see SEPARATE_SCORE in the
+     backend. Absent on every run stored before this existed. */
+  separate_scores?: Record<string, {
+    named: number; answers: number; asked: number; absent: number; score: number }>;
   total_prompts: number;
   /* Named against the convention, and kept that way because stored runs and the
      Supabase columns carry these keys. `mentions_score` is the count of answers
@@ -347,6 +377,11 @@ interface Strings {
   back: string;
   lastRun: string;
   aiVisibilityScore: string;
+  bingSearchCard: string;
+  bingSearchSub: (named: number, answers: number) => string;
+  bingSearchAbsent: (absent: number, asked: number) => string;
+  bingSearchNote: string;
+  askedAs: (query: string) => string;
   vsCompetitorsAvg: (n: number) => string;
   /* The two words are not interchangeable and the industry fixed their meaning
      before we did: a MENTION is the brand named in the prose, a CITATION is the
@@ -623,6 +658,13 @@ const STR: Record<Lang, Strings> = {
     back: "Back",
     lastRun: "Last run: today",
     aiVisibilityScore: "AI visibility score",
+    bingSearchCard: "Bing search visibility",
+    bingSearchSub: (named, answers) =>
+      `named in ${named} of ${answers} Copilot summaries`,
+    bingSearchAbsent: (absent, asked) =>
+      `Bing drew no summary for ${absent} of ${asked} queries`,
+    bingSearchNote: "Measured on the search phrase behind each prompt, not the prompt itself — Copilot's summary is a search feature and answers search phrases. A different question from the one the assistants were asked, so it is reported beside the score above rather than inside it.",
+    askedAs: (q) => `typed into Bing as "${q}"`,
     vsCompetitorsAvg: (n) => `vs competitors avg ${n}%`,
     mentionRateSub: (named, answers) => `named in ${named} of ${answers} answers that came back`,
     citationsCard: "Citations",
@@ -945,6 +987,13 @@ const STR: Record<Lang, Strings> = {
     citationsCardSub: (pct) => `назвали и дали ссылку на ваш сайт · ${pct}% ответов`,
     mentionsNoLinkCard: "Упоминания без ссылки",
     mentionsNoLinkSub: (pct) => `назвали, но ссылки на вас нет · ${pct}% ответов`,
+    bingSearchCard: "Видимость в поиске Bing",
+    bingSearchSub: (named, answers) =>
+      `назвали в ${named} из ${answers} сводок Copilot`,
+    bingSearchAbsent: (absent, asked) =>
+      `Bing не нарисовал сводку на ${absent} из ${asked} запросов`,
+    bingSearchNote: "Меряется по короткой поисковой фразе за промптом, а не по самому промпту: сводка Copilot — поисковая поверхность и отвечает на поисковые запросы. Это другой вопрос, чем задавали ассистентам, поэтому цифра стоит рядом со счётом выше, а не внутри него.",
+    askedAs: (q) => `в Bing напечатали «${q}»`,
     proOnly: "Pro",
     proTooltip: "Доступно на платных тарифах",
     modelSilentTooltip: "Спросили по всем промптам этого прогона — измерять оказалось нечего.",
@@ -2003,7 +2052,7 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
   const rows = useMemo(() => {
     return data.results
       .map((r) => {
-        const models = ran.map((k) => infoFor(r, k));
+        const models = scoredOnly(data, ran).map((k) => infoFor(r, k));
         const youHere = models.some((m) => m.mentioned);
         const rivals = Array.from(new Set(models.flatMap((m) => m.competitors_found || [])));
         // Names the models brought up that nobody asked us to track. Often the
@@ -2058,7 +2107,7 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
         : "";
       const hit = data.results.find((r) => r.prompt.toLowerCase() === p.toLowerCase());
       if (!hit) return { prompt: p, state: "unknown" as const, rivals: [] as string[], added };
-      const models = ran.map((k) => infoFor(hit, k));
+      const models = scoredOnly(data, ran).map((k) => infoFor(hit, k));
       return {
         prompt: p,
         state: models.some((m) => m.mentioned) ? ("present" as const) : ("absent" as const),
@@ -3146,6 +3195,15 @@ function PromptRow({ result, t, tab, ran, modelsUsed, runDate }: { result: Audit
             )}
             <span className="min-w-0">{result.prompt}</span>
           </p>
+          {/* Copilot was typed a search phrase, not this sentence. Shown on
+              its tab only, because on the others it would be a detail about a
+              model the reader is not looking at — and omitted everywhere would
+              leave an answer sitting under a question nobody asked it. */}
+          {tab === "copilot" && result.search_query && (
+            <p className="mt-1 truncate text-xs text-neutral-400">
+              {t.askedAs(result.search_query)}
+            </p>
+          )}
           {competitors.length > 0 && (
             <p className="mt-1 truncate text-xs text-neutral-400">
               {competitors.map((c, i) => `${i + 1}. ${c}`).join("  ")}
@@ -3377,6 +3435,18 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
 
   const ran = useMemo(() => modelsIn(data), [data]);
 
+  /* The Bing figure, shown only when there is something to say.
+
+     Hidden when Copilot was never selected, and hidden when it was asked and
+     Bing drew nothing at all — a strip reading "0%, named in 0 of 0" states a
+     failure to measure as a result, which is the one thing this card must not
+     do. The banner above already reports that case in words. */
+  const bingSearch = useMemo(() => {
+    const s = data.separate_scores?.copilot;
+    if (!s || !s.answers) return null;
+    return s;
+  }, [data]);
+
   /* Asked on this run and silent throughout — distinct from never asked.
      Reads model_status rather than guessing from the results, because that is
      where the backend records what it selected as opposed to what replied. */
@@ -3409,7 +3479,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     if (tab !== "all" && !ran.includes(tab as ModelName)) setTab("all");
   }, [ran, tab]);
   const modelsForTab = (r: AuditResult) =>
-    (tab === "all" ? ran : ran.filter((k) => k === tab)).map((k) => infoFor(r, k));
+    (tab === "all" ? scoredOnly(data, ran) : ran.filter((k) => k === tab)).map((k) => infoFor(r, k));
 
   /* The competitor table, counted for whichever tab is open.
 
@@ -3484,7 +3554,16 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     /* The backend sends the denominator it divided by. Recomputing it as
        prompts × models silently disagrees whenever a model was asked and did
        not answer — exactly the run where the numbers most need explaining. */
-    const modelCount = Math.max(ran.length || activeModels(data).length || 1, 1);
+    /* The models the headline is actually over. Copilot is asked the search
+       phrase rather than the prompt, so the backend leaves it out of
+       `data.answers` and `data.visibility_score` — and a numerator summed over
+       every model that ran would then count mentions the denominator never
+       heard about. That is "9 of 7" again, one layer up.
+
+       Older payloads carry no `separate_scores`, and every model stays in,
+       which is what they were scored as. */
+    const scored = scoredOnly(data, ran);
+    const modelCount = Math.max(scored.length || activeModels(data).length || 1, 1);
     const allAnswers = typeof data.answers === "number" && data.answers > 0
       ? data.answers
       : data.total_prompts * modelCount;
@@ -3501,7 +3580,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       citationCount = data.mentions_score;
       bareMentionCount = data.citations_score;
       scorePct = data.visibility_score;
-      named = ran.reduce((s, k) => s + modelNamedCount(data, k), 0);
+      named = scored.reduce((s, k) => s + modelNamedCount(data, k), 0);
     } else {
       const key = tab as ModelName;
       citationCount = data.results.filter((r) => infoFor(r, key).mentioned_with_link).length;
@@ -4417,6 +4496,39 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
             )}
           </div>
         </div>
+
+        {/* Bing search, measured on a different question and kept apart.
+
+            Deliberately outside the three-card row above and styled as one
+            wide strip rather than a fourth tile. A fourth tile beside the
+            headline would invite the eye to average them, and these two
+            numbers cannot be averaged: one is what assistants say when asked
+            a sentence, the other is what Bing summarises when typed a phrase.
+            The sentence under it says so rather than leaving it to be
+            inferred from a tooltip nobody opens. */}
+        {bingSearch && (
+          <div className="mb-6 rounded-2xl border border-dashed border-neutral-200 bg-white p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.bingSearchCard}</p>
+                <div className="mt-2 flex items-baseline gap-3">
+                  <span className="text-4xl font-bold tracking-tight">{bingSearch.score}%</span>
+                  <span className="text-xs text-neutral-400">
+                    {t.bingSearchSub(bingSearch.named, bingSearch.answers)}
+                  </span>
+                </div>
+              </div>
+              {bingSearch.absent > 0 && (
+                <p className="text-xs text-neutral-400">
+                  {t.bingSearchAbsent(bingSearch.absent, bingSearch.asked)}
+                </p>
+              )}
+            </div>
+            <p className="mt-3 max-w-2xl text-xs leading-relaxed text-neutral-400">
+              {t.bingSearchNote}
+            </p>
+          </div>
+        )}
 
         {/* Where you stand vs competitors */}
         <div className="mb-6 rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
