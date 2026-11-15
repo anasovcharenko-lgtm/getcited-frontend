@@ -112,6 +112,25 @@ export function modelNamedCount(
   return (data.results || []).filter((r) => infoFor(r, key).mentioned).length;
 }
 
+/* How many answers this model actually returned.
+
+   One definition, because three separate ones were already on screen at the
+   same time. The percentage on a model tab divided by the prompts ASKED while
+   the fraction printed beside it divided by the answers RECEIVED: AI Overview
+   named the brand once, out of seven answers to ten prompts, and the card read
+   "10% · named in 1 of 7". One of seven is fourteen percent. The distribution
+   panel below it, doing the same sum its own way, said fourteen — so the same
+   model held two scores on one screen.
+
+   Answers, not prompts, is the right denominator: a model that stayed silent
+   was not asked and found wanting, and scoring the silence as absence hands a
+   worse number to whoever answered least. */
+export function answeredFor(
+  data: { results?: AuditResult[] }, key: ModelName): number {
+  return (data.results || []).filter(
+    (r) => (infoFor(r, key).answer || "").trim()).length;
+}
+
 export function modelsIn(
   data: { models_answered?: string[]; models_run?: string[]; results?: AuditResult[] },
 ): ModelName[] {
@@ -3370,9 +3389,17 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
   const rankingForTab = useMemo(() => {
     if (tab === "all") return data.competitor_ranking;
     const key = tab as ModelName;
-    const answered = data.results.filter((r) => (infoFor(r, key).answer || "").trim()).length;
+    const answered = answeredFor(data, key);
+    /* Counted among the answers this model gave, not among every row. A row
+       the model never answered carries no mentions, so in practice the two
+       agree — but "9 of 7" was on this screen once, and a numerator that
+       cannot reach outside its own denominator is the only way to be sure it
+       never returns. */
     const count = (pick: (i: ModelMentionInfo) => boolean) =>
-      data.results.filter((r) => pick(infoFor(r, key))).length;
+      data.results.filter((r) => {
+        const i = infoFor(r, key);
+        return (i.answer || "").trim() && pick(i);
+      }).length;
 
     return data.competitor_ranking
       .map((c) => {
@@ -3424,8 +3451,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       : data.total_prompts * modelCount;
     const answers = tab === "all"
       ? allAnswers
-      : data.results.filter((r) => (infoFor(r, tab as ModelName).answer || "").trim()).length
-        || data.total_prompts;
+      : answeredFor(data, tab as ModelName) || data.total_prompts;
 
     /* Per-model counts come from the results, which carry every model. The
        combined tab uses the backend's own totals so the headline cannot drift
@@ -3442,7 +3468,10 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       citationCount = data.results.filter((r) => infoFor(r, key).mentioned_with_link).length;
       bareMentionCount = data.results.filter((r) => infoFor(r, key).mentioned_without_link).length;
       named = modelNamedCount(data, key);
-      scorePct = data.total_prompts ? Math.round((named / data.total_prompts) * 100) : 0;
+      /* Over `answers`, the same denominator the fraction beside it prints.
+         Dividing by total_prompts here is what made the card say 10% above
+         "named in 1 of 7". */
+      scorePct = answers ? Math.round((named / answers) * 100) : 0;
     }
 
     const others = rankingForTab.filter((c) => !c.is_your_brand);
@@ -4542,8 +4571,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                  and named the brand in two is at 50%, not 25%. Claude stays
                  locked because nothing behind it exists yet. */
               ...MODELS.map((m) => {
-                const answered = data.results.filter(
-                  (r) => (infoFor(r, m.key).answer || "").trim()).length;
+                const answered = answeredFor(data, m.key);
                 const named = modelNamedCount(data, m.key);
                 return {
                   label: m.label,
