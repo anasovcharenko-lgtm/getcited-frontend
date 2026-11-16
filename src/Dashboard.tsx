@@ -551,6 +551,9 @@ interface Strings {
   retryModels: string;
   retryModelsBusy: string;
   retryModelsHint: string;
+  modelsNotMeasured: (names: string) => string;
+  addModelsCta: string;
+  addModelsHint: string;
   retryModelsFailed: string;
   sourcesTitle: string;
   menuProjects: string;
@@ -858,6 +861,10 @@ const STR: Record<Lang, Strings> = {
     retryModels: "Ask them again",
     retryModelsBusy: "Asking…",
     retryModelsHint: "Only the unanswered prompts are asked again. Everything already measured stays as it is.",
+    modelsNotMeasured: (names) =>
+      `Not measured in this audit: ${names}. They can be added without running it again.`,
+    addModelsCta: "Add to this audit",
+    addModelsHint: "Only the new model's prompts are bought; everything already measured stays.",
     retryModelsFailed: "Could not reach them this time. The audit is unchanged.",
     sourcesTitle: "Where AI looks for answers",
     menuProjects: "← My projects",
@@ -1160,6 +1167,10 @@ const STR: Record<Lang, Strings> = {
     retryModels: "Спросить заново",
     retryModelsBusy: "Спрашиваем…",
     retryModelsHint: "Заново спрашиваются только промпты без ответа. Всё уже измеренное остаётся как есть.",
+    modelsNotMeasured: (names) =>
+      `В этом аудите не измерялись: ${names}. Их можно добавить, не прогоняя аудит заново.`,
+    addModelsCta: "Добавить в этот аудит",
+    addModelsHint: "Докупаются только промпты новой модели; всё уже измеренное остаётся на месте.",
     retryModelsFailed: "В этот раз достучаться не вышло. Аудит не изменился.",
     sourcesTitle: "Откуда AI берёт ответы",
     menuProjects: "← Мои проекты",
@@ -3744,12 +3755,44 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       .map(([k, v]) => `${labels[k] ?? k} — ${v.absent}/${v.asked}`);
   }, [data.model_status]);
 
+  /* Models this audit never measured, which the server has now.
+
+     `failedModels` can only see what is already in `model_status`, so it
+     covers a model that was asked and stayed silent — and says nothing about
+     a model that did not exist when the audit ran. Google AI Mode was added
+     tonight, and there was no way to put it on yesterday's audit short of
+     paying for the whole run again.
+
+     The server owns the list, as it does for markets, because anything the
+     browser hardcodes about which models exist goes stale the day one is
+     added. Which is exactly what happened. */
+  const [serverModels, setServerModels] = useState<
+    { key: string; label: string; separate?: boolean }[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch(`${API_URL}/models`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && Array.isArray(d?.models)) setServerModels(d.models); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const unmeasuredModels = useMemo(() => {
+    const status = data.model_status || {};
+    return serverModels.filter((m) => {
+      const st = status[m.key];
+      // Never in this audit at all, or explicitly left out of it. A model that
+      // ran and failed belongs to `failedModels`, which words it differently.
+      return !st || st.selected === false;
+    });
+  }, [serverModels, data.model_status]);
+
   /* ---- recommendations, categorised ---- */
   /* Measure the models that came back empty, on the prompts already asked.
      The server only buys the gaps, so a model that answered most of them costs
      the remainder and a model that answered all of them is refused outright. */
-  const retryModels = async () => {
-    const want = failedModels.map((f) => f.key);
+  const retryModels = async (keys?: string[]) => {
+    const want = keys ?? failedModels.map((f) => f.key);
     if (want.length === 0) return;
     setRetrying(true);
     setRetryError("");
@@ -4397,6 +4440,38 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           <ModelSwitcher tab={tab} setTab={setTab} t={t} ran={ran} silent={silent} />
         </div>
 
+        {/* A model this audit never measured, which exists now.
+
+            Not amber: nothing went wrong here. An audit run before a model
+            was added is not a damaged audit, and colouring it like a failure
+            would say otherwise. Offered rather than applied, because it costs
+            money and the reader decides.
+
+            Only the gaps are bought, so adding a model to a finished audit
+            costs that model's ten prompts and leaves every answer already
+            paid for exactly where it is. */}
+        {unmeasuredModels.length > 0 && (
+          <div className="mb-6 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+            <p className="text-sm text-neutral-700">
+              {t.modelsNotMeasured(unmeasuredModels.map((m) => m.label).join(", "))}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => retryModels(unmeasuredModels.map((m) => m.key))}
+                disabled={retrying}
+                className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white
+                           transition hover:bg-neutral-800 disabled:opacity-60"
+              >
+                {retrying ? t.retryModelsBusy : t.addModelsCta}
+              </button>
+              <span className="text-xs text-neutral-500">{t.addModelsHint}</span>
+            </div>
+            {retryError && (
+              <p className="mt-2 text-xs text-neutral-700">{retryError}</p>
+            )}
+          </div>
+        )}
+
         {failedModels.length > 0 && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-sm text-amber-800">{t.modelFailed(failedModels.map((f) => f.label).join(", "))}</p>
@@ -4415,7 +4490,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                 bad minute, so the second ask often simply works. */}
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
-                onClick={retryModels}
+                onClick={() => retryModels()}
                 disabled={retrying}
                 className="rounded-lg bg-amber-800 px-3 py-1.5 text-xs font-medium text-white
                            transition hover:bg-amber-900 disabled:opacity-60"
