@@ -40,6 +40,10 @@ export type ModelMentionInfo = {
   sources?: string[];
   cited_domains?: string[];
   discovered_brands?: string[];
+  /* The engine drew no summary for this query. Set by the backend for the
+     search surfaces, and the opposite of "you were not named": nobody was.
+     Declared here because the export has to keep the two apart. */
+  absent?: boolean;
 };
 
 /* The models an audit can carry, in display order. The backend has the same
@@ -507,6 +511,10 @@ interface Strings {
   csvNo: string;
   csvUnreadable: string;
   csvNotChecked: string;
+  csvAnswered: string;
+  csvPrompts: string;
+  csvNoAnswer: string;
+  csvNoSummary: string;
   oppTitle: string;
   oppSub: string;
   oppLine: (cited: number, names: string) => string;
@@ -804,6 +812,10 @@ const STR: Record<Lang, Strings> = {
     /* Not "no". Only the most-cited pages are opened, and a blank or a "no"
        on the rest would be a claim about pages nobody looked at. */
     csvNotChecked: "not checked",
+    csvAnswered: "answered",
+    csvPrompts: "Download all prompts",
+    csvNoAnswer: "no answer",
+    csvNoSummary: "no summary drawn",
     oppTitle: "Where a mention would do the most work",
     oppSub: "Pages the models read to answer these questions, with a competitor named on them and you absent — most-cited first. Whether a mention can actually be had on any of them is a separate question this audit cannot answer: the order is what the models lean on, not what is easy to get.",
     oppLine: (cited, names) => `cited ${cited}× · named here: ${names}. You are not.`,
@@ -1114,6 +1126,10 @@ const STR: Record<Lang, Strings> = {
     csvNo: "нет",
     csvUnreadable: "страницу не удалось прочитать",
     csvNotChecked: "не проверялась",
+    csvAnswered: "ответила",
+    csvPrompts: "Скачать все промпты",
+    csvNoAnswer: "нет ответа",
+    csvNoSummary: "сводки не было",
     oppTitle: "Где упоминание даст больше всего",
     oppSub: "Страницы, которые модели читают, отвечая на эти вопросы: конкурент на них назван, вас — нет. Сверху те, куда модели ходят чаще. Удастся ли там разместиться — отдельный вопрос, на который этот аудит ответить не может: порядок здесь по тому, на что опираются модели, а не по тому, что легче получить.",
     oppLine: (cited, names) => `цитируется ${cited}× · здесь названы: ${names}. Вас — нет.`,
@@ -3190,6 +3206,7 @@ function PromptRow({ result, t, tab, ran, modelsUsed, runDate }: { result: Audit
     .map((m) => ({ key: m.key, label: m.label, info: infoFor(result, m.key) }));
 
   const youMentioned = models.some((m) => m.info.mentioned);
+  const namedBy = models.filter((m) => m.info.mentioned).map((m) => m.label);
   const competitors = Array.from(new Set(models.flatMap((m) => m.info.competitors_found)));
 
   return (
@@ -3225,8 +3242,20 @@ function PromptRow({ result, t, tab, ran, modelsUsed, runDate }: { result: Audit
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {/* Which models named you, not just that one did.
+
+              This badge is about the prompt; the answers underneath are about
+              one model each. On a prompt where Gemini named the brand and
+              ChatGPT did not, the card opened on ChatGPT's answer under a
+              green "You appear" — and reads as the badge being wrong. It was
+              right about the prompt and silent about which answer, which is
+              the half the eye was asking for. Naming them costs four words. */}
           <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${youMentioned ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
-            {youMentioned ? t.youAppear : t.youDontAppear}
+            {youMentioned
+              ? (namedBy.length && namedBy.length < models.length
+                  ? `${t.youAppear} · ${namedBy.join(", ")}`
+                  : t.youAppear)
+              : t.youDontAppear}
           </span>
           {open ? <ChevronDown className="h-4 w-4 text-neutral-400" /> : <ChevronRight className="h-4 w-4 text-neutral-400" />}
         </div>
@@ -3671,6 +3700,67 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       .filter((r) => r.youMentioned)
       .sort((a, b) => a.competitorCount - b.competitorCount);
   }, [tab, data.results]);
+
+  /* The whole run as one table: every prompt against every model.
+
+     The sources export answers "which pages do the models read". This answers
+     "what happened to each question", which is the thing a reader in a meeting
+     points at. It was not downloadable at all — the screen groups prompts into
+     three buckets and shows them one expandable card at a time, which is right
+     for reading and useless for a handout.
+
+     One row per prompt and model, not per prompt: a prompt is not covered or
+     uncovered in general, it is covered by ChatGPT and missed by Gemini, and
+     flattening that into one row per prompt is what the dashboard already
+     does well enough. The file is for the detail underneath. */
+  const downloadPromptsCsv = () => {
+    const esc = (v: unknown) =>
+      v === null || v === undefined ? "" : `"${String(v).replace(/"/g, '""')}"`;
+    const head = ["prompt", "prompt_type", "asked_as", "model", "status",
+                  "you_named", "named_with_link", "competitors_named",
+                  "other_brands_named", "sources", "country", "language"];
+
+    const labels = Object.fromEntries(MODELS.map((m) => [m.key, m.label]));
+    const rows: string[] = [];
+    for (const r of data.results) {
+      for (const key of ran) {
+        const i = infoFor(r, key);
+        /* Three states, never two. "No summary drawn" is not "did not answer"
+           and neither is "you were not named" — collapsing them in the export
+           would undo the distinction the whole audit is built on, in the one
+           artefact that leaves the building. */
+        const status = i.absent ? t.csvNoSummary
+          : (i.answer || "").trim() ? t.csvAnswered : t.csvNoAnswer;
+        rows.push([
+          r.prompt,
+          (r.prompt_type && t.promptTypes[r.prompt_type]) || r.prompt_type || "",
+          // Only Copilot is asked something other than the prompt.
+          key === "copilot" ? (r.search_query || "") : "",
+          labels[key] ?? key,
+          status,
+          i.mentioned ? t.csvYes : t.csvNo,
+          i.mentioned_with_link ? t.csvYes : t.csvNo,
+          (i.competitors_found || []).join(" | "),
+          (i.discovered_brands || []).join(" | "),
+          (i.sources || i.cited_domains || []).join(" | "),
+          data.country || "",
+          data.language || "",
+        ].map(esc).join(","));
+      }
+    }
+
+    // The byte-order mark, for the same reason the sources export has one:
+    // without it Excel on Windows reads the file as the local codepage and
+    // turns every Spanish and Cyrillic prompt into mojibake.
+    const csv = "﻿" + [head.join(","), ...rows].join("\n");
+    const href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `prompts-${(data.brand || "audit").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+      + `-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(href);
+  };
 
   const runDate = useMemo(() => {
     const d = data.run_at ? new Date(data.run_at) : new Date();
@@ -4398,6 +4488,17 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
             <span className="text-lg font-semibold">{brandName}</span>
           </button>
           <div className="flex items-center gap-3">
+            {/* In the header, not beside the sources table: this is the whole
+                run, and it should not be reachable only from a panel about
+                something else — nor gated on a page check the reader may never
+                have run. */}
+            <button
+              onClick={downloadPromptsCsv}
+              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium
+                         text-neutral-700 transition hover:border-neutral-500 hover:text-neutral-900"
+            >
+              {t.csvPrompts}
+            </button>
             <LangSwitch lang={lang} setLang={setLang} />
             <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-900"><ArrowLeft className="h-4 w-4" /> {t.back}</button>
           </div>
