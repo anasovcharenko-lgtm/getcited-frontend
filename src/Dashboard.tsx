@@ -373,7 +373,7 @@ export type PageCheckResult = {
 
 type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "deepseek" | "ai_overview" | "copilot" | "ai_mode" | "claude";
 type Lang = "en" | "ru";
-type View = "overview" | "recommendations" | "uncovered" | "covered" | "competitors" | "open";
+type View = "overview" | "recommendations" | "uncovered" | "covered" | "competitors" | "open" | "all";
 
 /* ────────────────────────────────────────────────────────────────
    Copy
@@ -412,6 +412,10 @@ interface Strings {
   landscapeBare: (n: number, answers: number) => string;
   landscapeSub: string;
   bestCoveredTitle: string;
+  allPromptsTitle: string;
+  allPromptsSub: string;
+  bucketOfAll: (n: number, total: number) => string;
+  seeAllPrompts: string;
   bestCoveredEmpty: string;
   seeCompetitorsDoBetter: string;
   openTitle: string;
@@ -659,6 +663,7 @@ interface Strings {
   seeAiResponse: string;
   hideAiResponse: string;
   citedDomains: string;
+  unnamedSources: string;
   noAnswerCaptured: string;
   youAppear: string;
   youDontAppear: string;
@@ -697,6 +702,10 @@ const STR: Record<Lang, Strings> = {
     landscapeCited: (n, a) => `Cited with a link in ${n} of ${a} answers`,
     landscapeBare: (n, a) => `Named without a link in ${n} of ${a} answers`,
     bestCoveredTitle: "Your best covered topics",
+    allPromptsTitle: "All prompts",
+    allPromptsSub: "Every prompt in this run, whoever was named. Open one to read each model's answer and the pages it read.",
+    bucketOfAll: (n, total) => `${n} of the ${total} prompts in this run.`,
+    seeAllPrompts: "See all of them",
     bestCoveredEmpty: "No strongly covered topics yet.",
     seeCompetitorsDoBetter: "See where competitors do better →",
     openTitle: "Prompts nobody has won",
@@ -992,6 +1001,7 @@ const STR: Record<Lang, Strings> = {
     seeAiResponse: "See what AI answered",
     hideAiResponse: "Hide answer",
     citedDomains: "Sources the model read",
+    unnamedSources: "pages Google linked through a wrapper and would not name",
     noAnswerCaptured: "This model didn't return an answer for this prompt.",
     youAppear: "You appear",
     youDontAppear: "You don't appear",
@@ -1028,6 +1038,10 @@ const STR: Record<Lang, Strings> = {
     landscapeCited: (n, a) => `Со ссылкой в ${n} из ${a} ответов`,
     landscapeBare: (n, a) => `Без ссылки в ${n} из ${a} ответов`,
     bestCoveredTitle: "Лучше всего покрытые темы",
+    allPromptsTitle: "Все промпты",
+    allPromptsSub: "Все промпты этого прогона, кого бы ни назвали. Разверни любой, чтобы прочитать ответ каждой модели и её источники.",
+    bucketOfAll: (n, total) => `${n} из ${total} промптов этого прогона.`,
+    seeAllPrompts: "Показать все",
     bestCoveredEmpty: "Пока нет уверенно покрытых тем.",
     seeCompetitorsDoBetter: "Смотреть, где конкуренты лучше →",
     openTitle: "Промпты, которые никто не занял",
@@ -1312,6 +1326,7 @@ const STR: Record<Lang, Strings> = {
     seeAiResponse: "Смотреть ответ AI",
     hideAiResponse: "Свернуть ответ",
     citedDomains: "Источники, на которые опирался ответ",
+    unnamedSources: "страниц Google отдал через обёртку и не назвал",
     noAnswerCaptured: "Эта модель не вернула ответ на этот промпт.",
     youAppear: "Вы есть в ответе",
     youDontAppear: "Вас нет в ответе",
@@ -1877,8 +1892,38 @@ function statLabel(name: string, isYou: boolean, youLabel: string) {
    whole answer, so they are shown as links. `sources` carries the URLs;
    `cited_domains` is the fallback for audits saved before it existed, and those
    stay as plain chips because a domain has no page to open. */
-function SourceList({ info, label }: { info: ModelMentionInfo; label: string }) {
-  const urls = info.sources || [];
+/* A link that names no page.
+
+   Google hands out `google.com/goto?url=<blob>` and
+   `vertexaisearch.cloud.google.com/grounding-api-redirect/...` instead of the
+   page it means. The server follows them, and about half will not resolve —
+   the blob is a protobuf whose bytes are encrypted behind the same header
+   every time, so there is nothing to decode locally either.
+
+   What arrived on screen was twelve rows reading "google.com/goto", each
+   clickable, none of them telling the reader anything. Counting them is
+   honest; printing them twelve times is not useful. They are counted and
+   said once.
+
+   Also here: thumbnails and map pins from the results block. They were never
+   pages anyone can write for, and the backend drops them from new runs — this
+   catches them in audits already stored. */
+export function isUnnamedSource(u: string): boolean {
+  return /google\.com\/goto\?|vertexaisearch\.cloud\.google\.com|googleusercontent\.com|gstatic\.com/.test(u)
+    || /^https?:\/\/(www\.)?google\.com\/(maps|searchviewer|imgres|travel|shopping)/.test(u);
+}
+
+function SourceList({ info, label, unnamedNote }: { info: ModelMentionInfo; label: string; unnamedNote: string }) {
+  const all = info.sources || [];
+  const urls = all.filter((u) => !isUnnamedSource(u));
+  const unnamed = all.length - urls.length;
+  if (urls.length === 0 && unnamed > 0) {
+    return (
+      <p className="mt-2 text-[10px] text-neutral-400">
+        {label} — {unnamed} · {unnamedNote}
+      </p>
+    );
+  }
   if (urls.length > 0) {
     return (
       <div className="mt-2">
@@ -1906,6 +1951,11 @@ function SourceList({ info, label }: { info: ModelMentionInfo; label: string }) 
             );
           })}
         </ol>
+        {unnamed > 0 && (
+          <p className="mt-1 pl-[18px] text-[10px] text-neutral-400">
+            + {unnamed} · {unnamedNote}
+          </p>
+        )}
       </div>
     );
   }
@@ -2272,7 +2322,7 @@ function CompetitorPrompts({ data, t, lang, setLang, onBack, addBox }: { data: A
                   {open && r.answer && (
                     <div className="border-t border-neutral-100 bg-neutral-50/60 px-4 py-4">
                       <AnswerMarkdown text={r.answer} />
-                      {r.info && <SourceList info={r.info} label={t.citedDomains} />}
+                      {r.info && <SourceList info={r.info} label={t.citedDomains} unnamedNote={t.unnamedSources} />}
                     </div>
                   )}
                 </div>
@@ -3275,7 +3325,7 @@ function PromptRow({ result, t, tab, ran, modelsUsed, runDate }: { result: Audit
               ) : (
                 <p className="text-xs italic text-neutral-400">{t.noAnswerCaptured}</p>
               )}
-              <SourceList info={m.info} label={t.citedDomains} />
+              <SourceList info={m.info} label={t.citedDomains} unnamedNote={t.unnamedSources} />
             </div>
           ))}
         </div>
@@ -3689,6 +3739,33 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       .filter((r) => !r.youMentioned && r.competitors.length === 0 && r.discovered.length === 0);
   }, [tab, data.results]);
 
+  /* Every prompt in the run, in one place.
+
+     The three buckets are a reading of the run, not the run. Each page shows
+     one of them, the link to "nobody has won" disappears when that bucket is
+     empty, and nothing anywhere lists all ten together — so someone who loaded
+     ten prompts and counts four on a page concludes six were lost. That has
+     now happened twice to the person who knows this tool best, which makes it
+     the screen's fault and not the reader's.
+
+     Ordered the way the question is usually asked: where you are missing
+     first, then where you are named. The state is a word on the row, so the
+     categories survive without being walls. */
+  const allPrompts = useMemo(() => {
+    const rank = { lost: 0, open: 1, covered: 2 };
+    return data.results
+      .map((r) => {
+        const ms = modelsForTab(r);
+        const youMentioned = ms.some((m) => m.mentioned);
+        const competitors = Array.from(new Set(ms.flatMap((m) => m.competitors_found)));
+        const discovered = Array.from(new Set(ms.flatMap((m) => m.discovered_brands || [])));
+        const state: "covered" | "lost" | "open" = youMentioned ? "covered"
+          : (competitors.length || discovered.length) ? "lost" : "open";
+        return { prompt: r.prompt, state, competitors, discovered, result: r };
+      })
+      .sort((a, b) => rank[a.state] - rank[b.state]);
+  }, [tab, data.results]);
+
   const bestCoveredPrompts = useMemo(() => {
     return data.results
       .map((r) => {
@@ -3718,7 +3795,8 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       v === null || v === undefined ? "" : `"${String(v).replace(/"/g, '""')}"`;
     const head = ["prompt", "prompt_type", "asked_as", "model", "status",
                   "you_named", "named_with_link", "competitors_named",
-                  "other_brands_named", "sources", "country", "language"];
+                  "other_brands_named", "sources", "unnamed_sources",
+                  "country", "language"];
 
     const labels = Object.fromEntries(MODELS.map((m) => [m.key, m.label]));
     const rows: string[] = [];
@@ -3729,6 +3807,8 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
            and neither is "you were not named" — collapsing them in the export
            would undo the distinction the whole audit is built on, in the one
            artefact that leaves the building. */
+        const every = i.sources || i.cited_domains || [];
+        const named = every.filter((u) => !isUnnamedSource(u));
         const status = i.absent ? t.csvNoSummary
           : (i.answer || "").trim() ? t.csvAnswered : t.csvNoAnswer;
         rows.push([
@@ -3742,7 +3822,11 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           i.mentioned_with_link ? t.csvYes : t.csvNo,
           (i.competitors_found || []).join(" | "),
           (i.discovered_brands || []).join(" | "),
-          (i.sources || i.cited_domains || []).join(" | "),
+          named.join(" | "),
+          // Counted, not printed. Forty-six rows of "google.com/goto?url=CAES…"
+          // in one column is a file nobody reads twice, and dropping them
+          // silently would understate what the model actually read.
+          String(every.length - named.length),
           data.country || "",
           data.language || "",
         ].map(esc).join(","));
@@ -4434,10 +4518,12 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     return <CompetitorPrompts data={data} t={t} lang={lang} setLang={setLang} onBack={() => setView("overview")} addBox={addBox} />;
   }
 
-  if (view === "uncovered" || view === "covered" || view === "open") {
+  if (view === "uncovered" || view === "covered" || view === "open" || view === "all") {
     const isUncovered = view === "uncovered";
     const isOpen = view === "open";
-    const listRows = isOpen ? openPrompts : isUncovered ? uncoveredPrompts : bestCoveredPrompts;
+    const isAll = view === "all";
+    const listRows = isAll ? allPrompts
+      : isOpen ? openPrompts : isUncovered ? uncoveredPrompts : bestCoveredPrompts;
     return (
       <div className="min-h-screen bg-white text-neutral-900">
         <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
@@ -4449,10 +4535,25 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           </div>
         </header>
         <main className="mx-auto max-w-4xl px-6 py-10">
-          <h1 className="text-xl font-semibold">{isOpen ? t.openTitle : isUncovered ? t.uncoveredTitle : t.bestCoveredTitle}</h1>
+          <h1 className="text-xl font-semibold">{isAll ? t.allPromptsTitle : isOpen ? t.openTitle : isUncovered ? t.uncoveredTitle : t.bestCoveredTitle}</h1>
           <p className="mt-1 text-sm text-neutral-500">
-            {isOpen ? t.openSub(openPrompts.length) : isUncovered ? t.uncoveredSub(uncoveredPrompts.length) : ""}
+            {isAll ? t.allPromptsSub : isOpen ? t.openSub(openPrompts.length) : isUncovered ? t.uncoveredSub(uncoveredPrompts.length) : ""}
           </p>
+          {/* How much of the audit this page is.
+
+              Each of these three pages shows one bucket, and none of them said
+              so. A reader who loaded ten prompts and counts four here concludes
+              six are missing — which has now happened twice, to the person who
+              knows this tool best. The three add up to the whole run, and
+              saying which part is in front of you costs one line. */}
+          {!isAll && (
+            <p className="mt-1 text-xs text-neutral-400">
+              {t.bucketOfAll(listRows.length, data.results.length)}{" "}
+              <button onClick={() => setView("all")} className="underline hover:text-neutral-900">
+                {t.seeAllPrompts}
+              </button>
+            </p>
+          )}
 
           {listRows.length === 0 ? (
             <p className="mt-6 rounded-xl border border-dashed border-neutral-200 p-6 text-center text-sm text-neutral-400">
@@ -4722,6 +4823,11 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                   {t.openTitle} · {openPrompts.length} <ChevronRight className="h-3 w-3" />
                 </button>
               )}
+              {/* Never conditional. The other two links come and go with their
+                  buckets, and between them they can hide the whole run. */}
+              <button onClick={() => setView("all")} className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-900">
+                {t.allPromptsTitle} · {data.results.length} <ChevronRight className="h-3 w-3" />
+              </button>
             </div>
           </div>
           <div className="space-y-2">
