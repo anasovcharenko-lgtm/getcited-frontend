@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import { saveAuditRun } from "./saveAudit";
 import { apiFetch } from "./api";
 import type { AuditData } from "./Dashboard";
+import { ProjectTrend } from "./ProjectTrend";
 
 const API_URL = "https://web-production-b2168.up.railway.app";
 
@@ -23,6 +24,7 @@ type AuditRow = {
   name: string | null;
   language: string | null;
   brand_size: string | null;
+  models_used: Record<string, string> | null;
   payload: AuditData | null;
 };
 
@@ -83,6 +85,10 @@ type Strings = {
   noPayload: string; failed: string;
   samePrompts: (n: number) => string;
   nameRun: string; namePlaceholder: string; nameSaveFailed: string;
+  trendTitle: string; trendEmpty: string; notComparable: string;
+  noiseFloor: (lo: number, hi: number) => string;
+  noiseNone: string; runsOn: (n: number, day: string) => string;
+  allMarkets: string;
 };
 
 const STR: Record<"en" | "ru", Strings> = {
@@ -97,6 +103,13 @@ const STR: Record<"en" | "ru", Strings> = {
     samePrompts: (n) => `Runs the same ${n} prompt${n === 1 ? "" : "s"} as last time, so the two are comparable.`,
     nameRun: "Name this run", namePlaceholder: "e.g. Argentina — franchise prompts",
     nameSaveFailed: "Could not save the name.",
+    trendTitle: "Visibility over time",
+    trendEmpty: "One run so far. The trend appears once there are two.",
+    notComparable: "different prompts or models — not on the line",
+    noiseFloor: (lo) => `Runs made the same day, in the same market, on the same prompts typically land ${lo} points apart. Treat a move smaller than that as noise, not progress.`,
+    noiseNone: "No two runs share a day yet, so there is nothing to measure run-to-run variation against. Until then, read small movements cautiously.",
+    runsOn: (n, day) => `${n} runs on ${day}`,
+    allMarkets: "All markets",
   },
   ru: {
     title: "Ваши проекты", sub: "Проект — это бренд. Открыть прошлый аудит бесплатно: ничего не меряется заново, пока вы не попросите.",
@@ -109,6 +122,13 @@ const STR: Record<"en" | "ru", Strings> = {
     samePrompts: (n) => `Прогонит те же ${n} ${n === 1 ? "промпт" : n < 5 ? "промпта" : "промптов"}, что и в прошлый раз — чтобы результаты можно было сравнить.`,
     nameRun: "Назвать прогон", namePlaceholder: "напр. Аргентина — промпты про франшизу",
     nameSaveFailed: "Не удалось сохранить название.",
+    trendTitle: "Видимость по времени",
+    trendEmpty: "Пока один прогон. Динамика появится со второго.",
+    notComparable: "другие промпты или модели — на линию не идёт",
+    noiseFloor: (lo) => `Прогоны одного дня, одного рынка и на тех же промптах обычно расходятся на ${lo} пунктов. Движение меньше этого — шум, а не прогресс.`,
+    noiseNone: "Пока нет двух прогонов в один день, не с чем сравнивать разброс. До тех пор мелкие движения читайте осторожно.",
+    runsOn: (n, day) => `${n} прогонов за ${day}`,
+    allMarkets: "Все рынки",
   },
 };
 
@@ -153,7 +173,7 @@ export function Projects({ lang = "en", onBack, onOpen }: {
         if (!user) { if (!cancelled) setProjects([]); return; }
         const { data: rows } = await supabase
           .from("audits")
-          .select("id, brand, created_at, visibility_score, total_prompts, country, language, brand_size, payload, name")
+          .select("id, brand, created_at, visibility_score, total_prompts, country, language, brand_size, payload, name, models_used")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(200);
@@ -323,6 +343,15 @@ export function Projects({ lang = "en", onBack, onOpen }: {
                     )}
                   </div>
                   {count > 0 && <p className="mt-2 text-xs text-neutral-400">{t.samePrompts(count)}</p>}
+
+                  {/* The trend sits above the list of runs, because the
+                      question "are we getting anywhere" comes before "which
+                      run was which". */}
+                  {p.runs.length > 1 && (
+                    <div className="mt-4">
+                      <ProjectTrend runs={p.runs} t={t} lang={lang} />
+                    </div>
+                  )}
 
                   {p.runs.length > 1 && (
                     <div className="mt-4 divide-y divide-neutral-100 border-t border-neutral-100 pt-2">
