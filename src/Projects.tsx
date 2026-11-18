@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight, Pencil } from "lucide-react";
 import { supabase } from "./supabase";
 import { saveAuditRun } from "./saveAudit";
 import { apiFetch } from "./api";
@@ -18,12 +18,61 @@ type AuditRow = {
   visibility_score: number | null;
   total_prompts: number | null;
   country: string | null;
+  /* A label the user gave this run. Null on every row that existed before the
+     column did, which is why nothing reads it without a fallback. */
+  name: string | null;
   language: string | null;
   brand_size: string | null;
   payload: AuditData | null;
 };
 
 type Project = { brand: string; runs: AuditRow[] };
+/* What a run is called when nobody has named it.
+
+   Every row read "16 Nov 2026 · 10 prompts", and a brand audited in three
+   markets produces seventeen of those. The market was already in the row --
+   selected, stored, and shown in the audit's own header -- just never printed
+   here, which is the cheapest fix available and the one that should have
+   existed before naming was needed at all.
+
+   A name replaces the whole label rather than decorating it: someone who has
+   taken the trouble to call a run "Argentina — franchise prompts" does not
+   need to be told it had ten prompts in the same breath. The date stays,
+   because two runs of the same market are told apart by nothing else. */
+/* A one-line editor. Escape abandons, Enter commits, blur commits too --
+   someone who types a name and clicks away meant to keep it, and losing it
+   would be the kind of small betrayal that stops people naming anything. */
+function NameField({ initial, t, onSave, onCancel }: {
+  initial: string; t: Strings;
+  onSave: (v: string) => void; onCancel: () => void;
+}) {
+  const [v, setV] = useState(initial);
+  return (
+    <input
+      autoFocus
+      value={v}
+      placeholder={t.namePlaceholder}
+      onChange={(e) => setV(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onSave(v.trim());
+        if (e.key === "Escape") onCancel();
+      }}
+      onBlur={() => onSave(v.trim())}
+      className="w-full rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none
+                 focus:border-neutral-900"
+    />
+  );
+}
+
+function runLabel(r: AuditRow, t: Strings, fmt: (s: string) => string): string {
+  const when = fmt(r.created_at);
+  if (r.name) return `${r.name} · ${when}`;
+  const parts = [when];
+  if (r.country) parts.push(r.country);
+  if (r.total_prompts) parts.push(`${r.total_prompts} ${t.prompts}`);
+  return parts.join(" · ");
+}
+
 
 type Strings = {
   title: string; sub: string; back: string;
@@ -33,6 +82,7 @@ type Strings = {
   open: string; rerun: string; rerunning: string;
   noPayload: string; failed: string;
   samePrompts: (n: number) => string;
+  nameRun: string; namePlaceholder: string; nameSaveFailed: string;
 };
 
 const STR: Record<"en" | "ru", Strings> = {
@@ -45,6 +95,8 @@ const STR: Record<"en" | "ru", Strings> = {
     noPayload: "Saved before results were kept — this one cannot be reopened.",
     failed: "Could not run it. Try again.",
     samePrompts: (n) => `Runs the same ${n} prompt${n === 1 ? "" : "s"} as last time, so the two are comparable.`,
+    nameRun: "Name this run", namePlaceholder: "e.g. Argentina — franchise prompts",
+    nameSaveFailed: "Could not save the name.",
   },
   ru: {
     title: "Ваши проекты", sub: "Проект — это бренд. Открыть прошлый аудит бесплатно: ничего не меряется заново, пока вы не попросите.",
@@ -55,6 +107,8 @@ const STR: Record<"en" | "ru", Strings> = {
     noPayload: "Сохранён до того, как мы начали хранить результаты — этот открыть нельзя.",
     failed: "Не удалось прогнать. Попробуйте ещё раз.",
     samePrompts: (n) => `Прогонит те же ${n} ${n === 1 ? "промпт" : n < 5 ? "промпта" : "промптов"}, что и в прошлый раз — чтобы результаты можно было сравнить.`,
+    nameRun: "Назвать прогон", namePlaceholder: "напр. Аргентина — промпты про франшизу",
+    nameSaveFailed: "Не удалось сохранить название.",
   },
 };
 
@@ -68,6 +122,28 @@ export function Projects({ lang = "en", onBack, onOpen }: {
   const [promptCounts, setPromptCounts] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+
+  /* Written straight to the row, not through the API.
+
+     The client already updates this table when a model is added to a finished
+     audit, so the permission exists and a backend round trip would buy
+     nothing. The local list is updated first: a rename that waits on the
+     network before showing feels broken, and if the write fails the message
+     says so rather than leaving a name on screen that is not in the database. */
+  const rename = async (id: string | number, value: string) => {
+    const name = value || null;
+    setEditing(null);
+    setProjects((ps) => (ps || []).map((proj) => ({
+      ...proj,
+      runs: proj.runs.map((r) => (String(r.id) === String(id) ? { ...r, name } : r)),
+    })));
+    const { error: err } = await supabase.from("audits").update({ name }).eq("id", id);
+    if (err) {
+      console.error("rename failed", err);
+      setError(t.nameSaveFailed);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +153,7 @@ export function Projects({ lang = "en", onBack, onOpen }: {
         if (!user) { if (!cancelled) setProjects([]); return; }
         const { data: rows } = await supabase
           .from("audits")
-          .select("id, brand, created_at, visibility_score, total_prompts, country, language, brand_size, payload")
+          .select("id, brand, created_at, visibility_score, total_prompts, country, language, brand_size, payload, name")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(200);
@@ -200,10 +276,27 @@ export function Projects({ lang = "en", onBack, onOpen }: {
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-base font-semibold">{p.brand}</p>
-                      <p className="mt-1 text-xs text-neutral-500">
-                        {t.runs(p.runs.length)} · {t.lastRun} {fmt(last.created_at)}
-                        {last.total_prompts ? ` · ${last.total_prompts} ${t.prompts}` : ""}
-                      </p>
+                      {editing === String(last.id) ? (
+                        <div className="mt-1 max-w-sm">
+                          <NameField
+                            initial={last.name || ""} t={t}
+                            onCancel={() => setEditing(null)}
+                            onSave={(v) => rename(last.id, v)}
+                          />
+                        </div>
+                      ) : (
+                        <p className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
+                          <span className="truncate">
+                            {t.runs(p.runs.length)} · {t.lastRun} {runLabel(last, t, fmt)}
+                          </span>
+                          <button
+                            onClick={() => setEditing(String(last.id))}
+                            title={t.nameRun}
+                            className="shrink-0 text-neutral-300 hover:text-neutral-900">
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
@@ -234,15 +327,33 @@ export function Projects({ lang = "en", onBack, onOpen }: {
                   {p.runs.length > 1 && (
                     <div className="mt-4 divide-y divide-neutral-100 border-t border-neutral-100 pt-2">
                       {p.runs.slice(1).map((r) => (
-                        <button key={String(r.id)}
-                          onClick={() => r.payload && onOpen(r.payload, r.id)}
-                          disabled={!r.payload}
-                          className="flex w-full items-center justify-between py-2 text-left text-xs text-neutral-500 hover:text-neutral-900 disabled:opacity-50">
-                          <span>{fmt(r.created_at)}{r.total_prompts ? ` · ${r.total_prompts} ${t.prompts}` : ""}</span>
-                          <span className="flex items-center gap-1 tabular-nums">
-                            {r.visibility_score ?? "—"}% {r.payload && <ChevronRight className="h-3 w-3" />}
-                          </span>
-                        </button>
+                        <div key={String(r.id)} className="flex items-center gap-2 py-2 text-xs text-neutral-500">
+                          {editing === String(r.id) ? (
+                            <NameField
+                              initial={r.name || ""} t={t}
+                              onCancel={() => setEditing(null)}
+                              onSave={(v) => rename(r.id, v)}
+                            />
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => r.payload && onOpen(r.payload, r.id)}
+                                disabled={!r.payload}
+                                className="min-w-0 flex-1 truncate text-left hover:text-neutral-900 disabled:opacity-50">
+                                {runLabel(r, t, fmt)}
+                              </button>
+                              <button
+                                onClick={() => setEditing(String(r.id))}
+                                title={t.nameRun}
+                                className="shrink-0 text-neutral-300 hover:text-neutral-900">
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                              <span className="flex shrink-0 items-center gap-1 tabular-nums">
+                                {r.visibility_score ?? "—"}% {r.payload && <ChevronRight className="h-3 w-3" />}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
