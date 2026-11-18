@@ -14,6 +14,7 @@ import { Projects } from "./Projects";
 import { apiFetch } from "./api";
 import { WaitlistForm } from "./Waitlist";
 import { useMarketChoice, LANGUAGES } from "./markets";
+import { detectableMove, resolutionNote } from "./resolution";
 
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
@@ -164,6 +165,14 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   }, [step, brand]);
 
   const customLines = customRows.map((l) => l.trim()).filter(Boolean);
+
+  /* Generated runs use the backend's default of ten; a typed run uses what
+     has been typed, and tracked prompts are added to both. Falls silent while
+     a manual list is empty rather than quoting the resolution of nothing. */
+  const promptCount = (mode === "manual" ? customLines.length : 10) + tracked.length;
+  const resolution = promptCount > 0 && models.length > 0
+    ? detectableMove(promptCount, models.length)
+    : null;
 
   /* Pasting a whole list into any row spreads it across rows. People arrive
      with the list already written somewhere, so refusing multi-line paste
@@ -355,6 +364,18 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
             </div>
           ) : (
             <p className="rounded-lg bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-500">Generated prompts cover six kinds of query: comparison, commercial, problem, brand, industry and technical.</p>
+          )}
+
+          {/* What this sample can see, said before it is bought.
+
+              Someone choosing ten prompts is choosing a measurement that
+              cannot distinguish a five-point move from noise. They should
+              learn that while they can still choose twenty — not a month
+              later, from a chart that appears to show progress. */}
+          {resolution !== null && (
+            <p className="text-xs leading-relaxed text-neutral-400">
+              {resolutionNote.en(resolution)}
+            </p>
           )}
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button type="submit" disabled={loading} className="h-12 rounded-lg bg-neutral-900 text-sm text-white hover:bg-neutral-800 disabled:opacity-50 flex items-center gap-2 justify-center font-medium">
