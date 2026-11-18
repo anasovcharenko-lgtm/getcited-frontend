@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { eventsBetween, eventsAround } from "./platformEvents";
 import { ArrowLeft, ChevronDown, ChevronRight, Lock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -429,6 +430,7 @@ interface Strings {
   historyChange: string;
   historyNotEnough: string;
   historyNotEnoughSub: string;
+  platformEventsHeading: string;
   whatAiSays: string;
   whatAiSaysEmpty: string;
   seeHowAccurate: string;
@@ -719,6 +721,7 @@ const STR: Record<Lang, Strings> = {
     historyChange: "vs previous audit",
     historyNotEnough: "Not enough data yet",
     historyNotEnoughSub: "Run a few more audits for this brand and the trend will appear here.",
+    platformEventsHeading: "The platforms changed something around this run",
     whatAiSays: "What AI says about your brand",
     /* It said "run another audit to try again", which blames a glitch. The
          card is empty because no model named the brand, so there was no
@@ -1055,6 +1058,7 @@ const STR: Record<Lang, Strings> = {
     historyChange: "к прошлому аудиту",
     historyNotEnough: "Пока недостаточно данных",
     historyNotEnoughSub: "Запустите ещё несколько аудитов этого бренда — и здесь появится динамика.",
+    platformEventsHeading: "Рядом с этим прогоном платформы что-то меняли",
     whatAiSays: "Что AI говорит о вашем бренде",
     whatAiSaysEmpty: "Ни одна модель не назвала вас в этом прогоне — цитировать нечего.",
     seeHowAccurate: "Проверить точность →",
@@ -3846,6 +3850,11 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     URL.revokeObjectURL(href);
   };
 
+  /* Platform changes this run sits inside or just behind. */
+  const runEvents = useMemo(
+    () => eventsAround(data.run_at ? new Date(data.run_at) : new Date()),
+    [data.run_at]);
+
   const runDate = useMemo(() => {
     const d = data.run_at ? new Date(data.run_at) : new Date();
     return d.toLocaleDateString(lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -4137,7 +4146,30 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       return `${x},${y}`;
     }).join(" ");
     const delta = values[values.length - 1] - values[values.length - 2];
-    return { points, delta, dates: history.map((p) => new Date(p.created_at)) };
+    const dates = history.map((p) => new Date(p.created_at));
+
+    /* Where a platform change falls on this line.
+
+       Positioned by time rather than by index, because the runs are not evenly
+       spaced: placing an event at "between the third and fourth dot" would put
+       a fixed date in a different spot every time a run is added. Events
+       outside the span are dropped rather than clamped to an edge, which would
+       claim they happened during a window they did not. */
+    const first = dates[0].getTime();
+    const last = dates[dates.length - 1].getTime();
+    const span = Math.max(last - first, 1);
+    const marks = eventsBetween(dates[0], dates[dates.length - 1]).map((e) => {
+      const at = Date.parse(e.date);
+      const end = e.endsOn ? Date.parse(e.endsOn) : at;
+      return {
+        event: e,
+        x: ((Math.max(at, first) - first) / span) * w,
+        // A fortnight-long rollout is a band, not a line: the whole window is
+        // unreliable, and a single stroke would say otherwise.
+        width: ((Math.min(end, last) - Math.max(at, first)) / span) * w,
+      };
+    });
+    return { points, delta, dates, marks, w, h };
   }, [history]);
 
   /* ────────────────────────────────────────────────────────────
@@ -4674,6 +4706,34 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           </div>
         )}
 
+        {/* What the platforms were doing when this run was measured.
+
+            The history chart marks these on a trend, but a single audit is
+            read on its own at least as often, and on its own there was nothing
+            to say the week it belongs to was unusual. Neutral, not amber:
+            nothing failed. It is the context a number needs before anyone
+            draws a conclusion from it. */}
+        {runEvents.length > 0 && (
+          <div className="mb-6 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+            <p className="text-xs font-medium text-neutral-500">{t.platformEventsHeading}</p>
+            <ul className="mt-2 space-y-1.5">
+              {runEvents.map((e, i) => (
+                <li key={i} className="text-xs leading-snug text-neutral-600">
+                  <a href={e.source} target="_blank" rel="noopener noreferrer"
+                     className="font-medium underline decoration-neutral-300 hover:decoration-neutral-500">
+                    {e.label[lang]}
+                  </a>
+                  <span className="text-neutral-400">
+                    {" · "}{new Date(e.date).toLocaleDateString()}
+                    {e.endsOn && ` – ${new Date(e.endsOn).toLocaleDateString()}`}
+                  </span>
+                  <span className="block text-neutral-500">{e.note[lang]}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {failedModels.length > 0 && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-sm text-amber-800">{t.modelFailed(failedModels.map((f) => f.label).join(", "))}</p>
@@ -5049,12 +5109,41 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           {historyGeom ? (
             <>
               <svg viewBox="0 0 400 90" width="100%" height="90" preserveAspectRatio="none" className="mt-3">
+                {/* Behind the line, never over it: this is context for the
+                    measurement, not a competing reading of it. */}
+                {historyGeom.marks.map((m, i) => (
+                  m.width > 1
+                    ? <rect key={i} x={m.x} y={0} width={m.width} height={historyGeom.h}
+                            fill="#171717" opacity={0.06} />
+                    : <line key={i} x1={m.x} x2={m.x} y1={0} y2={historyGeom.h}
+                            stroke="#171717" strokeWidth={1} strokeDasharray="3 3" opacity={0.25} />
+                ))}
                 <polyline points={historyGeom.points} fill="none" stroke="#171717" strokeWidth={2.5} />
               </svg>
               <div className="mt-1 flex justify-between text-[10px] text-neutral-400">
                 <span>{historyGeom.dates[0].toLocaleDateString()}</span>
                 <span>{historyGeom.dates[historyGeom.dates.length - 1].toLocaleDateString()}</span>
               </div>
+              {/* Named underneath rather than left as marks on a chart. A grey
+                  band nobody can identify is decoration; the point is to be
+                  able to say which two of the three causes were Google's. */}
+              {historyGeom.marks.length > 0 && (
+                <ul className="mt-3 space-y-1.5 border-t border-neutral-150 pt-3">
+                  {historyGeom.marks.map((m, i) => (
+                    <li key={i} className="text-[11px] leading-snug text-neutral-500">
+                      <span className="text-neutral-400">
+                        {new Date(m.event.date).toLocaleDateString()}
+                        {m.event.endsOn && ` – ${new Date(m.event.endsOn).toLocaleDateString()}`}
+                      </span>{" "}
+                      <a href={m.event.source} target="_blank" rel="noopener noreferrer"
+                         className="font-medium text-neutral-700 underline decoration-neutral-300 hover:decoration-neutral-500">
+                        {m.event.label[lang]}
+                      </a>
+                      <span className="block text-neutral-400">{m.event.note[lang]}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </>
           ) : (
             <div className="mt-4">
