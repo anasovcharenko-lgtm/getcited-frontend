@@ -59,6 +59,7 @@ export const MODELS = [
   { key: "ai_overview", label: "AI Overview" },
   { key: "copilot", label: "Copilot" },
   { key: "ai_mode", label: "Google AI Mode" },
+  { key: "yandex", label: "Яндекс Нейро" },
 ] as const;
 
 export type ModelName = (typeof MODELS)[number]["key"];
@@ -74,6 +75,10 @@ export type AuditResult = {
      beside Copilot's answer: a result displayed under a question it was not
      asked is the small lie this audit exists to avoid. */
   search_query?: string;
+  /* The sub-questions Yandex rewrote this prompt into. Query fan-out, which
+     every engine performs and only this one reports back: the questions a
+     page has to answer to be found, rather than the one that was typed. */
+  sub_queries?: string[];
   /* Google search volume for the prompt used verbatim as a search phrase.
      Absent when the phrase is too long for the API or Google has no data. */
   search_volume?: number;
@@ -91,6 +96,7 @@ export type AuditResult = {
   ai_overview?: ModelMentionInfo;
   copilot?: ModelMentionInfo;
   ai_mode?: ModelMentionInfo;
+  yandex?: ModelMentionInfo;
 };
 
 const NO_ANSWER: ModelMentionInfo = {
@@ -372,7 +378,7 @@ export type PageCheckResult = {
   detail?: string;
 };
 
-type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "deepseek" | "ai_overview" | "copilot" | "ai_mode" | "claude";
+type ModelKey = "all" | "chatgpt" | "gemini" | "perplexity" | "deepseek" | "ai_overview" | "copilot" | "ai_mode" | "yandex" | "claude";
 type Lang = "en" | "ru";
 type View = "overview" | "recommendations" | "uncovered" | "covered" | "competitors" | "open" | "all";
 
@@ -389,6 +395,7 @@ interface Strings {
   bingSearchAbsent: (absent: number, asked: number) => string;
   bingSearchNote: string;
   askedAs: (query: string) => string;
+  subQueries: string;
   vsCompetitorsAvg: (n: number) => string;
   /* The two words are not interchangeable and the industry fixed their meaning
      before we did: a MENTION is the brand named in the prose, a CITATION is the
@@ -685,6 +692,7 @@ const STR: Record<Lang, Strings> = {
       `Bing drew no summary for ${absent} of ${asked} queries`,
     bingSearchNote: "Measured on the search phrase behind each prompt, not the prompt itself — Copilot's summary is a search feature and answers search phrases. A different question from the one the assistants were asked, so it is reported beside the score above rather than inside it.",
     askedAs: (q) => `typed into Bing as "${q}"`,
+    subQueries: "Yandex searched for:",
     vsCompetitorsAvg: (n) => `vs competitors avg ${n}%`,
     mentionRateSub: (named, answers) => `named in ${named} of ${answers} answers that came back`,
     citationsCard: "Citations",
@@ -1028,6 +1036,7 @@ const STR: Record<Lang, Strings> = {
       `Bing не нарисовал сводку на ${absent} из ${asked} запросов`,
     bingSearchNote: "Меряется по короткой поисковой фразе за промптом, а не по самому промпту: сводка Copilot — поисковая поверхность и отвечает на поисковые запросы. Это другой вопрос, чем задавали ассистентам, поэтому цифра стоит рядом со счётом выше, а не внутри него.",
     askedAs: (q) => `в Bing напечатали «${q}»`,
+    subQueries: "Яндекс искал:",
     proOnly: "Pro",
     proTooltip: "Доступно на платных тарифах",
     modelSilentTooltip: "Спросили по всем промптам этого прогона — измерять оказалось нечего.",
@@ -1361,6 +1370,7 @@ const MODEL_NOTES: Partial<Record<ModelKey, string>> = {
   ai_overview: "Google's AI Overview, read from the live results page. Google shows one for only some queries.",
   copilot: "Copilot's summary on the Bing results page, not the Copilot app — Microsoft publishes no API for the app. Bing shows a summary for only some queries.",
   ai_mode: "Google's AI Mode — its conversational search, a separate product from the AI Overview block, asked the prompt as written.",
+  yandex: "Yandex's generative answer, through Yandex Cloud's Search API. The same engine that answers above the results on yandex.ru, asked through the door Yandex opens to developers — not a capture of the live results page.",
 };
 
 function categorize(text: string): "mentions" | "technical" | "content" | "authority" | "keywords" {
@@ -3284,6 +3294,18 @@ function PromptRow({ result, t, tab, ran, modelsUsed, runDate }: { result: Audit
               its tab only, because on the others it would be a detail about a
               model the reader is not looking at — and omitted everywhere would
               leave an answer sitting under a question nobody asked it. */}
+          {/* What the engine actually went looking for.
+
+              Worth more than most of what this audit measures: it is the list
+              of questions a page has to answer in order to be found, rather
+              than the question the customer happened to type. Only Yandex
+              reports it, so it only appears there. */}
+          {tab === "yandex" && (result.sub_queries?.length ?? 0) > 0 && (
+            <p className="mt-1 text-xs text-neutral-400">
+              {t.subQueries}{" "}
+              <span className="text-neutral-500">{result.sub_queries!.join(" · ")}</span>
+            </p>
+          )}
           {tab === "copilot" && result.search_query && (
             <p className="mt-1 truncate text-xs text-neutral-400">
               {t.askedAs(result.search_query)}
