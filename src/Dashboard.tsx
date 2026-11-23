@@ -1349,12 +1349,16 @@ const STR: Record<Lang, Strings> = {
 } as const;
 
 /* Every tab the dashboard can show. Whether one is selectable comes from the
-   run, not from this list — see ModelSwitcher. The last two have no backend
-   behind them yet and so are never in `ran`, which is what greys them out. */
+   run, not from this list — see ModelSwitcher.
+
+   Claude used to be appended here by hand, as a greyed-out tab for a model the
+   backend did not have. It has one now, so the server lists it like every
+   other model and the hand-written entry would show it twice. Nothing is
+   hardcoded here any more, which is the point: a tab the server does not serve
+   is a tab advertising a measurement nobody can run. */
 const MODEL_TABS: { key: ModelKey; label: string }[] = [
   { key: "all", label: "All models" },
   ...MODELS.map((m) => ({ key: m.key as ModelKey, label: m.label })),
-  { key: "claude", label: "Claude" },
 ];
 
 /* What a tab actually measures, where the name alone would overstate it.
@@ -1371,6 +1375,7 @@ const MODEL_NOTES: Partial<Record<ModelKey, string>> = {
   copilot: "Copilot's summary on the Bing results page, not the Copilot app — Microsoft publishes no API for the app. Bing shows a summary for only some queries.",
   ai_mode: "Google's AI Mode — its conversational search, a separate product from the AI Overview block, asked the prompt as written.",
   yandex: "Yandex's generative answer, through Yandex Cloud's Search API. The same engine that answers above the results on yandex.ru, asked through the door Yandex opens to developers — not a capture of the live results page.",
+  claude: "Claude through Anthropic's API with web search switched on, which is not the Claude app people use. Sources are the pages the answer cited, not everything the search returned.",
 };
 
 function categorize(text: string): "mentions" | "technical" | "content" | "authority" | "keywords" {
