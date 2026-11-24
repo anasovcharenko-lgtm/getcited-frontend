@@ -3955,7 +3955,18 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     const labels = Object.fromEntries(MODELS.map((m) => [m.key, m.label]));
     return Object.entries(status)
       .filter(([, v]) => v.ok && v.selected !== false && gapOf(v) > 0)
-      .map(([k, v]) => `${labels[k] ?? k} — ${gapOf(v)}/${v.asked}`);
+      /* With the reason, which the backend has been sending all along.
+         `model_error` builds a tally a later success cannot erase — "6 x
+         rate limited (429)" — precisely so a model that answered some
+         prompts and dropped others can say which and why. A model that
+         answered none shows it; a model that answered most did not, and
+         "DeepSeek — 6/20" left the only useful part out. The reader is
+         asking why six are missing, and we knew. */
+      .map(([k, v]) => {
+        const reason = (v.error || "").trim();
+        return `${labels[k] ?? k} — ${gapOf(v)}/${v.asked}`
+          + (reason ? ` · ${reason}` : "");
+      });
   }, [data.model_status]);
 
   /* Queries where the thing being measured does not exist.
