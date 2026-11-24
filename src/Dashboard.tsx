@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { eventsBetween, eventsAround } from "./platformEvents";
 import { ArrowLeft, ChevronDown, ChevronRight, Lock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { plainMath } from "./mathText";
 import remarkGfm from "remark-gfm";
 import { supabase } from "./supabase";
 import { saveAddedPrompts, saveAddedModels, activeModels } from "./saveAudit";
@@ -1985,7 +1986,14 @@ function SourceList({ info, label, unnamedNote }: { info: ModelMentionInfo; labe
 
 /* AI answers come back as markdown — headings, bold, and comparison tables.
    Rendering them raw showed literal ** and pipe characters, so we render
-   properly but keep the type small to fit inside an expanded row. */
+   properly but keep the type small to fit inside an expanded row.
+
+   Any arithmetic in the question gets answered in LaTeX, which the markdown
+   renderer does not know about: a Russian audit put
+   `\frac{\text{Прибыль}}{\text{Затраты}} \times 100%` on screen as written.
+   `plainMath` rewrites it as readable arithmetic rather than typesetting it.
+   Nobody on this screen is checking the algebra — they are reading what the
+   model said about a brand, and the formula has to stop being in the way. */
 function AnswerMarkdown({ text }: { text: string }) {
   return (
     <div className="text-xs leading-relaxed text-neutral-700">
@@ -2015,7 +2023,7 @@ function AnswerMarkdown({ text }: { text: string }) {
           hr: () => <hr className="my-2 border-neutral-100" />,
         }}
       >
-        {text}
+        {plainMath(text)}
       </ReactMarkdown>
     </div>
   );
