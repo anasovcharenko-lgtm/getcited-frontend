@@ -163,7 +163,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await apiFetch(`${API_URL}/audit`, { method: "POST", body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, /* Typed prompts replace generation; tracked ones are added to it. Sending tracked as custom_prompts is what used to switch generation off. */ custom_prompts: mode === "manual" ? customLines.slice(0, maxPrompts) : [], extra_prompts: tracked }) });
+      const res = await apiFetch(`${API_URL}/audit`, { method: "POST", body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, /* Typed prompts replace generation; tracked ones are added to it. Sending tracked as custom_prompts is what used to switch generation off. */ custom_prompts: mode === "manual" ? customLines.slice(0, maxPrompts) : [], extra_prompts: tracked, /* How many to generate when we are not sending our own. The server caps it; without it sent, generation used its own global default and an account allowed fifty got twenty. */ prompt_count: maxPrompts }) });
       const data = await res.json();
 
       /* A failed response is still JSON, and it used to be handed to the
