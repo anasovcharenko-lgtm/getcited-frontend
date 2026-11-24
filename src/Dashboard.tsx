@@ -3913,17 +3913,26 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     const status = data.model_status;
     if (!status) return [];
     const labels = Object.fromEntries(MODELS.map((m) => [m.key, m.label]));
-    /* Three different things look alike in model_status, and only one is a
+    /* Four different things look alike in model_status, and only one is a
        failure worth a warning:
          enabled: false  — switched off on the server, deliberate
          selected: false — not ticked for this audit, also deliberate
+         asked: 0        — never put a question, so it cannot have failed
          ok: false       — asked, and did not answer
-       The second was missing, so a model simply left out of the run was
+       The second was missing once, so a model left out of the run was
        announced as having not responded, with the numbers called incomplete
-       when they were exactly as complete as asked for. */
+       when they were exactly as complete as asked for.
+
+       `asked: 0` is the same mistake arriving by a different road. A Russian
+       audit does not run Copilot or AI Mode — no vendor sells us that market
+       for those two — and both appeared in this banner beside a model that
+       had genuinely crashed, which reads as three things broken when one
+       was. Whatever the reason a model was not asked, not being asked is not
+       failing: this condition is true for all of them and needs no theory
+       about which flag should have caught it. */
     return Object.entries(status)
       .filter(([, v]) => !v.ok && v.enabled !== false && v.selected !== false
-        && gapOf(v) > 0)
+        && v.asked !== 0 && gapOf(v) > 0)
       .map(([k, v]) => ({ key: k, label: labels[k] ?? k, reason: (v.error || "").trim() }));
   }, [data.model_status]);
 
