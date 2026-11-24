@@ -1,3 +1,4 @@
+import { MODELS } from "./models";
 import { supabase } from "./supabase";
 
 /* Saving a run lives here rather than in each landing page, because the two
@@ -35,7 +36,11 @@ export type AuditPayload = {
    before-and-after built on top of it. */
 export function activeModels(data: AuditPayload): string[] {
   const status = data.model_status;
-  const candidates = ["chatgpt", "gemini", "perplexity", "claude", "ai_overview", "copilot", "ai_mode", "yandex"];
+  // Read from the one list rather than typed again. The copy that used to be
+  // here had lost DeepSeek, so a DeepSeek answer was measured, scored, shown
+  // on screen — and then not written to the history table, which is the one
+  // place a run cannot be reconstructed from later.
+  const candidates: string[] = MODELS.map((m) => m.key);
   const present = candidates.filter((m) =>
     (data.results || []).some((r) => r[m] && typeof r[m] === "object"));
   if (!status) return present;

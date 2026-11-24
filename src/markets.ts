@@ -2,7 +2,17 @@ import { useEffect, useState } from "react";
 
 const API_URL = "https://web-production-b2168.up.railway.app";
 
-export type Market = { code: string; name: string; language: string };
+/* `unavailable` lists the models that cannot answer about this market, and is
+   absent for almost all of them. Russia and Belarus carry one because the
+   vendor behind Copilot and AI Mode does not sell those countries — a fact
+   the form should state before a run rather than leave someone to notice
+   afterwards that two columns are missing. */
+export type Market = {
+  code: string;
+  name: string;
+  language: string;
+  unavailable?: string[];
+};
 
 /* Language names, because the form offers names and the API speaks ISO codes.
 

@@ -47,22 +47,14 @@ export type ModelMentionInfo = {
   absent?: boolean;
 };
 
-/* The models an audit can carry, in display order. The backend has the same
-   list; both sides read it rather than naming models inline, because a model
-   named in one place and forgotten in another is a number that silently
-   excludes it. */
-export const MODELS = [
-  { key: "chatgpt", label: "ChatGPT" },
-  { key: "gemini", label: "Gemini" },
-  { key: "perplexity", label: "Perplexity" },
-  { key: "deepseek", label: "DeepSeek" },
-  { key: "ai_overview", label: "AI Overview" },
-  { key: "copilot", label: "Copilot" },
-  { key: "ai_mode", label: "Google AI Mode" },
-  { key: "yandex", label: "Яндекс Нейро" },
-] as const;
-
-export type ModelName = (typeof MODELS)[number]["key"];
+/* Moved to models.ts, re-exported here so the many call sites that import it
+   from this file keep working. It had to leave: saveAudit.ts needs the same
+   list and cannot import this module without a cycle, so it kept a hand-typed
+   copy — and that copy had already lost DeepSeek, which meant DeepSeek rows
+   were never written to the history table. */
+import { MODELS, type ModelName } from "./models";
+export { MODELS };
+export type { ModelName };
 
 export type AuditResult = {
   prompt: string;
@@ -92,6 +84,7 @@ export type AuditResult = {
   chatgpt: ModelMentionInfo;
   // Optional: every run saved before a model existed has no key for it.
   perplexity?: ModelMentionInfo;
+  claude?: ModelMentionInfo;
   deepseek?: ModelMentionInfo;
   ai_overview?: ModelMentionInfo;
   copilot?: ModelMentionInfo;

@@ -14,6 +14,7 @@ import { Projects } from "./Projects";
 import { apiFetch } from "./api";
 import { WaitlistForm } from "./Waitlist";
 import { useMarketChoice, LANGUAGES } from "./markets";
+import { useServerModels } from "./models";
 import { detectableMove, resolutionNote } from "./resolution";
 
 const BRAND = "GetCited";
@@ -109,9 +110,29 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   /* Which models this audit runs. Unticking one keeps it out of this audit and
      out of its cost; the backend narrows further if a model is switched off
      globally, because enabling one is a billing decision, not a per-audit one. */
+  const { models: serverModels } = useServerModels();
   const [models, setModels] = useState<string[]>(MODELS.map((m) => m.key));
   const toggleModel = (m: string) =>
     setModels((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
+  // Everything the server offers, ticked, once we know what that is. Written
+  // as a replacement rather than a merge: the built-in list is a placeholder
+  // for the seconds before the real one lands, and keeping its extras would
+  // tick a model the server does not have.
+  useEffect(() => {
+    if (serverModels.length) setModels(serverModels.map((m) => m.key));
+  }, [serverModels]);
+
+  // Models the chosen market cannot be measured by. Unticked and disabled
+  // rather than hidden: a greyed-out box with a reason teaches what the
+  // product cannot do here, where a missing box just looks like a shorter
+  // list. The server drops them anyway; this is so nobody finds out later.
+  const chosenMarket = markets.find((m) => m.code === country);
+  const countryName = chosenMarket?.name || country;
+  const offMarket = chosenMarket?.unavailable || [];
+  useEffect(() => {
+    if (offMarket.length) setModels((cur) => cur.filter((k) => !offMarket.includes(k)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [country, offMarket.join(",")]);
   const [comps, setComps] = useState([{ name: "", website: "" }]);
   const [step, setStep] = useState(1);
   // "generate" asks the model to build the prompt set; "manual" runs exactly
@@ -273,14 +294,23 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           <div>
             <span className="mb-1 block text-xs text-neutral-500">Which models to check</span>
             <div className="flex flex-wrap gap-2">
-              {MODELS.map((m) => (
-                <label key={m.key} className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
-                  <input type="checkbox" checked={models.includes(m.key)} onChange={() => toggleModel(m.key)} className="h-4 w-4 accent-neutral-900" />
-                  {m.label}
-                </label>
-              ))}
+              {(serverModels.length ? serverModels : MODELS).map((m) => {
+                const off = offMarket.includes(m.key);
+                return (
+                  <label
+                    key={m.key}
+                    title={off ? `Not measured in ${countryName}` : undefined}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${off ? "cursor-not-allowed border-neutral-100 text-neutral-300" : "cursor-pointer border-neutral-200"}`}>
+                    <input type="checkbox" disabled={off} checked={!off && models.includes(m.key)} onChange={() => toggleModel(m.key)} className="h-4 w-4 accent-neutral-900" />
+                    {m.label}
+                  </label>
+                );
+              })}
             </div>
-            <span className="mt-1 block text-xs text-neutral-400">Untick a model to leave it out of this audit and out of its cost. A model switched off on the server stays off either way.</span>
+            <span className="mt-1 block text-xs text-neutral-400">
+              Untick a model to leave it out of this audit and out of its cost. A model switched off on the server stays off either way.
+              {offMarket.length > 0 && ` Greyed out: not measured in ${countryName} — no vendor covers this market for ${offMarket.length === 1 ? "it" : "them"}.`}
+            </span>
           </div>
           <label className="block">
             <span className="mb-1 block text-xs text-neutral-500">How well known is your brand?</span>
