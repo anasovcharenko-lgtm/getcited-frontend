@@ -8,7 +8,7 @@ import { Dashboard, MODELS, type AuditData } from "./Dashboard";
 
 import { COMPANY, companyLine } from "./legal/company";
 
-import { isAdmin } from "./admins";
+import { isAdmin, promptLimitFor } from "./admins";
 import { saveAuditRun } from "./saveAudit";
 import { Projects } from "./Projects";
 import { apiFetch } from "./api";
@@ -20,8 +20,10 @@ import { detectableMove, resolutionNote } from "./resolution";
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
 
-// Every prompt costs money, so the hand-written list has a ceiling too.
-const MAX_PROMPTS = 20;
+// Every prompt costs money, so the hand-written list has a ceiling too. The
+// number lives in admins.ts, next to the accounts it is raised for, because
+// it was written out twice here and in RuPage and the two would have drifted
+// the moment one of them changed.
 
 /* Markets and languages both come from `markets.ts`, which gets the list from
    the server. Two hand-written copies lived here and in RuPage, a third lived
@@ -102,6 +104,21 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   const [brand, setBrand] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
+  /* How many prompt rows this account may add. The quota check below reads
+     the user inside the submit handler, which is too late for a ceiling the
+     form has to enforce while someone is typing — so the address is held in
+     state. Absent until the session resolves, which gives the ordinary
+     ceiling for a moment; the request is bounded again on submit, so a row
+     that should not exist cannot be sent even if one appeared. */
+  const [email, setEmail] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    supabase.auth.getUser()
+      .then(({ data }) => { if (alive) setEmail(data.user?.email ?? null); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const maxPrompts = promptLimitFor(email);
   const { markets, country, language, chooseCountry, chooseLanguage } = useMarketChoice("US");
   // Decides how the queries split between broad and long-tail. A mid-size brand
   // cannot win a broad comparison query however good its site is, so measuring
@@ -203,14 +220,14 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
     if (lines.length < 2) return false;
     const next = [...customRows];
     next.splice(index, 1, ...lines);
-    setCustomRows(next.slice(0, MAX_PROMPTS));
+    setCustomRows(next.slice(0, maxPrompts));
     return true;
   };
   // Everything this audit will measure, used only to validate the form. What
   // the request actually sends is split in two: typed prompts replace
   // generation, tracked prompts are added to it.
   const promptsToRun = Array.from(new Set([
-    ...(mode === "manual" ? customLines.slice(0, MAX_PROMPTS) : []),
+    ...(mode === "manual" ? customLines.slice(0, maxPrompts) : []),
     ...tracked,
   ]));
 
@@ -233,7 +250,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await apiFetch(`${API_URL}/audit`, { method: "POST", body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, /* Typed prompts replace generation; tracked ones are added to it. Sending tracked as custom_prompts is what used to switch generation off. */ custom_prompts: mode === "manual" ? customLines.slice(0, MAX_PROMPTS) : [], extra_prompts: tracked }) });
+      const res = await apiFetch(`${API_URL}/audit`, { method: "POST", body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, /* Typed prompts replace generation; tracked ones are added to it. Sending tracked as custom_prompts is what used to switch generation off. */ custom_prompts: mode === "manual" ? customLines.slice(0, maxPrompts) : [], extra_prompts: tracked }) });
       const data = await res.json();
 
       /* A failed response is still JSON, and it used to be handed to the
@@ -386,7 +403,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
                 </div>
               ))}
               <div className="flex items-center justify-between">
-                {customRows.length < MAX_PROMPTS ? (
+                {customRows.length < maxPrompts ? (
                   <button type="button" onClick={() => setCustomRows([...customRows, ""])} className="text-xs text-neutral-500 hover:text-neutral-900">+ Add prompt</button>
                 ) : <span />}
                 <span className="text-xs text-neutral-400">{customLines.length} prompt(s)</span>

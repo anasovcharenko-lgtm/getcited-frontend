@@ -6,7 +6,7 @@ import { Dashboard, MODELS, type AuditData } from "./Dashboard";
 
 import { COMPANY, companyLine } from "./legal/company";
 
-import { isAdmin } from "./admins";
+import { isAdmin, promptLimitFor } from "./admins";
 import { saveAuditRun } from "./saveAudit";
 import { Projects } from "./Projects";
 import { apiFetch } from "./api";
@@ -17,8 +17,8 @@ import { detectableMove, resolutionNote } from "./resolution";
 const BRAND = "GetCited";
 const API_URL = "https://web-production-b2168.up.railway.app";
 
-// Every prompt costs money, so the hand-written list has a ceiling too.
-const MAX_PROMPTS = 20;
+// Every prompt costs money, so the hand-written list has a ceiling too. The
+// number lives in admins.ts, beside the accounts it is raised for.
 
 /* Markets and languages come from `markets.ts`, which reads the server's list.
    See the note in App.tsx: this file held the second of three hand-written
@@ -44,6 +44,19 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
   const [brand, setBrand] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
+  /* Сколько строк промптов может добавить этот аккаунт. Число живёт в
+     admins.ts рядом со списком аккаунтов, для которых оно поднято — потому
+     что раньше оно было написано дважды, здесь и в App.tsx, и именно так эта
+     страница однажды осталась без освобождения от лимита. */
+  const [email, setEmail] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    supabase.auth.getUser()
+      .then(({ data }) => { if (alive) setEmail(data.user?.email ?? null); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const maxPrompts = promptLimitFor(email);
   const { markets, country, language, chooseCountry, chooseLanguage } = useMarketChoice("RU");
   // Определяет, как запросы делятся между широкими и узкими. Средний бренд не
   // выигрывает широкий сравнительный запрос, каким бы хорошим ни был его сайт.
@@ -123,14 +136,14 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
     if (lines.length < 2) return false;
     const next = [...customRows];
     next.splice(index, 1, ...lines);
-    setCustomRows(next.slice(0, MAX_PROMPTS));
+    setCustomRows(next.slice(0, maxPrompts));
     return true;
   };
   // Everything this audit will measure, used only to validate the form. What
   // the request actually sends is split in two: typed prompts replace
   // generation, tracked prompts are added to it.
   const promptsToRun = Array.from(new Set([
-    ...(mode === "manual" ? customLines.slice(0, MAX_PROMPTS) : []),
+    ...(mode === "manual" ? customLines.slice(0, maxPrompts) : []),
     ...tracked,
   ]));
 
@@ -150,7 +163,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
           return;
         }
       }
-      const res = await apiFetch(`${API_URL}/audit`, { method: "POST", body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, /* Typed prompts replace generation; tracked ones are added to it. Sending tracked as custom_prompts is what used to switch generation off. */ custom_prompts: mode === "manual" ? customLines.slice(0, MAX_PROMPTS) : [], extra_prompts: tracked }) });
+      const res = await apiFetch(`${API_URL}/audit`, { method: "POST", body: JSON.stringify({ brand: brand.trim(), competitor_list: comps.filter(c => c.name.trim()).map(c => ({ name: c.name.trim(), website: c.website.trim() })), description: description.trim(), website: website.trim(), country, language, brand_size: brandSize, models, /* Typed prompts replace generation; tracked ones are added to it. Sending tracked as custom_prompts is what used to switch generation off. */ custom_prompts: mode === "manual" ? customLines.slice(0, maxPrompts) : [], extra_prompts: tracked }) });
       const data = await res.json();
 
       /* A failed response is still JSON, and it used to be handed to the
@@ -293,7 +306,7 @@ function Modal({ onClose, onAuditComplete }: { onClose: () => void; onAuditCompl
                 </div>
               ))}
               <div className="flex items-center justify-between">
-                {customRows.length < MAX_PROMPTS ? (
+                {customRows.length < maxPrompts ? (
                   <button type="button" onClick={() => setCustomRows([...customRows, ""])} className="text-xs text-neutral-500 hover:text-neutral-900">+ Добавить промпт</button>
                 ) : <span />}
                 <span className="text-xs text-neutral-400">{customLines.length} промпт(ов)</span>
