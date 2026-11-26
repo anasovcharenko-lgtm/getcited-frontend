@@ -4966,7 +4966,20 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
                       <div className={`h-full rounded-full ${stat.is_your_brand ? "bg-neutral-900" : "bg-neutral-300"}`} style={{ width: `${(stat.mention_rate / max) * 100}%` }} />
                     </div>
                   )}
-                  <span className="w-14 shrink-0 text-right text-xs font-semibold">{t.ofTotal(covered, total)}</span>
+                  {/* Wide enough for the numbers this now produces, and tabular so every
+    row is the same width whatever digits it holds.
+
+    w-14 was 56px against "58 of 175" at 52.7 — inside, but by two
+    pixels, and the spread between rows is 2.5: "13 of 175" measures
+    50.2 and "58 of 175" 52.7. So in a font a shade wider than this
+    one measured in, some rows wrapped and others did not, and the
+    column came out ragged for no reason a reader could see.
+
+    Fifty prompts across nine engines put three digits on the left of
+    that "of" as a matter of course, and "137 of 175" overflows 56px
+    in any font. nowrap so it can never break again whatever the copy
+    or the language does — Russian "из" is wider than "of". */}
+                  <span className="w-20 shrink-0 whitespace-nowrap text-right text-xs font-semibold tabular-nums">{t.ofTotal(covered, total)}</span>
                 </div>
               );
             })}
