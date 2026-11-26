@@ -3828,7 +3828,12 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
     const head = ["prompt", "prompt_type", "asked_as", "model", "status",
                   "you_named", "named_with_link", "competitors_named",
                   "other_brands_named", "sources", "unnamed_sources",
-                  "country", "language"];
+                  "country", "language",
+                  // Last on purpose. Everything before it is scannable in a
+                  // spreadsheet; this one is a page of prose per cell, and
+                  // putting it earlier would push the columns people actually
+                  // sort by off the right-hand side.
+                  "answer"];
 
     const labels = Object.fromEntries(MODELS.map((m) => [m.key, m.label]));
     const rows: string[] = [];
@@ -3861,6 +3866,25 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           String(every.length - named.length),
           data.country || "",
           data.language || "",
+          /* The answer itself, which the file has never carried.
+
+             Until now the export said a model named you and which pages it
+             read, and left out the sentence that did it. That sentence is
+             what anyone asking "why am I not in this one" actually needs,
+             and the only way to read it was expanding cards on screen one at
+             a time.
+
+             Formulas are rewritten the same way the screen rewrites them: a
+             model asked anything with arithmetic answers in LaTeX, and a
+             spreadsheet is no more a renderer than a table row is. No words
+             change, so the file and the screen say the same thing — which
+             matters more here than anywhere, because this is the artefact
+             that leaves the building.
+
+             Line endings normalised because the file separates its own rows
+             with \n, and a CRLF inside a quoted cell is the kind of thing
+             one parser in five gets wrong. */
+          plainMath((i.answer || "").replace(/\r\n?/g, "\n")),
         ].map(esc).join(","));
       }
     }
