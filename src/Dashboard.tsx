@@ -4846,14 +4846,14 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
             <div className="mt-2 text-5xl font-bold tracking-tight">{metrics.scorePct}%</div>
             {/* What the percentage is a percentage of. Without it the headline
                 number cannot be checked against the lists further down. */}
-            <p className="mt-1 text-xs text-neutral-400">{t.mentionRateSub(metrics.named, metrics.answers)}</p>
-            <p className="text-xs text-neutral-400">{t.vsCompetitorsAvg(metrics.competitorAvg)}</p>
+            <p className="mt-1 text-balance text-xs text-neutral-400">{t.mentionRateSub(metrics.named, metrics.answers)}</p>
+            <p className="text-balance text-xs text-neutral-400">{t.vsCompetitorsAvg(metrics.competitorAvg)}</p>
           </div>
 
           <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.citationsCard}</p>
             <div className="mt-2 text-5xl font-bold tracking-tight">{metrics.citationCount}</div>
-            <p className="mt-1 text-xs text-neutral-400">{t.citationsCardSub(metrics.withLinkPct)}</p>
+            <p className="mt-1 text-balance text-xs text-neutral-400">{t.citationsCardSub(metrics.withLinkPct)}</p>
             {metrics.topRivalsByCitations.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {metrics.topRivalsByCitations.map((c) => (
@@ -4872,7 +4872,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
           <div className="rounded-2xl border border-neutral-150 bg-neutral-50/50 p-6">
             <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">{t.mentionsNoLinkCard}</p>
             <div className="mt-2 text-5xl font-bold tracking-tight">{metrics.bareMentionCount}</div>
-            <p className="mt-1 text-xs text-neutral-400">{t.mentionsNoLinkSub(metrics.noLinkPct)}</p>
+            <p className="mt-1 text-balance text-xs text-neutral-400">{t.mentionsNoLinkSub(metrics.noLinkPct)}</p>
             {metrics.topRivalsByBareMentions.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {metrics.topRivalsByBareMentions.map((c) => (
