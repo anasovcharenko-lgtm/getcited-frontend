@@ -17,7 +17,7 @@ import { useMarketChoice, LANGUAGES } from "./markets";
 import { useServerModels } from "./models";
 import { detectableMove, resolutionNote } from "./resolution";
 
-const BRAND = "GetCited";
+const BRAND = "Nominor";
 const API_URL = "https://web-production-b2168.up.railway.app";
 
 // Every prompt costs money, so the hand-written list has a ceiling too. The
@@ -473,7 +473,7 @@ export default function App() {
       <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">N</span></div>
             <span className="font-semibold">{BRAND}</span>
           </div>
           <nav className="hidden items-center gap-8 text-sm text-neutral-500 md:flex">
@@ -828,7 +828,7 @@ export default function App() {
               <thead>
                 <tr className="border-b border-neutral-300 text-left">
                   <th className="pb-3 pr-4 font-medium"> </th>
-                  <th className="pb-3 pr-4 font-semibold">GetCited</th>
+                  <th className="pb-3 pr-4 font-semibold">Nominor</th>
                   <th className="pb-3 pr-4 font-medium text-neutral-500">Peec AI</th>
                   <th className="pb-3 pr-4 font-medium text-neutral-500">Profound</th>
                   <th className="pb-3 font-medium text-neutral-500">Otterly</th>
@@ -997,7 +997,7 @@ export default function App() {
         <div className="mx-auto max-w-5xl px-6 py-10">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">N</span></div>
               <span className="font-semibold">{BRAND}</span>
             </div>
             <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-neutral-400">

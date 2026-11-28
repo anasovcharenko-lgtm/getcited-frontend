@@ -9,16 +9,16 @@ export const LEGAL_DOCS: LegalDoc[] = [
     lang: "en",
     title: "Privacy Policy",
     nav: "Privacy",
-    body: `**Last updated: 30 September 2026**
+    body: `**Last updated: 28 November 2026**
 
-This policy explains what personal data GetCited collects, why, and what you can
+This policy explains what personal data Nominor collects, why, and what you can
 do about it. It is written to meet the UK GDPR and the Data Protection Act 2018.
 
 ---
 
 ## 1. Who we are
 
-GetCited is a service operated by **Absolute One Ltd**, a company registered in
+Nominor is a service operated by **Absolute One Ltd**, a company registered in
 England and Wales under company number **17362397**, registered office
 **College House, 17 King Edwards Road, Ruislip, England, HA4 7AE**.
 
@@ -97,7 +97,7 @@ membership. Please do not type any of it into an audit field.
 | Email you about a problem with the service | Legitimate interests — you need to know |
 | Keep the service secure, investigate abuse | Legitimate interests — running a safe service |
 | Understand which features are used, in aggregate | Legitimate interests — improving the product |
-| Marketing email about GetCited | Consent, which you can withdraw at any time |
+| Marketing email about Nominor | Consent, which you can withdraw at any time |
 | Analytics cookies | Consent |
 
 Where we rely on legitimate interests we have weighed them against your rights
@@ -231,7 +231,7 @@ See our separate [Cookie Notice](/cookies).
 
 ## 11. Children
 
-GetCited is a business tool and is not for anyone under 18. We do not knowingly
+Nominor is a business tool and is not for anyone under 18. We do not knowingly
 collect data from children. If you believe a child has given us data, email
 **hi@absoluteone.ltd** and we will delete it.
 
@@ -255,9 +255,9 @@ material, we will email account holders at least 14 days before it takes effect.
     lang: "en",
     title: "Terms of Service",
     nav: "Terms",
-    body: `**Last updated: 30 September 2026**
+    body: `**Last updated: 28 November 2026**
 
-These terms are the agreement between you and us when you use GetCited. By
+These terms are the agreement between you and us when you use Nominor. By
 creating an account you accept them. If you do not, please do not use the
 service.
 
@@ -268,15 +268,15 @@ service.
 **Absolute One Ltd**, registered in England and Wales, company number
 **17362397**, registered office **College House, 17 King Edwards Road, Ruislip, England, HA4 7AE**. In these terms
 "we", "us" and "our" mean that company. "You" means the person or organisation
-using GetCited.
+using Nominor.
 
 Contact: **hi@absoluteone.ltd**
 
 ---
 
-## 2. What GetCited does
+## 2. What Nominor does
 
-GetCited runs search-style prompts through AI assistants and reports how often a
+Nominor runs search-style prompts through AI assistants and reports how often a
 brand is named, how often it is linked, which competitors appear instead, and
 which web pages the AI models cited.
 
@@ -300,7 +300,7 @@ That means:
   that happens an audit may be incomplete, and we will say so rather than hide it.
 - Third-party data in the results — cited pages, competitor information — comes
   from sources we do not control and may be wrong or out of date.
-- Nothing in a GetCited report should be relied on as the sole basis for a
+- Nothing in a Nominor report should be relied on as the sole basis for a
   commercial decision.
 
 We are not affiliated with, endorsed by, or partnered with OpenAI, Google,
@@ -329,7 +329,7 @@ you first and give you a chance to fix it.
 - Enter special category personal data — health, ethnicity, religion, political
   opinions, sexual orientation, biometrics — into any field
 - Attempt to extract our prompts, scrape the service, or reverse-engineer it
-- Resell, sublicense or white-label GetCited output as your own product without a
+- Resell, sublicense or white-label Nominor output as your own product without a
   written agreement with us
 - Use automated means to create accounts or exceed your plan's limits
 - Circumvent rate limits or usage caps
@@ -343,7 +343,7 @@ service from it is not.
 
 ## 6. Plans, limits and payment
 
-Current plans, prices and usage limits are shown at **https://getcited.space/#pricing** and
+Current plans, prices and usage limits are shown at **https://trynominor.com/#pricing** and
 form part of these terms.
 
 - Prices are in **US dollars** and include VAT where applicable
@@ -366,7 +366,7 @@ guarantees.
 **If you are a consumer** (buying for purposes outside a business), the Consumer
 Contracts Regulations 2013 give you 14 days to cancel.
 
-Because GetCited is a digital service delivered immediately, when you subscribe
+Because Nominor is a digital service delivered immediately, when you subscribe
 you ask us to start straight away and you acknowledge that you lose the 14-day
 right to cancel once we have begun supplying it. If you have not run an audit, we
 will refund you in full within those 14 days.
@@ -399,7 +399,7 @@ without asking you first.
 
 ## 9. Availability
 
-We aim to keep GetCited running, but we do not promise a particular uptime. The
+We aim to keep Nominor running, but we do not promise a particular uptime. The
 service depends on third-party AI providers, and when they go down, we go down
 with them.
 
@@ -418,13 +418,13 @@ Subject to that:
 
 - We are not liable for lost profits, lost revenue, lost business, loss of
   goodwill, or indirect or consequential loss
-- We are not liable for decisions you take on the basis of a GetCited report
+- We are not liable for decisions you take on the basis of a Nominor report
 - We are not liable for the behaviour of third-party AI providers, or for
   anything on the third-party websites our reports cite
 - Our total liability to you in any 12-month period is limited to the greater of
   the amount you paid us in those 12 months, or £100
 
-If you use GetCited in the course of a business, you agree this allocation of
+If you use Nominor in the course of a business, you agree this allocation of
 risk is reasonable given the price of the service.
 
 ---
@@ -490,9 +490,9 @@ are fixable.`,
     lang: "en",
     title: "Cookie Notice",
     nav: "Cookies",
-    body: `**Last updated: 30 September 2026**
+    body: `**Last updated: 28 November 2026**
 
-This notice explains the cookies and similar technologies GetCited uses. It sits
+This notice explains the cookies and similar technologies Nominor uses. It sits
 alongside our [Privacy Policy](/privacy) and is written to meet the Privacy and
 Electronic Communications Regulations (PECR) and the UK GDPR.
 
@@ -524,7 +524,7 @@ These make the site work. Turn them off and you cannot stay signed in.
 |---|---|---|---|
 | \`sb-<project>-auth-token\` | Supabase | Keeps you signed in between page loads | 1 hour, refreshed while you are active |
 | \`sb-<project>-auth-token-code-verifier\` | Supabase | Security check during Google sign-in (PKCE) | End of sign-in |
-| \`getcited-lang\` | GetCited | Remembers whether you chose English or Russian | 1 year |
+| \`nm.nav\` | Nominor | Local storage, not a cookie: remembers whether the dashboard sidebar is open | Until you clear your browser storage |
 
 PECR allows these without consent because you cannot use the service without
 them.
@@ -592,12 +592,12 @@ Questions: **hi@absoluteone.ltd**`,
     lang: "ru",
     title: "Политика в отношении обработки персональных данных",
     nav: "Персональные данные",
-    body: `**Редакция от 30 сентября 2026 г.**
+    body: `**Редакция от 28 ноября 2026 г.**
 
 Настоящая Политика составлена во исполнение требований части 2 статьи 18.1
 Федерального закона от 27.07.2006 № 152-ФЗ «О персональных данных» и определяет
 порядок обработки персональных данных и меры по обеспечению их безопасности в
-сервисе GetCited.
+сервисе Nominor.
 
 Публикация этого документа в свободном доступе — прямая обязанность оператора, а
 не пожелание.
@@ -614,7 +614,7 @@ Questions: **hi@absoluteone.ltd**`,
 | Регистрационные данные | регистрационный номер 17362397, Англия и Уэльс |
 | Адрес | College House, 17 King Edwards Road, Ruislip, England, HA4 7AE |
 | Электронная почта | hi@absoluteone.ltd |
-| Сайт | getcited.space |
+| Сайт | trynominor.com |
 
 Ответственный за организацию обработки персональных данных: **[ФИО ИЛИ
 ДОЛЖНОСТЬ]**, контакт — **hi@absoluteone.ltd**.
@@ -863,7 +863,7 @@ API передаваемые данные не применяются для о�
 ## 14. Изменение Политики
 
 Оператор вправе изменять настоящую Политику. Действующая редакция размещается по
-адресу getcited.space/ru/privacy. Об изменениях, существенно затрагивающих права
+адресу trynominor.com/ru/privacy. Об изменениях, существенно затрагивающих права
 субъектов, пользователи уведомляются по электронной почте не менее чем за 14 дней
 до вступления изменений в силу.`,
   },
@@ -872,7 +872,7 @@ API передаваемые данные не применяются для о�
     lang: "ru",
     title: "Согласие на обработку персональных данных",
     nav: "Согласие",
-    body: `**Редакция от 30 сентября 2026 г.**
+    body: `**Редакция от 28 ноября 2026 г.**
 
 Настоящее согласие даётся в соответствии со статьями 6 и 9 Федерального закона от
 27.07.2006 № 152-ФЗ «О персональных данных».
@@ -888,13 +888,13 @@ API передаваемые данные не применяются для о�
 ## 1. Оператор
 
 **Absolute One Ltd**, регистрационный номер 17362397, Англия и Уэльс, адрес: College House, 17 King Edwards Road, Ruislip, England, HA4 7AE,
-электронная почта: **hi@absoluteone.ltd**, сайт: getcited.space.
+электронная почта: **hi@absoluteone.ltd**, сайт: trynominor.com.
 
 ---
 
 ## 2. Субъект
 
-Физическое лицо, совершившее регистрацию в сервисе GetCited либо осуществившее
+Физическое лицо, совершившее регистрацию в сервисе Nominor либо осуществившее
 вход в сервис.
 
 ---
@@ -1000,10 +1000,10 @@ API передаваемые данные не применяются для о�
     lang: "ru",
     title: "Пользовательское соглашение",
     nav: "Соглашение",
-    body: `**Редакция от 30 сентября 2026 г.**
+    body: `**Редакция от 28 ноября 2026 г.**
 
-Настоящее соглашение регулирует использование сервиса GetCited, размещённого по
-адресу getcited.space. Регистрация в сервисе означает принятие условий настоящего
+Настоящее соглашение регулирует использование сервиса Nominor, размещённого по
+адресу trynominor.com. Регистрация в сервисе означает принятие условий настоящего
 соглашения в полном объёме.
 
 Если вы не согласны с условиями — не используйте сервис.
@@ -1178,7 +1178,7 @@ OpenAI, Google, Anthropic и иных поставщиков моделей, к 
 ## 11. Изменение условий
 
 Администрация вправе изменять настоящее соглашение. Действующая редакция
-размещается по адресу getcited.space/ru/terms.
+размещается по адресу trynominor.com/ru/terms.
 
 Об изменениях, затрагивающих цену, объём ответственности или права пользователя,
 администрация уведомляет по электронной почте не менее чем за 30 дней.
@@ -1203,10 +1203,10 @@ OpenAI, Google, Anthropic и иных поставщиков моделей, к 
     lang: "ru",
     title: "Политика использования файлов cookie",
     nav: "Cookie",
-    body: `**Редакция от 30 сентября 2026 г.**
+    body: `**Редакция от 28 ноября 2026 г.**
 
 Настоящий документ описывает, какие файлы cookie и аналогичные технологии
-использует сервис GetCited. Он дополняет [Политику в отношении обработки
+использует сервис Nominor. Он дополняет [Политику в отношении обработки
 персональных данных](/ru/privacy).
 
 ---
@@ -1241,7 +1241,7 @@ OpenAI, Google, Anthropic и иных поставщиков моделей, к 
 |---|---|---|---|
 | \`sb-<project>-auth-token\` | Supabase | Сохранение сессии авторизации | 1 час, обновляется при активности |
 | \`sb-<project>-auth-token-code-verifier\` | Supabase | Проверка безопасности при входе через Google (PKCE) | До завершения входа |
-| \`getcited-lang\` | GetCited | Запоминает выбранный язык интерфейса | 1 год |
+| \`nm.nav\` | Nominor | Локальное хранилище, не cookie: запоминает, раскрыта ли боковая панель дашборда | До очистки хранилища браузера |
 
 Эти cookie обрабатываются на основании подпункта 5 пункта 1 статьи 6 № 152-ФЗ —
 обработка необходима для исполнения договора, стороной которого является субъект.
