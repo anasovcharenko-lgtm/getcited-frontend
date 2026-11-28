@@ -22,16 +22,16 @@ d = ImageDraw.Draw(img)
 
 PAD = 84
 
-# Logo mark: black rounded square with a G, same as the site header.
+# Logo mark: black rounded square with an N, same as the site header.
 M = 76
 d.rounded_rectangle([PAD, PAD, PAD + M, PAD + M], radius=18, fill=BLACK)
 gf = font(F, 46)
-gb = d.textbbox((0, 0), "G", font=gf)
+gb = d.textbbox((0, 0), "N", font=gf)
 d.text((PAD + (M - (gb[2] - gb[0])) / 2 - gb[0],
-        PAD + (M - (gb[3] - gb[1])) / 2 - gb[1]), "G", font=gf, fill=WHITE)
+        PAD + (M - (gb[3] - gb[1])) / 2 - gb[1]), "N", font=gf, fill=WHITE)
 
 wf = font(F, 40)
-d.text((PAD + M + 24, PAD + (M - 40) / 2 - 4), "GetCited", font=wf, fill=BLACK)
+d.text((PAD + M + 24, PAD + (M - 40) / 2 - 4), "Nominor", font=wf, fill=BLACK)
 
 # Headline
 hf = font(F, 82)
@@ -47,7 +47,7 @@ sf = font(FR, 30)
 d.text((PAD, 524), "See how often AI recommends your brand", font=sf, fill=GREY)
 
 uf = font(FR, 30)
-url = "getcited.space"
+url = "trynominor.com"
 ub = d.textbbox((0, 0), url, font=uf)
 d.text((W - PAD - (ub[2] - ub[0]), 524), url, font=uf, fill=BLACK)
 

@@ -1,8 +1,8 @@
 # Cookie Notice
 
-**Last updated: 30 September 2026**
+**Last updated: 28 November 2026**
 
-This notice explains the cookies and similar technologies GetCited uses. It sits
+This notice explains the cookies and similar technologies Nominor uses. It sits
 alongside our [Privacy Policy](/privacy) and is written to meet the Privacy and
 Electronic Communications Regulations (PECR) and the UK GDPR.
 
@@ -34,7 +34,7 @@ These make the site work. Turn them off and you cannot stay signed in.
 |---|---|---|---|
 | `sb-<project>-auth-token` | Supabase | Keeps you signed in between page loads | 1 hour, refreshed while you are active |
 | `sb-<project>-auth-token-code-verifier` | Supabase | Security check during Google sign-in (PKCE) | End of sign-in |
-| `getcited-lang` | GetCited | Remembers whether you chose English or Russian | 1 year |
+| `nm.nav` | Nominor | Local storage, not a cookie: remembers whether the dashboard sidebar is open | Until you clear your browser storage |
 
 PECR allows these without consent because you cannot use the service without
 them.

@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import { findDoc, navFor } from "./legal/content";
 import { COMPANY, companyLine } from "./legal/company";
 
-const BRAND = "GetCited";
+const BRAND = "Nominor";
 
 // Monochrome renderer for the legal markdown. react-markdown and remark-gfm are
 // already dependencies (the dashboard renders model answers with them), so the
@@ -84,7 +84,7 @@ export default function Legal({ lang }: { lang: "en" | "ru" }) {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to={home} className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white">
-              <span className="text-sm font-bold">G</span>
+              <span className="text-sm font-bold">N</span>
             </div>
             <span className="font-semibold">{BRAND}</span>
           </Link>

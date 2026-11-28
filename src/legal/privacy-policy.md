@@ -1,15 +1,15 @@
 # Privacy Policy
 
-**Last updated: 30 September 2026**
+**Last updated: 28 November 2026**
 
-This policy explains what personal data GetCited collects, why, and what you can
+This policy explains what personal data Nominor collects, why, and what you can
 do about it. It is written to meet the UK GDPR and the Data Protection Act 2018.
 
 ---
 
 ## 1. Who we are
 
-GetCited is a service operated by **Absolute One Ltd**, a company registered in
+Nominor is a service operated by **Absolute One Ltd**, a company registered in
 England and Wales under company number **17362397**, registered office
 **College House, 17 King Edwards Road, Ruislip, England, HA4 7AE**.
 
@@ -88,7 +88,7 @@ membership. Please do not type any of it into an audit field.
 | Email you about a problem with the service | Legitimate interests — you need to know |
 | Keep the service secure, investigate abuse | Legitimate interests — running a safe service |
 | Understand which features are used, in aggregate | Legitimate interests — improving the product |
-| Marketing email about GetCited | Consent, which you can withdraw at any time |
+| Marketing email about Nominor | Consent, which you can withdraw at any time |
 | Analytics cookies | Consent |
 
 Where we rely on legitimate interests we have weighed them against your rights
@@ -222,7 +222,7 @@ See our separate [Cookie Notice](/cookies).
 
 ## 11. Children
 
-GetCited is a business tool and is not for anyone under 18. We do not knowingly
+Nominor is a business tool and is not for anyone under 18. We do not knowingly
 collect data from children. If you believe a child has given us data, email
 **hi@absoluteone.ltd** and we will delete it.
 

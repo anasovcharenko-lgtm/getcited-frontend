@@ -1,8 +1,8 @@
 # Terms of Service
 
-**Last updated: 30 September 2026**
+**Last updated: 28 November 2026**
 
-These terms are the agreement between you and us when you use GetCited. By
+These terms are the agreement between you and us when you use Nominor. By
 creating an account you accept them. If you do not, please do not use the
 service.
 
@@ -13,15 +13,15 @@ service.
 **Absolute One Ltd**, registered in England and Wales, company number
 **17362397**, registered office **College House, 17 King Edwards Road, Ruislip, England, HA4 7AE**. In these terms
 "we", "us" and "our" mean that company. "You" means the person or organisation
-using GetCited.
+using Nominor.
 
 Contact: **hi@absoluteone.ltd**
 
 ---
 
-## 2. What GetCited does
+## 2. What Nominor does
 
-GetCited runs search-style prompts through AI assistants and reports how often a
+Nominor runs search-style prompts through AI assistants and reports how often a
 brand is named, how often it is linked, which competitors appear instead, and
 which web pages the AI models cited.
 
@@ -45,7 +45,7 @@ That means:
   that happens an audit may be incomplete, and we will say so rather than hide it.
 - Third-party data in the results — cited pages, competitor information — comes
   from sources we do not control and may be wrong or out of date.
-- Nothing in a GetCited report should be relied on as the sole basis for a
+- Nothing in a Nominor report should be relied on as the sole basis for a
   commercial decision.
 
 We are not affiliated with, endorsed by, or partnered with OpenAI, Google,
@@ -74,7 +74,7 @@ you first and give you a chance to fix it.
 - Enter special category personal data — health, ethnicity, religion, political
   opinions, sexual orientation, biometrics — into any field
 - Attempt to extract our prompts, scrape the service, or reverse-engineer it
-- Resell, sublicense or white-label GetCited output as your own product without a
+- Resell, sublicense or white-label Nominor output as your own product without a
   written agreement with us
 - Use automated means to create accounts or exceed your plan's limits
 - Circumvent rate limits or usage caps
@@ -88,7 +88,7 @@ service from it is not.
 
 ## 6. Plans, limits and payment
 
-Current plans, prices and usage limits are shown at **https://getcited.space/#pricing** and
+Current plans, prices and usage limits are shown at **https://trynominor.com/#pricing** and
 form part of these terms.
 
 - Prices are in **US dollars** and include VAT where applicable
@@ -111,7 +111,7 @@ guarantees.
 **If you are a consumer** (buying for purposes outside a business), the Consumer
 Contracts Regulations 2013 give you 14 days to cancel.
 
-Because GetCited is a digital service delivered immediately, when you subscribe
+Because Nominor is a digital service delivered immediately, when you subscribe
 you ask us to start straight away and you acknowledge that you lose the 14-day
 right to cancel once we have begun supplying it. If you have not run an audit, we
 will refund you in full within those 14 days.
@@ -144,7 +144,7 @@ without asking you first.
 
 ## 9. Availability
 
-We aim to keep GetCited running, but we do not promise a particular uptime. The
+We aim to keep Nominor running, but we do not promise a particular uptime. The
 service depends on third-party AI providers, and when they go down, we go down
 with them.
 
@@ -163,13 +163,13 @@ Subject to that:
 
 - We are not liable for lost profits, lost revenue, lost business, loss of
   goodwill, or indirect or consequential loss
-- We are not liable for decisions you take on the basis of a GetCited report
+- We are not liable for decisions you take on the basis of a Nominor report
 - We are not liable for the behaviour of third-party AI providers, or for
   anything on the third-party websites our reports cite
 - Our total liability to you in any 12-month period is limited to the greater of
   the amount you paid us in those 12 months, or £100
 
-If you use GetCited in the course of a business, you agree this allocation of
+If you use Nominor in the course of a business, you agree this allocation of
 risk is reasonable given the price of the service.
 
 ---

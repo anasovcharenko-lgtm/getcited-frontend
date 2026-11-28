@@ -3390,7 +3390,7 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
   );
 }
 
-export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "en", brandName = "GetCited", auditId = null }: { data: AuditData; onBack: () => void; onProjects?: () => void; lang?: Lang; brandName?: string; auditId?: string | number | null }) {
+export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "en", brandName = "Nominor", auditId = null }: { data: AuditData; onBack: () => void; onProjects?: () => void; lang?: Lang; brandName?: string; auditId?: string | number | null }) {
   /* The page URL sets the starting language, but the reader can change it.
      The audit itself can be in a different language from the interface - a
      Russian-market audit is often read by an English-speaking colleague. */
@@ -3402,11 +3402,11 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
      Wrapped: storage throws in a private window and on a blocked-cookies
      browser, and a nav preference is not worth a blank page. */
   const [navOpen, setNavOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem("gc.nav") !== "closed"; } catch { return true; }
+    try { return localStorage.getItem("nm.nav") !== "closed"; } catch { return true; }
   });
   const toggleNav = () => {
     setNavOpen((was) => {
-      try { localStorage.setItem("gc.nav", was ? "closed" : "open"); } catch { /* fine */ }
+      try { localStorage.setItem("nm.nav", was ? "closed" : "open"); } catch { /* fine */ }
       return !was;
     });
   };
@@ -4689,7 +4689,7 @@ export function Dashboard({ data: raw, onBack, onProjects, lang: initialLang = "
       <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <button onClick={onBack} className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">G</span></div>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white"><span className="text-sm font-bold">N</span></div>
             <span className="text-lg font-semibold">{brandName}</span>
           </button>
           <div className="flex items-center gap-3">
